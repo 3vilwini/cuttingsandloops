@@ -109,8 +109,8 @@
      same "labels" toggle — stroked so it stays readable over any field
      background or drawing color underneath it */
   .plantmark .txt{
-    position:absolute; top:100%; left:50%; transform:translateX(-50%);
-    margin-top:.3rem; white-space:nowrap; pointer-events:none;
+    position:absolute; top:50%; left:100%; transform:translateY(-50%);
+    margin-left:.4rem; white-space:nowrap; pointer-events:none;
     -webkit-text-stroke:3px var(--ink); paint-order:stroke fill;
   }
   /* fallback for a plant saved with an empty canvas — nothing was drawn,
@@ -987,10 +987,11 @@ pCanvas.addEventListener("pointermove", e => {
   currentStroke.push(p);
   pctx.lineTo(p.x, p.y); pctx.stroke();
 });
-window.addEventListener("pointerup", () => { drawing = false; });
+window.addEventListener("pointerup", () => { drawing = false; validatePlant(); });
 pClearCanvas.addEventListener("click", () => {
   pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
   plantDraftPaths = [];
+  validatePlant();
 });
 
 pFile.addEventListener("change", () => {
@@ -1002,7 +1003,9 @@ pFile.addEventListener("change", () => {
 pFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pFile.click(); } });
 pName.addEventListener("input", validatePlant);
 function validatePlant(){
-  pSaveBtn.disabled = !plantDraftFile || !pName.value.trim();
+  // a drawing is required now — no plant without one, so there's never a
+  // plain colored box on the map, only ever the drawing itself
+  pSaveBtn.disabled = !plantDraftFile || !pName.value.trim() || !plantDraftPaths.length;
 }
 
 function openPlantModal(pos){
