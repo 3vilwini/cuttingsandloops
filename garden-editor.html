@@ -925,6 +925,13 @@ document.addEventListener("keydown", e => {
   if(move){ e.preventDefault(); panBy(move[0], move[1]); }
 });
 
+// Escape closes whatever's open — works even while typing in one of these
+// panels' own fields, unlike the arrow-key panning guard above.
+document.addEventListener("keydown", e => {
+  if(e.key !== "Escape") return;
+  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
+});
+
 // start centered on the field, like the main garden view does — deferred a
 // frame so the viewport has actually been laid out before we measure it
 requestAnimationFrame(() => {
@@ -1428,15 +1435,39 @@ function hotSpotPositions(){
 // square appears/disappears exactly at its own visible edge, not some
 // smaller invisible area inside it.
 const HOTSPOT_HALF = 70;
+/* a plant's *actual* rendered box (drawing + its name label, which sits to
+   the right and can extend well past the 140px drawing itself for a longer
+   name) — measured live rather than assumed, so the protected area always
+   matches what's really on screen no matter how long the name is. Using a
+   fixed 140x140 box here undercounted that overflow and let a "plant here"
+   square appear right on top of a longer label — this is what fixes it. */
+function occupiedBoxes(){
+  const fieldRect = fieldEl.getBoundingClientRect();
+  return Array.from(document.querySelectorAll("#plantSlots .plantmark")).map(m => {
+    // .plantmark's own rect stops at 140x140 even though its name label is
+    // an absolutely-positioned child sitting outside that box (to the
+    // right) — an overflowing absolutely-positioned child never enlarges
+    // its ancestor's own bounding rect, so the label has to be measured
+    // separately and unioned in, or a long name's overflow goes unprotected
+    const markRect = m.getBoundingClientRect();
+    const txtEl = m.querySelector(".txt");
+    const txtRect = txtEl ? txtEl.getBoundingClientRect() : markRect;
+    const left = Math.min(markRect.left, txtRect.left), right = Math.max(markRect.right, txtRect.right);
+    const top = Math.min(markRect.top, txtRect.top), bottom = Math.max(markRect.bottom, txtRect.bottom);
+    return {
+      left: left - fieldRect.left, right: right - fieldRect.left,
+      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
+    };
+  });
+}
 function nearestHotSpot(x, y){
-  const occupied = Object.values(garden.plants || {});
+  const boxes = occupiedBoxes();
   let best = null, bestDist = Infinity;
   for(const s of hotSpotPositions()){
-    // a hot spot within an existing plant's own 140x140 footprint is never
-    // offered — being near a plant means dragging it, not planting a new
-    // one on top of it, wherever it's actually sitting now (not just its
-    // original grid spot, since it may have been dragged since)
-    if(occupied.some(p => Math.abs(p.x - s.x) <= HOTSPOT_HALF && Math.abs(p.y - s.y) <= HOTSPOT_HALF)) continue;
+    // a hot spot inside an existing plant's real rendered box (drawing +
+    // label) is never offered — being near a plant means dragging it, not
+    // planting a new one on top of it
+    if(boxes.some(b => s.x >= b.left && s.x <= b.right && s.y >= b.top && s.y <= b.bottom)) continue;
     if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
     const d = Math.hypot(x - s.x, y - s.y);
     if(d < bestDist){ bestDist = d; best = s; }
