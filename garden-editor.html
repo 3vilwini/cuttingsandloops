@@ -84,14 +84,14 @@
   #field{ position:relative; }
   #patternLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
-  /* seed slots — purely decorative placeholder markers for where seeds will
-     eventually live, laid out on a pattern-specific grid (fixed per pattern,
-     not random) so the field doesn't look totally bare. There's no seed
-     upload/claiming UI anymore — these never change once the pattern is set. */
-  #seedSlots{ position:absolute; inset:0; pointer-events:none; }
+  /* seed slots — fixed positions on a pattern-specific grid (never move once
+     the pattern is set). An empty one is a "+ add sound" invitation; a
+     filled one shows its title/artist and previews on hover, like a plant. */
+  #seedSlots{ position:absolute; inset:0; }
   /* the dot is the real anchor — sized+centered on its own, so toggling the
      label's visibility never shifts a seed's actual planted position. */
-  .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); }
+  .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; }
+  .seedslot.empty{ cursor:pointer; }
   .seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
   .seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
 
@@ -158,6 +158,16 @@
     border:2px solid #000; border-radius:0;
     box-shadow: 6px 6px 0 rgba(0,0,0,.55);
   }
+  /* docks under the swirl button's own panel, next to the seed-list nav
+     icon right below it — same left offset, shifted down to that row */
+  #seedListCard{ top:calc(2.5rem + 2.3rem + .6rem); max-width:220px; }
+  #seedListItems{ display:flex; flex-direction:column; gap:.5rem; max-height:220px; overflow-y:auto; }
+  .seedlistitem{
+    display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+    border:1px solid #000; padding:.4rem .5rem;
+  }
+  .seedlistitem span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .seedlistitem a{ color:var(--ink); flex-shrink:0; }
   .titlebar{
     height:18px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
     background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
@@ -169,7 +179,7 @@
   .sub{ color:var(--muted); margin:0 0 1.6rem; line-height:1.4; }
   label{ display:block; color:var(--muted); margin-bottom:.3rem; }
   .row{ margin-bottom:.8rem; }
-  input[type="text"]{
+  input[type="text"], select{
     width:100%; padding:.4rem .5rem; border-radius:0; border:1px solid #000;
     background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit;
   }
@@ -265,6 +275,9 @@
   <div class="navgroup">
     <button type="button" class="navbtn" id="navToggleBtn" title="open/close">𖦹</button>
   </div>
+  <div class="navgroup">
+    <button type="button" class="navbtn" id="seedListToggleBtn" title="seed list">⇩</button>
+  </div>
 </div>
 
 <div class="tagdisplay" id="tagDisplay"></div>
@@ -331,6 +344,43 @@
   </div>
 </div>
 
+<!-- seed list — every seed sound added so far, downloadable. Docks below
+     the builder card, same left offset. -->
+<div class="card" id="seedListCard">
+  <div class="titlebar"><span class="closebox"></span></div>
+  <div class="cardbody">
+    <label>seed list</label>
+    <div id="seedListItems"></div>
+  </div>
+</div>
+
+<!-- add a seed sound to an empty slot -->
+<div class="scrim" id="seedScrim">
+  <div class="modal">
+    <div class="titlebar"><span class="closebox"></span></div>
+    <div class="cardbody">
+      <p class="sub">add a sound to this seed.</p>
+
+      <label>track title</label>
+      <input type="text" id="sTitle" placeholder="track title">
+
+      <label style="margin-top:1rem;">artist</label>
+      <input type="text" id="sArtist" placeholder="artist">
+
+      <label style="margin-top:1rem;">the sound</label>
+      <label class="filelabel" id="sFileLabel" tabindex="0">
+        <span id="sFileLabelText">choose audio file…</span>
+        <input type="file" id="sFile" accept="audio/*" hidden>
+      </label>
+
+      <div class="actions">
+        <button type="button" class="ghost" id="sCancelBtn">cancel</button>
+        <button type="button" class="primary" id="sSaveBtn" disabled>add seed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ STEP 2 — plant a hybrid sound ============ -->
 <div class="scrim" id="plantScrim">
   <div class="modal">
@@ -355,6 +405,11 @@
         <span id="pRecipeLabelText">choose image…</span>
         <input type="file" id="pRecipeFile" accept="image/*" hidden>
       </label>
+
+      <label style="margin-top:1rem;">sampled from (optional)</label>
+      <select id="pSampledFrom">
+        <option value="">none</option>
+      </select>
 
       <label style="margin-top:1rem;">planted by</label>
       <input type="text" id="pName" placeholder="your name">
@@ -406,7 +461,8 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, recipeImage, paths ([[{x,y},...],...]), color, x, y, pinned }
+  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom, paths ([[{x,y},...],...]), color, x, y, pinned }
+  seeds: {},    // slot index (string "0".."9") -> { title, artist, audioRef }
 };
 
 // declared here (not down by connectChannels(), where they conceptually
@@ -416,6 +472,7 @@ const garden = {
 let plantSlotsChannel = null;
 let metaChannel = null;
 let tagPressChannel = null;
+let seedsChannel = null;
 
 /* garden.meta itself now lives in playhtml's synced Page Data (see
    connectChannels below) — that's the real persistence, shared across every
@@ -494,8 +551,6 @@ function arraySlotOffsets(scale){
     return { dx:r*Math.cos(t), dy:r*Math.sin(t) };
   });
 }
-const SEED_LABELS = ["~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops"];
-
 /* the current pattern's seed positions, in field coordinates — these double
    as the only plantable hot spots (see seedHotSpots below), so this is the
    single source of truth both renderSeedSlots and the field's hover/click
@@ -507,20 +562,35 @@ function seedFieldOffsets(){
     : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
 }
 
+/* an empty slot invites a click (opens the add-seed modal); a filled one
+   shows "title - artist" and previews on hover, same as a plant does. */
 function renderSeedSlots(){
   const layer = document.getElementById("seedSlots");
   layer.innerHTML = "";
   seedFieldOffsets().forEach((o, i) => {
+    const seed = garden.seeds[i];
     const el = document.createElement("div");
-    el.className = "seedslot";
+    el.className = "seedslot" + (seed ? "" : " empty");
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
     const dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
     label.className = "txt";
-    label.textContent = SEED_LABELS[i % SEED_LABELS.length];
+    label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add sound";
     el.appendChild(dot); el.appendChild(label);
+
+    if(seed){
+      let audioEl = null;
+      el.addEventListener("mouseenter", () => {
+        const ref = seed.audioRef || localSeedAudioRefs[i];
+        if(!ref) return;
+        audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
+      });
+      el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
+    } else {
+      el.addEventListener("click", () => openSeedModal(i));
+    }
     layer.appendChild(el);
   });
 }
@@ -834,7 +904,7 @@ document.getElementById("panRight").addEventListener("click", () => panBy(STEP,0
 
 document.addEventListener("keydown", e => {
   const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
-  if(typing || plantScrim.classList.contains("open")) return;
+  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open")) return;
   const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
   if(move){ e.preventDefault(); panBy(move[0], move[1]); }
 });
@@ -861,7 +931,7 @@ const navToggleBtn = document.getElementById("navToggleBtn");
 /* ---- modal exclusivity: opening either one always closes the other ----
    the swirl button itself shows pressed (inverted) while the panel is open —
    it's the only way to open or close it now, so that state has to be obvious. */
-function showBuilder(){ hidePlantModal(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
+function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
 function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAttribute("data-open", "false"); }
 
 // closed by default for every visitor — opened only via the nav swirl icon
@@ -978,6 +1048,20 @@ function connectChannels(){
   // tag-press easter egg — see checkTagPresses below
   tagPressChannel = playhtml.createPageData("tag-presses", {});
   tagPressChannel.onUpdate(checkTagPresses);
+
+  seedsChannel = playhtml.createPageData("garden-seeds", garden.seeds);
+  garden.seeds = seedsChannel.getData();
+  onSeedsChanged();
+  seedsChannel.onUpdate(data => { garden.seeds = data; onSeedsChanged(); });
+}
+
+/* re-renders everywhere seed title/artist text shows up: the field markers
+   themselves, the seed-list panel, and the plant modal's "sampled from"
+   options — kept in one place so nothing can drift out of sync. */
+function onSeedsChanged(){
+  renderSeedSlots();
+  renderSeedList();
+  renderSampledFromOptions();
 }
 
 /* pushes garden.meta as a whole to everyone else in the room */
@@ -1032,6 +1116,7 @@ const pFileLabelText = document.getElementById("pFileLabelText");
 const pRecipeFile = document.getElementById("pRecipeFile");
 const pRecipeLabel = document.getElementById("pRecipeLabel");
 const pRecipeLabelText = document.getElementById("pRecipeLabelText");
+const pSampledFrom = document.getElementById("pSampledFrom");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
 const pName = document.getElementById("pName");
@@ -1040,6 +1125,7 @@ const pCancelBtn = document.getElementById("pCancelBtn");
 const hoverSquare = document.getElementById("hoverSquare");
 
 const localPlantAudioRefs = {};
+const localSeedAudioRefs = {};
 let plantDraftFile = null;
 let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
@@ -1118,6 +1204,24 @@ function redrawPaths(paths){
   }
 }
 
+/* "sampled from" options are just every filled seed's "title - artist"
+   text, doubling as the option's own value — reused as-is in both the
+   plant modal and the seed-list panel (see renderSeedList). */
+function renderSampledFromOptions(){
+  const selected = pSampledFrom.value;
+  pSampledFrom.innerHTML = "";
+  const none = document.createElement("option");
+  none.value = ""; none.textContent = "none";
+  pSampledFrom.appendChild(none);
+  for(const seed of Object.values(garden.seeds || {})){
+    const label = `${seed.title} - ${seed.artist}`;
+    const opt = document.createElement("option");
+    opt.value = label; opt.textContent = label;
+    pSampledFrom.appendChild(opt);
+  }
+  pSampledFrom.value = selected; // keep the current pick if it's still in the list
+}
+
 function openPlantModal(pos){
   editingPlantId = null;
   pSub.textContent = "plant something new in this garden.";
@@ -1127,8 +1231,9 @@ function openPlantModal(pos){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
+  pSampledFrom.value = "";
   validatePlant();
-  hideBuilder();
+  hideBuilder(); hideSeedModal(); hideSeedList();
   plantScrim.classList.add("open");
 }
 
@@ -1146,8 +1251,9 @@ function openPlantEditModal(p){
   pName.value = p.name;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
   redrawPaths(plantDraftPaths);
+  pSampledFrom.value = p.sampledFrom || "";
   validatePlant();
-  hideBuilder();
+  hideBuilder(); hideSeedModal(); hideSeedList();
   plantScrim.classList.add("open");
 }
 function hidePlantModal(){ plantScrim?.classList.remove("open"); editingPlantId = null; }
@@ -1178,6 +1284,7 @@ pSaveBtn.addEventListener("click", async () => {
 
   const plant = {
     id: plantId, name: pName.value.trim(), audioRef, recipeImage,
+    sampledFrom: pSampledFrom.value || null,
     paths: plantDraftPaths, color: existing?.color || garden.meta.colors.seed,
     x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: existing?.pinned || false,
   };
@@ -1187,6 +1294,99 @@ pSaveBtn.addEventListener("click", async () => {
   hidePlantModal();
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant";
 });
+
+/* ==========================================================================
+   SEEDS — clicking an empty seed slot lets you name/upload a sound for it.
+   A filled slot just shows "title - artist" and previews on hover; there's
+   no re-editing a seed once it's set, unlike plants.
+   ========================================================================== */
+const seedScrim = document.getElementById("seedScrim");
+const sTitle = document.getElementById("sTitle");
+const sArtist = document.getElementById("sArtist");
+const sFile = document.getElementById("sFile");
+const sFileLabel = document.getElementById("sFileLabel");
+const sFileLabelText = document.getElementById("sFileLabelText");
+const sSaveBtn = document.getElementById("sSaveBtn");
+const sCancelBtn = document.getElementById("sCancelBtn");
+
+let seedDraftFile = null;
+let pendingSeedSlot = null;
+
+function validateSeed(){
+  sSaveBtn.disabled = !seedDraftFile || !sTitle.value.trim() || !sArtist.value.trim();
+}
+sTitle.addEventListener("input", validateSeed);
+sArtist.addEventListener("input", validateSeed);
+sFile.addEventListener("change", () => {
+  seedDraftFile = sFile.files[0] || null;
+  sFileLabelText.textContent = seedDraftFile ? seedDraftFile.name : "choose audio file…";
+  sFileLabel.classList.toggle("has-file", !!seedDraftFile);
+  validateSeed();
+});
+sFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); sFile.click(); } });
+
+function openSeedModal(slotIndex){
+  pendingSeedSlot = slotIndex;
+  seedDraftFile = null;
+  sTitle.value = ""; sArtist.value = "";
+  sFile.value = ""; sFileLabelText.textContent = "choose audio file…"; sFileLabel.classList.remove("has-file");
+  validateSeed();
+  hideBuilder(); hidePlantModal(); hideSeedList();
+  seedScrim.classList.add("open");
+}
+function hideSeedModal(){ seedScrim?.classList.remove("open"); }
+sCancelBtn.addEventListener("click", hideSeedModal);
+
+sSaveBtn.addEventListener("click", async () => {
+  sSaveBtn.disabled = true; sSaveBtn.textContent = "adding…";
+  const slot = pendingSeedSlot;
+  const audioRef = await uploadSeedFile(seedDraftFile, `seed-${slot}`).catch(err => {
+    console.warn("seed upload failed, falling back to a local-only blob URL:", err);
+    return URL.createObjectURL(seedDraftFile);
+  });
+  localSeedAudioRefs[slot] = audioRef;
+  const seed = { title: sTitle.value.trim(), artist: sArtist.value.trim(), audioRef };
+  garden.seeds[slot] = seed;
+  seedsChannel?.setData(draft => { draft[slot] = seed; });
+  onSeedsChanged();
+  hideSeedModal();
+  sSaveBtn.disabled = false; sSaveBtn.textContent = "add seed";
+});
+
+/* the seed-list panel — every seed added so far, each with a download link */
+const seedListCardEl = document.getElementById("seedListCard");
+const seedListToggleBtn = document.getElementById("seedListToggleBtn");
+function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
+function hideSeedList(){ seedListCardEl.style.display = "none"; seedListToggleBtn.setAttribute("data-open", "false"); }
+hideSeedList();
+seedListToggleBtn.addEventListener("click", () => {
+  const hidden = seedListCardEl.style.display === "none";
+  if(hidden) showSeedList(); else hideSeedList();
+});
+
+function renderSeedList(){
+  const list = document.getElementById("seedListItems");
+  list.innerHTML = "";
+  const seeds = Object.values(garden.seeds || {});
+  if(!seeds.length){
+    const empty = document.createElement("p");
+    empty.className = "sub";
+    empty.style.margin = "0";
+    empty.textContent = "no seeds yet — click an empty seed on the field to add one.";
+    list.appendChild(empty);
+    return;
+  }
+  for(const seed of seeds){
+    const row = document.createElement("div");
+    row.className = "seedlistitem";
+    const label = document.createElement("span");
+    label.textContent = `${seed.title} - ${seed.artist}`;
+    const dl = document.createElement("a");
+    dl.href = seed.audioRef; dl.download = `${seed.title} - ${seed.artist}`; dl.textContent = "⇩";
+    row.appendChild(label); row.appendChild(dl);
+    list.appendChild(row);
+  }
+}
 
 /* planting is only allowed on a hot spot — a fixed grid spread evenly across
    the field, unrelated to the decorative seed markers (those are clickable
@@ -1250,6 +1450,8 @@ fieldEl.addEventListener("click", e => {
 // unsynced first paint using local defaults.
 renderSeedSlots();
 renderPlantSlots();
+renderSeedList();
+renderSampledFromOptions();
 </script>
 
 </body>
