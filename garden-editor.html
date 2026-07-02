@@ -108,12 +108,12 @@
     cursor:pointer; font-family:inherit; font-size:inherit; color:var(--ink); padding:0;
   }
   .toggle .switch{
-    position:relative; width:34px; height:18px; border-radius:999px;
+    position:relative; width:26px; height:14px; border-radius:999px;
     border:1px solid #000; background:#000; flex-shrink:0;
   }
-  .toggle .knob{ position:absolute; top:1px; left:1px; width:14px; height:14px; border-radius:50%; background:var(--paper); }
+  .toggle .knob{ position:absolute; top:1px; left:1px; width:10px; height:10px; border-radius:50%; background:var(--paper); }
   .toggle[data-on="true"] .switch{ background:var(--paper); }
-  .toggle[data-on="true"] .knob{ left:17px; background:#000; }
+  .toggle[data-on="true"] .knob{ left:13px; background:#000; }
 
   /* ---- vintage mac window chrome ---- */
   .card{
@@ -525,8 +525,15 @@ const SEED_COLS = [-400,-200,0,200,400];
 /* base offsets from field center, one fixed layout per pattern (10 seeds each) —
    actual on-screen position is these offsets times the current scale, so slot
    placement spreads/tightens together with the pattern itself. */
+const LATTICE_ROWS = [
+  { dy:-180, xs:[-300, 0, 300] },
+  { dy:0,    xs:[-375, -125, 125, 375] },
+  { dy:180,  xs:[-300, 0, 300] },
+];
 const SEED_SLOTS_BASE = {
-  lattice: SEED_COLS.flatMap(dx => [{dx,dy:-160},{dx,dy:160}]),
+  // 3 / 4 / 3 rows — deliberately not the same grid as furrow, so the two
+  // patterns' seed layouts actually look different from each other
+  lattice: LATTICE_ROWS.flatMap(row => row.xs.map(dx => ({ dx, dy:row.dy }))),
   furrow:  SEED_COLS.flatMap(dx => [{dx,dy:-90}, {dx,dy:90}]),
 };
 function arraySlotOffsets(scale){
