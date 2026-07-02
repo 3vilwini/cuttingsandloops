@@ -49,6 +49,14 @@
     padding:.5rem .9rem; font-family:inherit; font-size:inherit;
   }
 
+  /* ---- live visitor count (bottom-right) ---- */
+  .visitorcount{
+    position:fixed; bottom:2.5rem; right:2.5rem; z-index:3;
+    display:flex; align-items:center; gap:.5rem;
+    border:1px solid #000; background:var(--paper); color:var(--ink); padding:.5rem .8rem;
+  }
+  .visitorcount .dot{ width:8px; height:8px; border-radius:50%; background:#3ab704; flex-shrink:0; }
+
   /* ---- arrow-key pad (top-right, perfect squares, gap kept between them) ---- */
   .arrowpad{
     position:fixed; top:2.5rem; right:2.5rem; z-index:3;
@@ -293,6 +301,10 @@
   <button type="button" class="toggle" data-key="plants"><span>plants</span><span class="switch"><span class="knob"></span></span></button>
   <button type="button" class="toggle" data-key="roots"><span>roots</span><span class="switch"><span class="knob"></span></span></button>
   <button type="button" class="toggle" data-key="labels"><span>labels</span><span class="switch"><span class="knob"></span></span></button>
+</div>
+
+<div class="visitorcount" aria-hidden="true">
+  <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
 <!-- ============ STEP 1 — creation form ============ -->
@@ -868,12 +880,36 @@ document.getElementById("navSeedsBtn").addEventListener("click", () => {
    real file storage here, so a slot's *metadata* (claimed/track/artist)
    syncs to every visitor, but the *audio itself* is only actually playable/
    downloadable by whoever uploaded it, until this points at a real upload
-   endpoint. I can't verify live cross-browser sync or cursor rendering from
-   here (this preview is a single browser) — worth testing yourself in two
-   tabs/two browsers once you're ready, per how you wanted to handle playhtml
-   testing earlier in this conversation.
+   endpoint. I can't verify live cross-browser sync from here (this preview
+   is a single browser) — worth testing yourself in two tabs/two browsers
+   once you're ready, per how you wanted to handle playhtml testing earlier
+   in this conversation.
+
+   CURSORS FIX: the option is `cursors: { enabled: true }`, not `cursors: {}`
+   — an empty object leaves cursors disabled (confirmed by reading playhtml's
+   own source: `if(!e.enabled){ return; }` gates the whole cursor client).
+   Passing `{}` previously meant cursors were silently never turned on.
    ========================================================================== */
-playhtml.init({ cursors: {} });
+playhtml.init({ cursors: { enabled: true } });
+
+/* live visitor count — window.cursors.allColors is playhtml's own list of
+   currently-connected players in this room (confirmed against the real
+   dist build, not just the docs); .length is exactly "here right now", not
+   historic. It isn't available the instant init() returns (the cursor room
+   connects async), so poll briefly until it exists, then just listen. */
+const visitorCountText = document.getElementById("visitorCountText");
+function renderVisitorCount(){
+  const n = window.cursors ? window.cursors.allColors.length : 1;
+  visitorCountText.textContent = `${n} here now`;
+}
+(function waitForCursors(){
+  if(window.cursors){
+    renderVisitorCount();
+    window.cursors.on("allColors", renderVisitorCount);
+  } else {
+    setTimeout(waitForCursors, 200);
+  }
+})();
 
 let seedSlotsChannel = null;
 let plantSlotsChannel = null;
