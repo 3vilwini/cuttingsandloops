@@ -9,54 +9,56 @@
 
 <body>
 
-<!-- LAYER 1 — the garden fills the whole screen and scrolls underneath -->
-<div class="viewport" id="viewport" tabindex="0"
-     aria-label="Sound field. Arrow keys to wander, Tab to move between planted sounds.">
+
+<!-- LAYER 1 — feel the grass -->
+<div class="viewport" id="viewport" tabindex="0">
   <div class="field" id="field">
-    <svg class="roots" id="roots" aria-hidden="true"></svg>
-    <div class="listener" id="listener" aria-hidden="true"></div>
+    <svg class="roots" id="roots"></svg>
+    <div class="listener" id="listener"></div>
     <!-- plots injected by garden.js -->
   </div>
 </div>
 
-<!-- LAYER 2 — the HUD: fixed, floats above, doesn't scroll with the garden -->
-<div class="hud">
 
+
+
+
+
+<!-- LAYER 2 — introductions, say hello -->
+<div class="hud">
   <div class="hud-corner tl">
-    <h1 id="title" contenteditable="true" spellcheck="false" aria-label="Garden title, editable">jardin I </h1>
-    <p class="intro">a  garden to cut sound plants. <br> wander around and encounter seeds and plants left by others. <br>click bare ground to start sowing.</p>
+    <h1 id="title">cuttings & loops</h1>
+    <p class="intro">cut a sound ~ plant a loop ~ propogate and grow</p>
   </div>
 
   <div class="hud-corner tr controls">
-    <button class="ctl" id="weatherBtn" aria-pressed="false" title="Sounds slowly dry out and fade. Water to revive them.">𓂃 ོ☼𓂃 weather</button>
-    <button class="ctl" id="sowBtn" title="Plant a sound where you're standing">𓇢𓆸 sow</button>
-    <button class="ctl" id="viewBtn" title="Cycle layers: plants then seeds then no roots then all">᭄᭡ plants</button>
-    <button class="ctl" id="stopBtn" title="Unpin everything and let the field fall quiet">༄ quiet</button>
-    <button class="ctl" id="exportBtn" title="Download this whole field as one garden.json file">જ⁀➴ export</button>
-    <label class="ctl filelabel" id="openLabel" tabindex="0" title="Open a saved field file">୨ৎ open
-      <input type="file" id="importInput" accept="application/json,.json">
-    </label>
-    <button class="ctl" id="clearBtn" title="Empty the field and forget the saved one">𓍼 clear</button>
+    <button class="ctl" id="sowBtn" title="introduce a new source sound">𓇢𓆸 sow</button>
+    <button class="ctl" id="viewBtn" title="plant a composition">᭄᭡ plant</button>
+    <button class="ctl" id="weatherBtn" title="the plants are drying and fading, feed them to revive sound">𓂃 ོ☼𓂃 water</button>
+    <button class="ctl" id="stopBtn" title="the plants are tired, let them sleep">༄ shhhhhh</button>
   </div>
 
-  <p class="hud-corner bl status" id="status" aria-live="polite">a field, bigger than the screen. wander in.</p>
+  <p class="hud-corner bl status" id="status">wander around, feel the grass</p>
 
   <footer class="hud-corner br">
-    <kbd>&larr; &uarr; &rarr; &darr;</kbd> wander &middot; <kbd>tab</kbd> between sounds &middot; drag a sound to move it (height = pitch) &middot;
-    double-click or <kbd>e</kbd> edit &middot; <kbd>enter</kbd> plant / pin &middot; <kbd>w</kbd> water &middot;
-    <kbd>shift</kbd>+click or <kbd>d</kbd> download &middot; <kbd>alt</kbd>+click or <kbd>del</kbd> remove (it fades &mdash; <kbd>w</kbd> to keep) &middot;
-    <kbd>v</kbd> view a plant&rsquo;s mix (outside the plants layer) &middot; <kbd>p</kbd> sow &middot; <kbd>esc</kbd> close &middot; saves itself as you go
+    <kbd>&larr; &uarr; &rarr; &darr;</kbd> to wander &middot; <kbd>tab</kbd> to explore sounds &middot; <kbd>drag</kbd> to move a sound (height = pitch) &middot;
+    <kbd>double-click</kbd> to edit &middot; <kbd>click</kbd> to plant or pin a sound &middot; <kbd>esc</kbd> to unpin &middot;
   </footer>
 
 </div>
 
+
+
 <!-- hover/focus preview of a plant's mix screenshot -->
-<div class="shot-peek" id="shotPeek" aria-hidden="true"><img alt="mix screenshot preview"></div>
+<div class="shot-peek" id="shotPeek"></div>
 
 <!-- full-size lightbox -->
-<div class="shot-box" id="shotBox" role="dialog" aria-modal="true" aria-hidden="true"><img alt="mix screenshot"></div>
+<div class="shot-box" id="shotBox" role="dialog"></div><img alt="mix screenshot"></div>
 
-<!-- LAYER 3 — the planting / editing dialog, above everything -->
+
+
+
+<!-- LAYER 3 — cut a loop, plant a sound -->
 <div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
   <div class="dialog">
     <h2 id="dlgTitle">plant a sound</h2>

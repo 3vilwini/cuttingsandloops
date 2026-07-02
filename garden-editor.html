@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>a new season — build a garden</title>
+<style>
+  @font-face{
+    font-family: "Deer Diary";
+    src: url("fonts/deer-diary.ttf") format("truetype");
+    font-display: swap;
+  }
+  :root{
+    --ink:#000; --paper:#fff; --muted:#555;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; }
+  body{
+    margin:0; color:var(--ink);
+    font-family: "Deer Diary", "Courier New", monospace;
+    font-size:.78rem;                          /* single size for all text on the page */
+    display:flex; align-items:center; justify-content:center; padding:2.5rem;
+    position:relative; overflow:hidden;
+  }
+
+  /* ---- nav stack (top-left, always on top) ---- */
+  .navstack{ position:fixed; top:2.5rem; left:2.5rem; z-index:3; display:flex; flex-direction:column; gap:.6rem; }
+  /* each group is a set of perfect-square buttons stuck together, one shared
+     border with an internal divider line rather than each button's own border */
+  .navgroup{ display:flex; flex-direction:column; border:1px solid #000; width:2.3rem; }
+  .navbtn{
+    width:2.3rem; height:2.3rem; border:none; border-top:1px solid #000;
+    background:var(--paper); color:var(--ink); padding:0;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-family:inherit; font-size:inherit; text-align:center;
+  }
+  .navbtn:first-child{ border-top:none; }
+  .navbtn:active{ background:#000; color:var(--paper); }
+  .navbtn:disabled{ opacity:.35; cursor:not-allowed; }
+  .navbtn:disabled:active{ background:var(--paper); color:var(--ink); }
+
+  /* ---- chosen weather tags (top-center, mirrors the picker in the card, read-only) ---- */
+  .tagdisplay{
+    position:fixed; top:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
+    display:flex; gap:.5rem;
+  }
+  .tagdisplay span{
+    display:inline-block; border:1px solid #000; border-radius:999px; background:var(--paper); color:var(--ink);
+    padding:.5rem .9rem; font-family:inherit; font-size:inherit;
+  }
+
+  /* ---- arrow-key pad (top-right, perfect squares, gap kept between them) ---- */
+  .arrowpad{
+    position:fixed; top:2.5rem; right:2.5rem; z-index:3;
+    display:grid; grid-template-columns:repeat(3, 2.3rem); grid-template-rows:repeat(2, 2.3rem);
+    gap:.3rem;
+  }
+  .arrowpad button{
+    grid-column:2; width:2.3rem; height:2.3rem; border:1px solid #000; background:var(--paper); color:var(--ink);
+    display:flex; align-items:center; justify-content:center; padding:0;
+    cursor:pointer; font-family:inherit; font-size:inherit;
+  }
+  .arrowpad button:active{ background:#000; color:var(--paper); }
+  .arrowpad #panUp{ grid-row:1; }
+  .arrowpad #panLeft{ grid-row:2; grid-column:1; }
+  .arrowpad #panDown{ grid-row:2; grid-column:2; }
+  .arrowpad #panRight{ grid-row:2; grid-column:3; }
+
+  /* ---- the pannable field: bigger than the viewport, arrow keys / pad scroll it ---- */
+  #viewport{ position:fixed; inset:0; z-index:0; overflow:auto; }
+  #field{ position:relative; }
+  #patternLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  /* seed slots — stand-ins for where real planted seeds will sit, laid out on
+     a pattern-specific grid (fixed per pattern, not random) so the empty field
+     doesn't look totally bare while you design. */
+  #seedSlots{ position:absolute; inset:0; pointer-events:none; }
+  /* the dot is the real anchor — sized+centered on its own, so toggling the
+     label's visibility never shifts a seed's actual planted position. */
+  .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); }
+  .seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
+  .seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
+
+  /* plants + roots — empty for now (no plant/sampling data exists in this
+     builder yet), wired up so the view toggles below have something real to
+     control once that data shows up. */
+  #plantSlots{ position:absolute; inset:0; pointer-events:none; }
+  #rootsLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  /* ---- bottom toggle bar: label, then pill switch, black/white (inverted vs before) ---- */
+  .viewtoggles{
+    position:fixed; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
+    display:flex; gap:2.2rem; align-items:center;
+  }
+  .toggle{
+    display:flex; align-items:center; gap:.5rem; border:none; background:none;
+    cursor:pointer; font-family:inherit; font-size:inherit; color:var(--ink); padding:0;
+  }
+  .toggle .switch{
+    position:relative; width:34px; height:18px; border-radius:999px;
+    border:1px solid #000; background:#000; flex-shrink:0;
+  }
+  .toggle .knob{ position:absolute; top:1px; left:1px; width:14px; height:14px; border-radius:50%; background:var(--paper); }
+  .toggle[data-on="true"] .switch{ background:var(--paper); }
+  .toggle[data-on="true"] .knob{ left:17px; background:#000; }
+
+  /* ---- vintage mac window chrome ---- */
+  .card{
+    position:relative; z-index:1;
+    width:100%; max-width:520px; background:var(--paper); color:var(--ink);
+    border:2px solid #000; border-radius:0;
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+  }
+  .titlebar{
+    height:20px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
+    background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
+  }
+  .titlebar .closebox{ width:11px; height:11px; border:1px solid #000; background:var(--paper); flex-shrink:0; }
+  .cardbody{ padding:1.5rem 1.6rem; }
+
+  .sub{ color:var(--muted); margin:0 0 1.6rem; line-height:1.4; }
+  label{ display:block; color:var(--muted); margin-bottom:.4rem; }
+  .row{ margin-bottom:1.5rem; }
+  input[type="text"]{
+    width:100%; padding:.5rem .6rem; border-radius:0; border:1px solid #000;
+    background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit;
+  }
+
+  /* tags */
+  .tagbank{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem; }
+  .tag{
+    padding:.3rem .8rem; border-radius:999px; border:1px solid #000;
+    background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit; cursor:pointer;
+  }
+  .tag[data-selected="true"]{ background:#000; color:var(--paper); }
+  .tag:disabled{ opacity:.35; cursor:not-allowed; }
+  .tagcustom{ display:flex; gap:.5rem; }
+  .tagcustom input{ flex:1; }
+  .tagcustom button{
+    padding:0 .9rem; border-radius:999px; border:1px solid #000; background:var(--paper); color:var(--ink);
+    font-family:inherit; cursor:pointer;
+  }
+
+  /* colors */
+  .colorgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
+  .colorpick span{ color:var(--muted); }
+  .colorpick{ display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; }
+  .colorpick input[type="color"]{
+    width:100%; height:38px; border:1px solid #000; border-radius:0; background:none; padding:2px; cursor:pointer;
+  }
+
+  /* pattern picker */
+  .patternbank{ display:flex; gap:.5rem; margin-bottom:1rem; }
+  .patternbtn{
+    flex:1; padding:.6rem .4rem; border:1px solid #000; background:var(--paper); color:var(--ink);
+    font-family:inherit; font-size:inherit; cursor:pointer; text-align:center; border-radius:0;
+  }
+  .patternbtn[data-selected="true"]{ background:#000; color:var(--paper); }
+
+  /* scale slider */
+  .scalerow{ display:flex; align-items:center; gap:.6rem; }
+  .scalerow input[type="range"]{ flex:1; accent-color:#000; }
+  .scalerow span{ color:var(--muted); width:2.6rem; text-align:right; }
+
+  .actions{ display:flex; justify-content:flex-end; gap:.6rem; margin-top:1.8rem; }
+  button.primary{
+    padding:.6rem 1.3rem; border-radius:999px; border:1px solid #000; background:#000; color:var(--paper);
+    font-family:inherit; font-size:inherit; cursor:pointer; font-weight:600;
+  }
+  button.primary:active{ background:var(--paper); color:#000; }
+  button.primary:disabled{ opacity:.35; cursor:not-allowed; }
+
+  /* modal (seed uploader) */
+  .scrim{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+    align-items:center; justify-content:center; padding:1.5rem; z-index:2;
+  }
+  .scrim.open{ display:flex; }
+  .modal{
+    width:100%; max-width:680px; max-height:85vh; overflow:auto;
+    background:var(--paper); color:var(--ink); border:2px solid #000; border-radius:0;
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+  }
+  .modal .cardbody{ padding:1.6rem; }
+  .modal h2{ margin:0 0 .2rem; font-size:inherit; }
+  .modal .sub{ margin-bottom:1.2rem; }
+
+  .inviterow{ display:flex; gap:.8rem; align-items:center; margin-bottom:1.4rem; }
+  .link-row{
+    display:flex; gap:.5rem; align-items:center;
+    background:var(--paper); border:1px solid #000; padding:.4rem .6rem;
+  }
+  .link-row code{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:inherit; }
+  .link-row button{ border:1px solid #000; background:var(--paper); color:var(--ink); border-radius:999px; padding:.3rem .7rem; cursor:pointer; font-family:inherit; }
+
+  /* 10 fixed slots, 2 columns x 5 rows — each is either an empty add-seed
+     mini-form or a claimed seed's info, once someone has saved it.
+     (named .libslot, not .seedslot — that class already belongs to the
+     field's own seed-position markers; reusing it collided the two.) */
+  .seedgrid{ display:grid; grid-template-columns:1fr 1fr; gap:.7rem; }
+  .libslot{
+    border:1px solid #000; padding:.6rem; min-height:4.4rem;
+    display:flex; align-items:center; gap:.7rem;
+  }
+  .libslot.claimed{ background:var(--paper); }
+
+  .seedcircle{
+    position:relative; flex-shrink:0; width:2.6rem; height:2.6rem; border-radius:50%;
+    border:1px solid #000; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    background:var(--paper);
+  }
+  .seedcircle .plus{ font-size:1.1rem; color:#000; pointer-events:none; }
+  .seedcircle.has-file .plus{ font-size:1.2rem; opacity:1; }
+  .seedcircle.locked{ opacity:.35; cursor:not-allowed; }
+
+  .libslot-fields{ flex:1; min-width:0; display:flex; flex-direction:column; gap:.35rem; }
+  .libslot-fields input[type="text"]{ padding:.3rem .5rem; }
+  .libslot-save{
+    border:1px solid #000; border-radius:999px; background:#000; color:var(--paper);
+    padding:.25rem .7rem; cursor:pointer; font-family:inherit; font-size:inherit; flex-shrink:0;
+  }
+  .libslot-save:disabled{ opacity:.35; cursor:not-allowed; }
+
+  .libslot .name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .libslot .iconbtn{
+    background:none; border:none; padding:0;
+    color:var(--ink); cursor:pointer; font-size:inherit; font-family:inherit; flex-shrink:0;
+  }
+  .libslot .iconbtn:active{ opacity:.5; }
+
+  .modal .actions{ margin-top:1.5rem; justify-content:flex-end; }
+  button.ghost{
+    background:none; border:1px solid #000; color:var(--ink); border-radius:999px;
+    padding:.3rem .8rem; cursor:pointer; font-size:inherit; font-family:inherit;
+  }
+  button.ghost:disabled{ opacity:.35; cursor:not-allowed; }
+</style>
+</head>
+<body>
+
+<div id="viewport">
+  <div id="field">
+    <svg id="patternLayer" aria-hidden="true"></svg>
+    <svg id="rootsLayer" aria-hidden="true"></svg>
+    <div id="seedSlots" aria-hidden="true"></div>
+    <div id="plantSlots" aria-hidden="true"></div>
+  </div>
+</div>
+
+<div class="navstack">
+  <div class="navgroup">
+    <button type="button" class="navbtn" id="navToggleBtn" title="open/close">𖦹</button>
+    <button type="button" class="navbtn" id="navSeedsBtn" title="seeds">᯽</button>
+  </div>
+  <div class="navgroup">
+    <button type="button" class="navbtn" id="plantBtn" title="plant" disabled>⚘</button>
+    <button type="button" class="navbtn" id="waterBtn" title="water" disabled>𓄹</button>
+  </div>
+</div>
+
+<div class="tagdisplay" id="tagDisplay"></div>
+
+<div class="arrowpad" aria-hidden="true">
+  <button type="button" id="panUp" title="up">↑</button>
+  <button type="button" id="panLeft" title="left">←</button>
+  <button type="button" id="panDown" title="down">↓</button>
+  <button type="button" id="panRight" title="right">→</button>
+</div>
+
+<div class="viewtoggles" id="viewToggles">
+  <button type="button" class="toggle" data-key="seeds"><span>seeds</span><span class="switch"><span class="knob"></span></span></button>
+  <button type="button" class="toggle" data-key="plants"><span>plants</span><span class="switch"><span class="knob"></span></span></button>
+  <button type="button" class="toggle" data-key="roots"><span>roots</span><span class="switch"><span class="knob"></span></span></button>
+  <button type="button" class="toggle" data-key="labels"><span>labels</span><span class="switch"><span class="knob"></span></span></button>
+</div>
+
+<!-- ============ STEP 1 — creation form ============ -->
+<div class="card" id="builderCard">
+  <div class="titlebar"><span class="closebox"></span></div>
+  <div class="cardbody">
+    <div class="row">
+      <label>what's the weather here? <span id="tagCountLabel">(0/3)</span></label>
+      <div class="tagbank" id="tagBank"></div>
+      <div class="tagcustom">
+        <input type="text" id="tagCustomInput" placeholder="add your own…">
+        <button type="button" id="tagCustomBtn">add</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="colorgrid">
+        <div class="colorpick">
+          <span>sky</span>
+          <input type="color" id="cBg1" value="#3AB704">
+        </div>
+        <div class="colorpick">
+          <span>soil</span>
+          <input type="color" id="cBg2" value="#E2FFCB">
+        </div>
+        <div class="colorpick">
+          <span>seed</span>
+          <input type="color" id="cSeed" value="#FFD8B6">
+        </div>
+        <div class="colorpick">
+          <span>labels</span>
+          <input type="color" id="cText" value="#FFFFFF">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>field pattern</label>
+      <div class="patternbank" id="patternBank"></div>
+      <div class="scalerow">
+        <input type="range" id="fieldScale" min="0.6" max="1.6" step="0.1" value="1">
+        <span id="fieldScaleLabel">1.0×</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="ghost" id="cancelBtn">cancel</button>
+      <button type="button" class="primary" id="createBtn">save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STEP 2 — collaborative seed library (10 fixed slots, synced) ============ -->
+<div class="scrim" id="seedScrim">
+  <div class="modal">
+    <div class="titlebar"><span class="closebox"></span></div>
+    <div class="cardbody">
+
+      <p class="sub">Invite friends to add seeds to the library. Then cut, loop, and remix your seeds to grow hybrid plants, and watch new blooms take root.</p>
+
+      <div class="inviterow">
+        <div class="link-row" style="flex:1; margin-bottom:0;">
+          <code id="shareLink">—</code>
+          <button type="button" id="copyLinkBtn">copy url</button>
+        </div>
+        <button type="button" class="toggle" id="lockToggle" data-on="false">
+          <span>seed library open</span><span class="switch"><span class="knob"></span></span>
+        </button>
+      </div>
+
+      <div class="seedgrid" id="seedGrid"></div>
+
+      <div class="actions" style="justify-content:space-between;">
+        <button type="button" class="ghost" id="downloadAllBtn" disabled>download all</button>
+        <button type="button" class="primary" id="feelGrassBtn" disabled>feel the grass</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+"use strict";
+import { playhtml } from "https://unpkg.com/playhtml";
+
+/* ============================================================
+   All state lives here, shaped to match the playhtml room-state
+   schema we designed (meta / seeds / status). Swap the marked
+   SYNC points for playhtml.createPageData(room, ...) + setData
+   when you wire up real sync — the shape doesn't need to change.
+   ============================================================ */
+const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
+const SEED_ICON = "✿";
+// set this to your deployed Worker's URL once you've run `wrangler deploy`
+// in upload-worker/ (e.g. "https://sound-garden-uploads.YOUR-SUBDOMAIN.workers.dev").
+// left empty, seeds fall back to session-only blob URLs (same as before) —
+// the app still works for local testing, it just can't share files across users yet.
+const UPLOAD_ENDPOINT = "";
+const MAX_TAGS = 3;
+const MAX_SEEDS = 10;
+const PATTERNS = [
+  { id:"lattice", label:"lattice" },   // grid of very thin light lines
+  { id:"array",   label:"array" },     // dots arranged in a spiral
+  { id:"furrow",  label:"furrow" },    // straight horizontal lines
+];
+
+const FIELD_W = 2400, FIELD_H = 1600;   // the field is bigger than the viewport — arrow keys pan it
+const STEP = 95;
+
+const garden = {
+  id: null,
+  status: "drafting",       // "drafting" -> "open"
+  meta: {
+    tags: [],
+    colors: {
+      background: ["#3AB704", "#E2FFCB"],   // [sky, soil] — top-to-bottom gradient stops
+      seed: "#FFD8B6",                       // also colors the field pattern
+      text: "#FFFFFF",                       // label color
+    },
+    pattern: "lattice",       // "lattice" | "array" | "furrow"
+    scale: 1,                 // multiplies pattern spacing/dot size
+  },
+  // fixed 10 slots, index -> { track, artist, fileName, color, claimedBy } | null.
+  // NOTE: this must be a plain object, not an array — playhtml's Page Data
+  // proxy throws "array assignment is not implemented / supported" on
+  // draft[i] = x for arrays (found by testing directly against the CDN
+  // build, unpkg.com/playhtml@2.11.3). Objects keyed by "0".."9" work fine.
+  seedSlots: Object.fromEntries(Array.from({length:MAX_SEEDS}, (_,i) => [i, null])),
+};
+
+function newId(len=8){
+  return crypto.randomUUID ? crypto.randomUUID().slice(0,len) : Math.random().toString(36).slice(2,2+len);
+}
+
+/* hex "#rrggbb" -> "r,g,b" so the seed color can be used at low opacity for the field pattern */
+function hexToRgb(hex){
+  const m = hex.replace("#","").match(/.{2}/g).map(h => parseInt(h,16));
+  return m.join(",");
+}
+
+const randInt = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
+
+/* hsl -> hex, so random defaults can be constrained to sane saturation/lightness
+   ranges instead of raw random RGB (which mostly produces muddy, low-contrast colors) */
+function hsl2hex(h, s, l){
+  s/=100; l/=100;
+  const k = n => (n + h/30) % 12;
+  const a = s * Math.min(l, 1-l);
+  const f = n => l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+  const toHex = n => Math.round(255*f(n)).toString(16).padStart(2,"0");
+  return `#${toHex(0)}${toHex(8)}${toHex(4)}`;
+}
+
+/* random but constrained: a saturated seed color, a sky->soil pair with real
+   lightness contrast, and labels picked for contrast against the sky. */
+function randomizeDefaultColors(){
+  const bgHue = randInt(0,359);
+  const seedHue = (bgHue + 180 + randInt(-40,40) + 360) % 360; // roughly complementary -> pops against the field
+  const skyLightness = randInt(35,45);
+  cBg1.value = hsl2hex(bgHue, randInt(55,75), skyLightness);
+  cBg2.value = hsl2hex((bgHue + randInt(-15,15) + 360) % 360, randInt(30,50), randInt(85,92));
+  cSeed.value = hsl2hex(seedHue, randInt(65,85), randInt(55,70));
+  cText.value = skyLightness < 50 ? "#FFFFFF" : "#000000";
+}
+
+const NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs){
+  const el = document.createElementNS(NS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* seed slots — one fixed layout per pattern (not random), so a given pattern
+   always shows its seeds in the same arrangement, matching how that pattern
+   reads visually (grid cells for lattice, spiral arms for array, rows for furrow). */
+const CX = FIELD_W/2, CY = FIELD_H/2;
+const SEED_COLS = [-400,-200,0,200,400];
+
+/* base offsets from field center, one fixed layout per pattern (10 seeds each) —
+   actual on-screen position is these offsets times the current scale, so slot
+   placement spreads/tightens together with the pattern itself. */
+const SEED_SLOTS_BASE = {
+  lattice: SEED_COLS.flatMap(dx => [{dx,dy:-160},{dx,dy:160}]),
+  furrow:  SEED_COLS.flatMap(dx => [{dx,dy:-90}, {dx,dy:90}]),
+};
+function arraySlotOffsets(scale){
+  // same spiral formula the pattern itself uses, so seeds land along its arms
+  return Array.from({length:10}, (_,i) => {
+    const t = 1 + i*0.9, r = 26*t*scale;
+    return { dx:r*Math.cos(t), dy:r*Math.sin(t) };
+  });
+}
+const SEED_LABELS = ["~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops"];
+
+function renderSeedSlots(){
+  const layer = document.getElementById("seedSlots");
+  layer.innerHTML = "";
+  const scale = garden.meta.scale || 1;
+  const offsets = garden.meta.pattern === "array"
+    ? arraySlotOffsets(scale)
+    : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
+  offsets.forEach((o, i) => {
+    const el = document.createElement("div");
+    el.className = "seedslot";
+    el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
+    el.style.color = garden.meta.colors.text;
+    const dot = document.createElement("span");
+    dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
+    const label = document.createElement("span");
+    label.className = "txt";
+    label.textContent = SEED_LABELS[i % SEED_LABELS.length];
+    el.appendChild(dot); el.appendChild(label);
+    layer.appendChild(el);
+  });
+}
+
+/* draws the current garden.meta.colors/pattern onto the field (gradient)
+   and the SVG layer (pattern lines/dots), sized to the whole (bigger-than-
+   viewport) field rather than just what's on screen. */
+function renderField(){
+  const { background, text, seed } = garden.meta.colors;
+  const fieldEl = document.getElementById("field");
+  fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
+  fieldEl.style.color = text;
+  renderSeedSlots();
+
+  const svg = document.getElementById("patternLayer");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  const rgb = hexToRgb(seed);
+
+  const scale = garden.meta.scale || 1;
+  const LATTICE_BASE = 52;              // grid cell size (2x the original default)
+  const FURROW_BASE = LATTICE_BASE / 2; // furrow lines are half as spread out as lattice
+
+  if(garden.meta.pattern === "array"){
+    // dots arranged in an outward spiral from center, spaced evenly along
+    // the curve (not by fixed angle step, or it thins into spokes at radius) —
+    // wider pitch + smaller dots so it reads as a spiral, not concentric rings.
+    const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
+    const a = 16 * scale;      // spiral pitch — distance between successive arms
+    const dotGap = 10 * scale; // arc-length distance between dots — doubled density vs before
+    const dotR = Math.max(0.6, 0.9 * scale);
+    const group = svgEl("g", { fill:`rgba(${rgb},.55)` });
+    let t = 1;
+    for(let r = a*t; r <= maxR; r = a*t){
+      const x = CX + r*Math.cos(t), y = CY + r*Math.sin(t);
+      group.appendChild(svgEl("circle", { cx:x.toFixed(1), cy:y.toFixed(1), r:dotR }));
+      t += dotGap / r;       // shrink angular step as radius grows -> even spacing
+    }
+    svg.appendChild(group);
+  } else {
+    // lattice (grid) or furrow (horizontal-only) — both are a tiled <pattern>
+    const spacing = (garden.meta.pattern === "lattice" ? LATTICE_BASE : FURROW_BASE) * scale;
+    const defs = svgEl("defs", {});
+    const pattern = svgEl("pattern", { id:"fieldPattern", width:spacing, height:spacing, patternUnits:"userSpaceOnUse" });
+    const stroke = `rgba(${rgb},.4)`;
+    pattern.appendChild(svgEl("line", { x1:0, y1:spacing/2, x2:spacing, y2:spacing/2, stroke, "stroke-width":0.6 }));
+    if(garden.meta.pattern === "lattice"){
+      pattern.appendChild(svgEl("line", { x1:spacing/2, y1:0, x2:spacing/2, y2:spacing, stroke, "stroke-width":0.6 }));
+    }
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+    svg.appendChild(svgEl("rect", { width:"100%", height:"100%", fill:"url(#fieldPattern)" }));
+  }
+
+  applyViewToggles(); // re-apply since renderSeedSlots() just rebuilt the label spans
+}
+
+/* ---- tag bank ---- */
+const tagBankEl = document.getElementById("tagBank");
+const tagCountLabel = document.getElementById("tagCountLabel");
+function renderTagBank(){
+  tagBankEl.innerHTML = "";
+  // bank tags first, in fixed order
+  for(const t of TAG_BANK){
+    const chosen = garden.meta.tags.includes(t);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = t;
+    b.setAttribute("data-selected", chosen ? "true" : "false");
+    b.disabled = !chosen && garden.meta.tags.length >= MAX_TAGS;
+    b.addEventListener("click", () => toggleTag(t));
+    tagBankEl.appendChild(b);
+  }
+  // then any custom (typed-in) tags — these aren't in TAG_BANK, so they need
+  // their own chips or they're stored in state but never shown (the bug).
+  for(const t of garden.meta.tags){
+    if(TAG_BANK.includes(t)) continue;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = t;
+    b.setAttribute("data-selected", "true");
+    b.addEventListener("click", () => toggleTag(t));
+    tagBankEl.appendChild(b);
+  }
+  tagCountLabel.textContent = `(${garden.meta.tags.length}/${MAX_TAGS})`;
+  renderTagDisplay();
+}
+
+/* top-center readout of the chosen tags — read-only, just mirrors the bank */
+const tagDisplayEl = document.getElementById("tagDisplay");
+function renderTagDisplay(){
+  tagDisplayEl.innerHTML = "";
+  for(const t of garden.meta.tags){
+    const s = document.createElement("span");
+    s.textContent = t;
+    tagDisplayEl.appendChild(s);
+  }
+}
+
+function toggleTag(t){
+  const i = garden.meta.tags.indexOf(t);
+  if(i>=0) garden.meta.tags.splice(i,1);
+  else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
+  renderTagBank();
+  // SYNC: draft room's meta.tags updates for everyone watching the create flow (only relevant if drafting is itself collaborative before the garden exists — otherwise this stays local until createGarden()).
+}
+document.getElementById("tagCustomBtn").addEventListener("click", () => {
+  const input = document.getElementById("tagCustomInput");
+  const v = input.value.trim().toLowerCase();
+  if(!v || garden.meta.tags.length >= MAX_TAGS || garden.meta.tags.includes(v)) return;
+  garden.meta.tags.push(v);
+  input.value = "";
+  renderTagBank();
+});
+
+/* ---- colors ---- */
+const cBg1 = document.getElementById("cBg1"), cBg2 = document.getElementById("cBg2");
+const cText = document.getElementById("cText"), cSeed = document.getElementById("cSeed");
+function applyColors(){
+  garden.meta.colors = { background:[cBg1.value, cBg2.value], text:cText.value, seed:cSeed.value };
+  renderField();
+}
+[cBg1,cBg2,cText,cSeed].forEach(el => el.addEventListener("input", applyColors));
+
+/* ---- scale slider ---- */
+const fieldScale = document.getElementById("fieldScale");
+const fieldScaleLabel = document.getElementById("fieldScaleLabel");
+fieldScale.addEventListener("input", () => {
+  garden.meta.scale = parseFloat(fieldScale.value);
+  fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
+  renderField();
+  // SYNC: room.setData(draft => { draft.meta.scale = garden.meta.scale; })
+});
+
+/* ---- pattern picker ---- */
+const patternBankEl = document.getElementById("patternBank");
+function renderPatternBank(){
+  patternBankEl.innerHTML = "";
+  for(const p of PATTERNS){
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "patternbtn"; b.textContent = p.label;
+    b.setAttribute("data-selected", garden.meta.pattern === p.id ? "true" : "false");
+    b.addEventListener("click", () => {
+      garden.meta.pattern = p.id;
+      renderPatternBank();
+      renderField();
+      // SYNC: room.setData(draft => { draft.meta.pattern = p.id; })
+    });
+    patternBankEl.appendChild(b);
+  }
+}
+
+renderTagBank();
+renderPatternBank();
+
+/* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
+const VIEW_STATE = { seeds:true, plants:true, roots:true, labels:true };
+function applyViewToggles(){
+  document.getElementById("seedSlots").style.display = VIEW_STATE.seeds ? "" : "none";
+  document.getElementById("plantSlots").style.display = VIEW_STATE.plants ? "" : "none";
+  document.getElementById("rootsLayer").style.display = VIEW_STATE.roots ? "" : "none";
+  document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
+    .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
+}
+document.querySelectorAll("#viewToggles button").forEach(b => {
+  b.setAttribute("data-on", "true");
+  b.addEventListener("click", () => {
+    const key = b.dataset.key;
+    VIEW_STATE[key] = !VIEW_STATE[key];
+    b.setAttribute("data-on", String(VIEW_STATE[key]));
+    applyViewToggles();
+  });
+});
+
+const viewportEl = document.getElementById("viewport");
+const fieldEl = document.getElementById("field");
+fieldEl.style.width = FIELD_W + "px";
+fieldEl.style.height = FIELD_H + "px";
+
+randomizeDefaultColors();
+applyColors();
+
+/* ---- arrow-key / arrow-pad panning, same idea as the main garden view ---- */
+function panBy(dx, dy){
+  viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
+}
+document.getElementById("panUp").addEventListener("click", () => panBy(0,-STEP));
+document.getElementById("panDown").addEventListener("click", () => panBy(0,STEP));
+document.getElementById("panLeft").addEventListener("click", () => panBy(-STEP,0));
+document.getElementById("panRight").addEventListener("click", () => panBy(STEP,0));
+
+document.addEventListener("keydown", e => {
+  const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
+  if(typing || seedScrim.classList.contains("open")) return;
+  const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
+  if(move){ e.preventDefault(); panBy(move[0], move[1]); }
+});
+
+// start centered on the field, like the main garden view does — deferred a
+// frame so the viewport has actually been laid out before we measure it
+requestAnimationFrame(() => {
+  viewportEl.scrollTo({ left: FIELD_W/2 - viewportEl.clientWidth/2, top: FIELD_H/2 - viewportEl.clientHeight/2 });
+});
+
+/* ---- create garden ---- */
+function ensureGardenId(){
+  if(garden.id) return;
+  garden.id = newId();
+  garden.status = "drafting";
+  // SYNC: this is the real creation point.
+  // const room = playhtml.createPageData("garden-" + garden.id, garden);
+  // (everything below reads/writes `garden` locally — swap to room.setData(...) here)
+}
+
+const builderCardEl = document.getElementById("builderCard");
+const createBtn = document.getElementById("createBtn");   // "save"
+createBtn.addEventListener("click", () => {
+  ensureGardenId();
+  builderCardEl.style.display = "none";
+  openSeedModal();
+});
+document.getElementById("cancelBtn").addEventListener("click", () => {
+  builderCardEl.style.display = "none";
+});
+
+/* ---- nav stack (icon-only): toggle the builder window, jump straight to seeds ---- */
+const navToggleBtn = document.getElementById("navToggleBtn");
+navToggleBtn.addEventListener("click", () => {
+  const hidden = builderCardEl.style.display === "none";
+  builderCardEl.style.display = hidden ? "" : "none";
+});
+document.getElementById("navSeedsBtn").addEventListener("click", () => {
+  ensureGardenId();
+  builderCardEl.style.display = "none";
+  openSeedModal();
+});
+
+/* ==========================================================================
+   PLAYHTML — the seed library is the first genuinely collaborative surface:
+   10 fixed slots, shared live across everyone who has the link, plus
+   always-on cursor presence. Element/page data + cursors, per the playhtml
+   docs (playhtml.fun/docs) — see the earlier research in this conversation
+   for why Page Data (one JSON blob, not per-element can-play) is the right
+   fit for a slot list like this.
+
+   HONEST LIMITATION: playhtml syncs JSON only. audioRef below is a
+   `blob:` URL, valid only in the browser tab that uploaded it — there is no
+   real file storage here, so a slot's *metadata* (claimed/track/artist)
+   syncs to every visitor, but the *audio itself* is only actually playable/
+   downloadable by whoever uploaded it, until this points at a real upload
+   endpoint. I can't verify live cross-browser sync or cursor rendering from
+   here (this preview is a single browser) — worth testing yourself in two
+   tabs/two browsers once you're ready, per how you wanted to handle playhtml
+   testing earlier in this conversation.
+   ========================================================================== */
+playhtml.init({ cursors: {} });
+
+let seedSlotsChannel = null;
+// BUG FOUND DURING TESTING: right after a local save, an onUpdate echo
+// carrying the pre-save default (from the initial server handshake, before
+// our write had round-tripped) came back and clobbered the local slot —
+// classic optimistic-update race. Mitigation: once a slot has been saved
+// locally, don't let an incoming update null it back out — only accept
+// incoming changes once they actually agree with (confirm) the local write,
+// or for slots we haven't touched ourselves. Not a full CRDT-correct fix,
+// just enough to survive the handshake race — revisit once you're testing
+// this for real across two tabs/browsers.
+const locallyWrittenSlots = new Set();
+function connectSeedSlotsChannel(){
+  // room-scoped to this garden's id, so each garden gets its own live slots
+  seedSlotsChannel = playhtml.createPageData(`garden-${garden.id}-seeds`, garden.seedSlots);
+  garden.seedSlots = seedSlotsChannel.getData();
+  seedSlotsChannel.onUpdate(data => {
+    Object.entries(data).forEach(([i, incoming]) => {
+      if(locallyWrittenSlots.has(i) && incoming === null && garden.seedSlots[i] !== null) return; // ignore the stale echo
+      garden.seedSlots[i] = incoming;
+    });
+    renderSeedGrid();
+  });
+}
+
+/* local-only fallback for when UPLOAD_ENDPOINT isn't set (or the upload
+   fails) — a blob: URL that never leaves this tab, keyed by slot index.
+   Once a real upload succeeds, slot.audioRef is a durable URL and this
+   fallback isn't needed for that slot. */
+const localAudioRefs = {};
+
+/* streams the file straight to the Worker, which writes it into R2 and
+   hands back the public URL. Throws on any failure — the caller decides
+   what to fall back to (see the saveBtn handler). */
+async function uploadSeedFile(file, index){
+  if(!UPLOAD_ENDPOINT) throw new Error("UPLOAD_ENDPOINT not configured");
+  const res = await fetch(`${UPLOAD_ENDPOINT}/upload`, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "X-Garden-Id": garden.id,
+      "X-Slot-Index": String(index),
+      "X-File-Name": file.name,
+    },
+    body: file,
+  });
+  if(!res.ok) throw new Error(`upload failed: ${res.status}`);
+  const { url } = await res.json();
+  return url;
+}
+
+/* ---- seed library modal ---- */
+const seedScrim = document.getElementById("seedScrim");
+const shareLink = document.getElementById("shareLink");
+const seedGridEl = document.getElementById("seedGrid");
+const downloadAllBtn = document.getElementById("downloadAllBtn");
+const feelGrassBtn = document.getElementById("feelGrassBtn");
+
+function openSeedModal(){
+  shareLink.textContent = `${location.origin}${location.pathname.replace(/[^/]*$/,'')}garden/${garden.id}`;
+  connectSeedSlotsChannel();
+  seedScrim.classList.add("open");
+  renderSeedGrid();
+}
+document.getElementById("copyLinkBtn").addEventListener("click", () => {
+  navigator.clipboard?.writeText(shareLink.textContent);
+});
+
+/* lock/unlock — a manual override on top of the 10-slot cap: the creator
+   can close the seed library early even if spots remain. */
+const lockToggle = document.getElementById("lockToggle");
+let libraryLocked = false;
+lockToggle.addEventListener("click", () => {
+  libraryLocked = !libraryLocked;
+  lockToggle.setAttribute("data-on", String(libraryLocked));
+  lockToggle.querySelector("span").textContent = libraryLocked ? "seed library locked" : "seed library open";
+  renderSeedGrid();
+  // SYNC: room.setData(draft => { draft.meta.seedsLocked = libraryLocked; })
+});
+
+/* download one seed's audio using its original filename, or every claimed
+   one, staggered slightly since browsers can block several simultaneous
+   programmatic downloads fired in the same tick. */
+function downloadSeed(slot, index){
+  // slot.audioRef is a real, durable URL once it was uploaded via the Worker
+  // — anyone can use it. localAudioRefs is only ever populated as a fallback
+  // when the upload wasn't configured/failed, and only works in this tab.
+  const audioRef = slot.audioRef || localAudioRefs[index];
+  if(!audioRef){ alert("only the person who added this seed can download it right now — see the storage note in the code."); return; }
+  const a = document.createElement("a");
+  a.href = audioRef; a.download = slot.fileName || slot.track || "seed";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+downloadAllBtn.addEventListener("click", () => {
+  Object.entries(garden.seedSlots).forEach(([i, slot]) => { if(slot) setTimeout(() => downloadSeed(slot, i), i*300); });
+});
+
+/* each empty slot keeps its own local draft (file/track/artist) until saved —
+   nothing here is synced or shown to anyone else until "save" is clicked. */
+function renderSeedGrid(){
+  seedGridEl.innerHTML = "";
+  const claimedCount = Object.values(garden.seedSlots).filter(Boolean).length;
+
+  Object.entries(garden.seedSlots).forEach(([index, slot]) => {
+    const li = document.createElement("div");
+    li.className = "libslot" + (slot ? " claimed" : "");
+
+    if(slot){
+      li.innerHTML = `<span class="seedcircle" style="background:${slot.color}"><span class="plus">${SEED_ICON}</span></span>
+        <span class="name">${slot.track} - ${slot.artist}</span>`;
+      const dl = document.createElement("button");
+      dl.type = "button"; dl.className = "iconbtn"; dl.title = "download"; dl.textContent = "↓";
+      dl.addEventListener("click", () => downloadSeed(slot, index));
+      const rm = document.createElement("button");
+      rm.type = "button"; rm.className = "iconbtn"; rm.title = "remove"; rm.textContent = "✕";
+      rm.addEventListener("click", () => {
+        garden.seedSlots[index] = null; delete localAudioRefs[index]; locallyWrittenSlots.delete(index);
+        seedSlotsChannel?.setData(draft => { draft[index] = null; });
+        // SYNC: the line above is the real sync call — local array is updated optimistically too
+        renderSeedGrid();
+      });
+      li.appendChild(dl); li.appendChild(rm);
+    } else {
+      let draftFile = null;
+      const circle = document.createElement("label");
+      circle.className = "seedcircle"; circle.tabIndex = 0;
+      circle.style.background = garden.meta.colors.seed;
+      circle.innerHTML = `<span class="plus">+</span><input type="file" accept="audio/*" hidden>`;
+      const fileInput = circle.querySelector("input");
+      const plus = circle.querySelector(".plus");
+
+      const fields = document.createElement("div");
+      fields.className = "libslot-fields";
+      const trackInput = document.createElement("input");
+      trackInput.type = "text"; trackInput.placeholder = "track name";
+      const artistInput = document.createElement("input");
+      artistInput.type = "text"; artistInput.placeholder = "artist";
+      fields.appendChild(trackInput); fields.appendChild(artistInput);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button"; saveBtn.className = "libslot-save"; saveBtn.textContent = "save"; saveBtn.disabled = true;
+
+      function applyLocked(){
+        const locked = libraryLocked;
+        circle.classList.toggle("locked", locked);
+        fileInput.disabled = locked; trackInput.disabled = locked; artistInput.disabled = locked;
+        validate();
+      }
+      function validate(){
+        saveBtn.disabled = libraryLocked || !draftFile || !trackInput.value.trim() || !artistInput.value.trim();
+      }
+      fileInput.addEventListener("change", () => {
+        draftFile = fileInput.files[0] || null;
+        circle.classList.toggle("has-file", !!draftFile);
+        circle.title = draftFile ? draftFile.name : "";
+        plus.textContent = draftFile ? SEED_ICON : "+";
+        validate();
+      });
+      circle.addEventListener("click", e => { if(libraryLocked) e.preventDefault(); });
+      [trackInput, artistInput].forEach(el => el.addEventListener("input", validate));
+
+      saveBtn.addEventListener("click", async () => {
+        saveBtn.disabled = true; saveBtn.textContent = "saving…";
+        const audioRef = await uploadSeedFile(draftFile, index).catch(err => {
+          console.warn("upload failed, falling back to a local-only blob URL:", err);
+          return URL.createObjectURL(draftFile); // still works for you, just not shareable
+        });
+        localAudioRefs[index] = audioRef;
+        const newSlot = {
+          track: trackInput.value.trim(), artist: artistInput.value.trim(),
+          fileName: draftFile.name, color: garden.meta.colors.seed,
+          audioRef,   // durable R2 URL once UPLOAD_ENDPOINT is set — this is what makes it downloadable by everyone
+        };
+        garden.seedSlots[index] = newSlot; locallyWrittenSlots.add(index);
+        seedSlotsChannel?.setData(draft => { draft[index] = newSlot; });
+        // SYNC: the line above is the real sync call — local array is updated optimistically too
+        renderSeedGrid();
+      });
+
+      applyLocked();
+      li.appendChild(circle); li.appendChild(fields); li.appendChild(saveBtn);
+    }
+    seedGridEl.appendChild(li);
+  });
+
+  downloadAllBtn.disabled = claimedCount === 0;
+  feelGrassBtn.disabled = claimedCount === 0;
+  updatePlantWaterButtons();
+}
+
+/* plant/water (and now the garden-view CTA) stay off until every spot in the
+   seed library is claimed. */
+const plantBtn = document.getElementById("plantBtn");
+const waterBtn = document.getElementById("waterBtn");
+function updatePlantWaterButtons(){
+  const full = Object.values(garden.seedSlots).filter(Boolean).length >= MAX_SEEDS;
+  plantBtn.disabled = !full;
+  waterBtn.disabled = !full;
+}
+
+feelGrassBtn.addEventListener("click", () => {
+  garden.status = "open";
+  // SYNC: room.setData(draft => { draft.status = "open"; })
+  location.href = `${location.pathname.replace(/[^/]*$/,'')}garden/${garden.id}`;
+  // (that route doesn't exist yet — this is the intended next step, see MEMORY notes in this file)
+});
+</script>
+
+</body>
+</html>
