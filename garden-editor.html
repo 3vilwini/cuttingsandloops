@@ -18,7 +18,7 @@
   body{
     margin:0; color:var(--ink);
     font-family: "Deer Diary", "Courier New", monospace;
-    font-size:.78rem;                          /* single size for all text on the page */
+    font-size:.65rem;                          /* single size for all text on the page — matches the builder panel */
     display:flex; align-items:center; justify-content:center; padding:2.5rem;
     position:relative; overflow:hidden;
   }
@@ -94,15 +94,25 @@
   #plantSlots{ position:absolute; inset:0; }
 
   /* a plant is its own freehand drawing on the map — no square/border
-     around it, just the strokes themselves at a true 3px on-screen width
-     (vector-effect:non-scaling-stroke on each polyline keeps that width
-     constant no matter how much the viewBox is scaled down for display) */
+     around it, just the strokes themselves, at the exact same scale they
+     were drawn at in the modal. width/height here must match pCanvas's
+     width/height attribute (140x140) 1:1, so the viewBox maps directly to
+     screen pixels with no scaling — vector-effect:non-scaling-stroke on
+     each polyline is just a safety net in case that ever changes. */
   .plantmark{
-    position:absolute; width:50px; height:50px; transform:translate(-50%,-50%);
+    position:absolute; width:140px; height:140px; transform:translate(-50%,-50%);
     cursor:pointer;
   }
   .plantmark svg{ width:100%; height:100%; overflow:visible; }
   .plantmark.pinned{ filter:drop-shadow(0 0 2px rgba(0,0,0,.6)); }
+  /* the plant's name, shown/hidden together with the seed labels via the
+     same "labels" toggle — stroked so it stays readable over any field
+     background or drawing color underneath it */
+  .plantmark .txt{
+    position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    margin-top:.3rem; white-space:nowrap; pointer-events:none;
+    -webkit-text-stroke:3px var(--ink); paint-order:stroke fill;
+  }
   /* fallback for a plant saved with an empty canvas — nothing was drawn,
      so there's no path data to show */
   .plantmark .fallback{
@@ -138,7 +148,7 @@
   .card{
     position:fixed; top:2.5rem; left:calc(2.5rem + 2.3rem + .6rem); z-index:2;
     width:100%; max-width:250px; background:var(--paper); color:var(--ink);
-    border:2px solid #000; border-radius:0; font-size:.65rem;
+    border:2px solid #000; border-radius:0;
     box-shadow: 6px 6px 0 rgba(0,0,0,.55);
   }
   .titlebar{
@@ -530,6 +540,15 @@ function renderPlantSlots(){
       fallback.style.background = p.color;
       el.appendChild(fallback);
     }
+
+    // the planter's name — same "txt" class the seed labels use, so the
+    // existing "labels" toggle shows/hides this one too for free
+    const label = document.createElement("span");
+    label.className = "txt";
+    label.textContent = p.name;
+    label.style.color = garden.meta.colors.text;
+    el.appendChild(label);
+
     let audioEl = null;
     el.addEventListener("mouseenter", () => {
       const ref = p.audioRef || localPlantAudioRefs[p.id];
