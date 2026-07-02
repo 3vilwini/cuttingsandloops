@@ -443,6 +443,7 @@
       <input type="text" id="pName" placeholder="your name">
 
       <div class="actions">
+        <button type="button" class="ghost" id="pDeleteBtn" style="display:none; margin-right:auto;">delete</button>
         <button type="button" class="ghost" id="pCancelBtn">cancel</button>
         <button type="button" class="primary" id="pSaveBtn" disabled>plant</button>
       </div>
@@ -697,12 +698,14 @@ function renderPlantSlots(){
     el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
 
-    // drag to reposition — persists for everyone via plantSlotsChannel. A
-    // mousedown that never actually moves is treated as a plain click and
-    // opens this plant for editing instead (see openPlantEditModal).
+    // drag to reposition (from anywhere on the marker) — persists for
+    // everyone via plantSlotsChannel. A mousedown that never actually moves
+    // is a plain click instead: on the label text it opens this plant for
+    // editing, on the drawing itself it toggles pinned.
     el.addEventListener("mousedown", e => {
       e.stopPropagation();
       e.preventDefault();
+      const clickedLabel = !!e.target.closest(".txt");
       const startX = e.clientX, startY = e.clientY;
       const origX = p.x, origY = p.y;
       let moved = false;
@@ -719,8 +722,13 @@ function renderPlantSlots(){
         if(moved){
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
-        } else {
+        } else if(clickedLabel){
           openPlantEditModal(p);
+        } else {
+          p.pinned = !p.pinned;
+          garden.plants[p.id] = p;
+          plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
+          renderPlantSlots();
         }
       }
       document.addEventListener("mousemove", onMove);
@@ -1207,6 +1215,7 @@ const pClearCanvas = document.getElementById("pClearCanvas");
 const pColor = document.getElementById("pColor");
 const pName = document.getElementById("pName");
 const pSaveBtn = document.getElementById("pSaveBtn");
+const pDeleteBtn = document.getElementById("pDeleteBtn");
 const pCancelBtn = document.getElementById("pCancelBtn");
 const hoverSquare = document.getElementById("hoverSquare");
 
@@ -1334,6 +1343,7 @@ function openPlantModal(pos){
   pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
   pColor.value = garden.meta.colors.seed; pctx.strokeStyle = pColor.value;
+  pDeleteBtn.style.display = "none";
   selectedSampledFrom = [];
   renderSampledFromBank();
   validatePlant();
@@ -1360,12 +1370,22 @@ function openPlantEditModal(p){
   // became a multi-select
   selectedSampledFrom = Array.isArray(p.sampledFrom) ? p.sampledFrom.slice() : (p.sampledFrom ? [p.sampledFrom] : []);
   renderSampledFromBank();
+  pDeleteBtn.style.display = "";
   validatePlant();
   hideBuilder(); hideSeedModal(); hideSeedList();
   plantScrim.classList.add("open");
 }
 function hidePlantModal(){ plantScrim?.classList.remove("open"); editingPlantId = null; }
 pCancelBtn.addEventListener("click", hidePlantModal);
+
+pDeleteBtn.addEventListener("click", () => {
+  if(!editingPlantId) return;
+  const id = editingPlantId;
+  delete garden.plants[id];
+  plantSlotsChannel?.setData(draft => { delete draft[id]; });
+  renderPlantSlots();
+  hidePlantModal();
+});
 
 pSaveBtn.addEventListener("click", async () => {
   const isEdit = !!editingPlantId;
