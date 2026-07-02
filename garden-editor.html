@@ -887,6 +887,9 @@ function connectChannels(){
 
   plantSlotsChannel = playhtml.createPageData("garden-plants", garden.plants);
   garden.plants = plantSlotsChannel.getData();
+  renderPlantSlots();   // draw whatever was already planted by anyone — the
+                        // only render calls before this point ran with the
+                        // empty local default, since this pull is async
   plantSlotsChannel.onUpdate(data => { garden.plants = data; renderPlantSlots(); });
 
   // colors/tags/pattern/scale. Whole-object/array replacement is fine here
