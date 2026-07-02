@@ -25,21 +25,20 @@
 
   /* ---- nav stack (top-left, always on top) ---- */
   .navstack{ position:fixed; top:2.5rem; left:2.5rem; z-index:3; display:flex; flex-direction:column; gap:.6rem; }
-  /* each group is a set of perfect-square buttons stuck together, one shared
-     border with an internal divider line rather than each button's own border */
-  .navgroup{ display:flex; flex-direction:column; border:1px solid #000; width:2.3rem; }
+  /* plain squares, each with its own full black border — not stuck together,
+     since each group only ever holds one button now */
+  .navgroup{ display:flex; flex-direction:column; width:2.3rem; }
   .navbtn{
-    width:2.3rem; height:2.3rem; border:none; border-top:1px solid #000;
+    width:2.3rem; height:2.3rem; border:2px solid #000;
     background:var(--paper); color:var(--ink); padding:0;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; font-family:inherit; font-size:inherit; text-align:center;
     /* without this the browser's native button chrome (a subtle bezel/
        shadow baked into appearance:auto) shows through on top of our own
-       1px border, especially on :active — doubled-up stroke + a shadow
+       border, especially on :active — doubled-up stroke + a shadow
        that was never actually in our CSS */
     appearance:none; -webkit-appearance:none; outline:none; box-shadow:none;
   }
-  .navbtn:first-child{ border-top:none; }
   .navbtn:active{ background:#000; color:var(--paper); }
   #navToggleBtn{ font-size:1.6rem; }
   /* pressed-looking while the panel it toggles is open, so it's obvious
