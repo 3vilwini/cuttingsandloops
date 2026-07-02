@@ -40,15 +40,18 @@
      this same button is what closes it again */
   .navbtn[data-open="true"]{ background:#000; color:var(--paper); }
 
-  /* ---- chosen weather tags (top-center, mirrors the picker in the card, read-only) ---- */
+  /* ---- chosen weather tags (top-center, mirrors the picker in the card) ----
+     clickable — see pressTag/checkTagPresses: two different people clicking
+     the same one within a couple seconds sends everyone to another page. */
   .tagdisplay{
     position:fixed; top:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
     display:flex; gap:.5rem;
   }
   .tagdisplay span{
     display:inline-block; border:1px solid #000; border-radius:999px; background:var(--paper); color:var(--ink);
-    padding:.5rem .9rem; font-family:inherit; font-size:inherit;
+    padding:.5rem .9rem; font-family:inherit; font-size:inherit; cursor:pointer;
   }
+  .tagdisplay span:hover{ box-shadow: 0 0 10px 3px var(--glow, transparent); }
 
   /* ---- live visitor count (top-right) ---- */
   .visitorcount{
@@ -101,8 +104,9 @@
      each polyline is just a safety net in case that ever changes. */
   .plantmark{
     position:absolute; width:140px; height:140px; transform:translate(-50%,-50%);
-    cursor:pointer;
+    cursor:grab;
   }
+  .plantmark:active{ cursor:grabbing; }
   .plantmark svg{ width:100%; height:100%; overflow:visible; }
   .plantmark.pinned{ filter:drop-shadow(0 0 2px rgba(0,0,0,.6)); }
   /* the plant's name, shown/hidden together with the seed labels via the
@@ -402,6 +406,7 @@ const garden = {
 // connectChannels() for the ReferenceError this caused when declared later.
 let plantSlotsChannel = null;
 let metaChannel = null;
+let tagPressChannel = null;
 
 /* garden.meta itself now lives in playhtml's synced Page Data (see
    connectChannels below) — that's the real persistence, shared across every
@@ -410,6 +415,10 @@ let metaChannel = null;
 function newId(len=8){
   return crypto.randomUUID ? crypto.randomUUID().slice(0,len) : Math.random().toString(36).slice(2,2+len);
 }
+
+// one random id per browser tab/session — just enough to tell "two distinct
+// people" apart for the tag-press easter egg below, not a real user identity
+const clientId = newId();
 
 /* hex "#rrggbb" -> "r,g,b" so the seed color can be used at low opacity for the field pattern */
 function hexToRgb(hex){
@@ -557,12 +566,35 @@ function renderPlantSlots(){
       audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
     });
     el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
-    el.addEventListener("click", e => {
-      e.stopPropagation(); // don't let this also trigger the field's plant-here click
-      p.pinned = !p.pinned;
-      garden.plants[p.id] = p;
-      plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
-      renderPlantSlots();
+    el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
+
+    // drag to reposition — persists for everyone via plantSlotsChannel,
+    // same whole-object setData pattern the pinned toggle already used. A
+    // mousedown that never actually moves is treated as a plain click and
+    // just toggles pinned, same as before.
+    el.addEventListener("mousedown", e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const startX = e.clientX, startY = e.clientY;
+      const origX = p.x, origY = p.y;
+      let moved = false;
+      function onMove(ev){
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if(!moved && Math.hypot(dx, dy) < 4) return;
+        moved = true;
+        p.x = origX + dx; p.y = origY + dy;
+        el.style.left = p.x + "px"; el.style.top = p.y + "px";
+      }
+      function onUp(){
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        if(!moved) p.pinned = !p.pinned;
+        garden.plants[p.id] = p;
+        plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
+        if(!moved) renderPlantSlots();
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
     });
     layer.appendChild(el);
   });
@@ -652,14 +684,44 @@ function renderTagBank(){
   renderTagDisplay();
 }
 
-/* top-center readout of the chosen tags — read-only, just mirrors the bank */
+/* top-center readout of the chosen tags — mirrors the bank, glows the
+   garden's seed color on hover, and doubles as the tag-press easter egg
+   trigger (see checkTagPresses). */
 const tagDisplayEl = document.getElementById("tagDisplay");
 function renderTagDisplay(){
   tagDisplayEl.innerHTML = "";
   for(const t of garden.meta.tags){
     const s = document.createElement("span");
     s.textContent = t;
+    s.style.setProperty("--glow", garden.meta.colors.seed);
+    s.addEventListener("click", () => pressTag(t));
     tagDisplayEl.appendChild(s);
+  }
+}
+
+/* two DISTINCT people (browser tabs) pressing the same tag within a couple
+   seconds of each other sends everyone currently on the page to another
+   page — a little synced "press together to unlock" moment. Each click
+   records {clientId, ts} into that tag's shared list; checkTagPresses (run
+   on every update, by everyone) looks for 2+ distinct clientIds still
+   inside the time window. */
+const TAG_PRESS_WINDOW_MS = 2000;
+function pressTag(t){
+  const now = Date.now();
+  tagPressChannel?.setData(draft => {
+    const recent = (draft[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
+    recent.push({ clientId, ts: now });
+    draft[t] = recent;
+  });
+}
+function checkTagPresses(data){
+  const now = Date.now();
+  for(const t in data){
+    const recent = (data[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
+    if(new Set(recent.map(e => e.clientId)).size >= 2){
+      window.location.href = "index.html";
+      return;
+    }
   }
 }
 
@@ -901,6 +963,10 @@ function connectChannels(){
   garden.meta = metaChannel.getData();
   applyMetaToUI();
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
+
+  // tag-press easter egg — see checkTagPresses below
+  tagPressChannel = playhtml.createPageData("tag-presses", {});
+  tagPressChannel.onUpdate(checkTagPresses);
 }
 
 /* pushes garden.meta as a whole to everyone else in the room */
