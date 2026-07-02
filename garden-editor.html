@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>a new season — build a garden</title>
+<title>୨ৎ cuttings જ⁀➴ loops ༄</title>
 <style>
   @font-face{
     font-family: "Deer Diary";
@@ -36,6 +36,7 @@
   }
   .navbtn:first-child{ border-top:none; }
   .navbtn:active{ background:#000; color:var(--paper); }
+  #navToggleBtn{ font-size:1.6rem; }
   /* pressed-looking while the panel it toggles is open, so it's obvious
      this same button is what closes it again */
   .navbtn[data-open="true"]{ background:#000; color:var(--paper); }
@@ -115,7 +116,6 @@
   .plantmark .txt{
     position:absolute; top:50%; left:100%; transform:translateY(-50%);
     margin-left:.4rem; white-space:nowrap; pointer-events:none;
-    -webkit-text-stroke:3px var(--ink); paint-order:stroke fill;
   }
   /* fallback for a plant saved with an empty canvas — nothing was drawn,
      so there's no path data to show */
@@ -336,7 +336,7 @@
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub">plant something new in this garden.</p>
+      <p class="sub" id="pSub">plant something new in this garden.</p>
 
       <label>the sound</label>
       <label class="filelabel" id="pFileLabel" tabindex="0">
@@ -350,12 +350,18 @@
         <button type="button" class="ghost" id="pClearCanvas" style="margin-left:.6rem; vertical-align:top;">clear</button>
       </div>
 
+      <label style="margin-top:1rem;">recipe screenshot (optional)</label>
+      <label class="filelabel" id="pRecipeLabel" tabindex="0">
+        <span id="pRecipeLabelText">choose image…</span>
+        <input type="file" id="pRecipeFile" accept="image/*" hidden>
+      </label>
+
       <label style="margin-top:1rem;">planted by</label>
       <input type="text" id="pName" placeholder="your name">
 
       <div class="actions">
         <button type="button" class="ghost" id="pCancelBtn">cancel</button>
-        <button type="button" class="primary" id="pSaveBtn" disabled>plant it</button>
+        <button type="button" class="primary" id="pSaveBtn" disabled>plant</button>
       </div>
     </div>
   </div>
@@ -400,7 +406,7 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, paths ([[{x,y},...],...]), color, x, y, pinned }
+  plants: {},   // plantId -> { id, name, audioRef, recipeImage, paths ([[{x,y},...],...]), color, x, y, pinned }
 };
 
 // declared here (not down by connectChannels(), where they conceptually
@@ -571,10 +577,9 @@ function renderPlantSlots(){
     el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
 
-    // drag to reposition — persists for everyone via plantSlotsChannel,
-    // same whole-object setData pattern the pinned toggle already used. A
+    // drag to reposition — persists for everyone via plantSlotsChannel. A
     // mousedown that never actually moves is treated as a plain click and
-    // just toggles pinned, same as before.
+    // opens this plant for editing instead (see openPlantEditModal).
     el.addEventListener("mousedown", e => {
       e.stopPropagation();
       e.preventDefault();
@@ -591,10 +596,12 @@ function renderPlantSlots(){
       function onUp(){
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
-        if(!moved) p.pinned = !p.pinned;
-        garden.plants[p.id] = p;
-        plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
-        if(!moved) renderPlantSlots();
+        if(moved){
+          garden.plants[p.id] = p;
+          plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
+        } else {
+          openPlantEditModal(p);
+        }
       }
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
@@ -1018,9 +1025,13 @@ async function uploadSeedFile(file, key){
    pre-filled as the plant's position.
    ========================================================================== */
 const plantScrim = document.getElementById("plantScrim");
+const pSub = document.getElementById("pSub");
 const pFile = document.getElementById("pFile");
 const pFileLabel = document.getElementById("pFileLabel");
 const pFileLabelText = document.getElementById("pFileLabelText");
+const pRecipeFile = document.getElementById("pRecipeFile");
+const pRecipeLabel = document.getElementById("pRecipeLabel");
+const pRecipeLabelText = document.getElementById("pRecipeLabelText");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
 const pName = document.getElementById("pName");
@@ -1030,7 +1041,9 @@ const hoverSquare = document.getElementById("hoverSquare");
 
 const localPlantAudioRefs = {};
 let plantDraftFile = null;
+let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
+let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
 
 const pctx = pCanvas.getContext("2d");
 // butt cap/miter join (canvas defaults) instead of round — jagged edges,
@@ -1074,43 +1087,105 @@ pFile.addEventListener("change", () => {
   validatePlant();
 });
 pFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pFile.click(); } });
+
+// optional — no validation gate, keeps whatever (if anything) was there
+// before when editing and nothing new is chosen
+pRecipeFile.addEventListener("change", () => {
+  plantDraftRecipeFile = pRecipeFile.files[0] || null;
+  pRecipeLabelText.textContent = plantDraftRecipeFile ? plantDraftRecipeFile.name : "choose image…";
+  pRecipeLabel.classList.toggle("has-file", !!plantDraftRecipeFile);
+});
+pRecipeLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pRecipeFile.click(); } });
+
 pName.addEventListener("input", validatePlant);
 function validatePlant(){
   // a drawing is required now — no plant without one, so there's never a
-  // plain colored box on the map, only ever the drawing itself
-  pSaveBtn.disabled = !plantDraftFile || !pName.value.trim() || !plantDraftPaths.length;
+  // plain colored box on the map, only ever the drawing itself. A new
+  // audio file is only required when planting new — editing can keep
+  // whatever audio was already there.
+  const needsFile = !editingPlantId;
+  pSaveBtn.disabled = (needsFile && !plantDraftFile) || !pName.value.trim() || !plantDraftPaths.length;
+}
+
+function redrawPaths(paths){
+  pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  for(const stroke of paths){
+    if(stroke.length < 2) continue;
+    pctx.beginPath();
+    pctx.moveTo(stroke[0].x, stroke[0].y);
+    for(const pt of stroke.slice(1)) pctx.lineTo(pt.x, pt.y);
+    pctx.stroke();
+  }
 }
 
 function openPlantModal(pos){
+  editingPlantId = null;
+  pSub.textContent = "plant something new in this garden.";
+  pSaveBtn.textContent = "plant";
   pendingPlantPos = pos || { x: CX, y: CY };
-  plantDraftFile = null;
+  plantDraftFile = null; plantDraftRecipeFile = null;
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
+  pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
   validatePlant();
   hideBuilder();
   plantScrim.classList.add("open");
 }
-function hidePlantModal(){ plantScrim?.classList.remove("open"); }
+
+/* editing reuses the same modal — pre-filled with the plant's current
+   name/drawing, position unchanged. A new audio/recipe file is optional;
+   leaving either blank keeps what was already there (see pSaveBtn below). */
+function openPlantEditModal(p){
+  editingPlantId = p.id;
+  pSub.textContent = "edit this planting.";
+  pSaveBtn.textContent = "save";
+  pendingPlantPos = { x: p.x, y: p.y };
+  plantDraftFile = null; plantDraftRecipeFile = null;
+  pFile.value = ""; pFileLabelText.textContent = "choose audio file… (keeps current if left blank)"; pFileLabel.classList.remove("has-file");
+  pRecipeFile.value = ""; pRecipeLabelText.textContent = p.recipeImage ? "choose image… (keeps current if left blank)" : "choose image…"; pRecipeLabel.classList.remove("has-file");
+  pName.value = p.name;
+  plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
+  redrawPaths(plantDraftPaths);
+  validatePlant();
+  hideBuilder();
+  plantScrim.classList.add("open");
+}
+function hidePlantModal(){ plantScrim?.classList.remove("open"); editingPlantId = null; }
 pCancelBtn.addEventListener("click", hidePlantModal);
 
 pSaveBtn.addEventListener("click", async () => {
-  pSaveBtn.disabled = true; pSaveBtn.textContent = "planting…";
-  const plantId = newId();
-  const audioRef = await uploadSeedFile(plantDraftFile, `plant-${plantId}`).catch(err => {
-    console.warn("plant upload failed, falling back to a local-only blob URL:", err);
-    return URL.createObjectURL(plantDraftFile);
-  });
+  const isEdit = !!editingPlantId;
+  pSaveBtn.disabled = true; pSaveBtn.textContent = isEdit ? "saving…" : "planting…";
+  const plantId = editingPlantId || newId();
+  const existing = garden.plants[plantId];
+
+  let audioRef = existing?.audioRef;
+  if(plantDraftFile){
+    audioRef = await uploadSeedFile(plantDraftFile, `plant-${plantId}`).catch(err => {
+      console.warn("plant upload failed, falling back to a local-only blob URL:", err);
+      return URL.createObjectURL(plantDraftFile);
+    });
+    localPlantAudioRefs[plantId] = audioRef;
+  }
+
+  let recipeImage = existing?.recipeImage || null;
+  if(plantDraftRecipeFile){
+    recipeImage = await uploadSeedFile(plantDraftRecipeFile, `plant-${plantId}-recipe`).catch(err => {
+      console.warn("recipe image upload failed, falling back to a local-only blob URL:", err);
+      return URL.createObjectURL(plantDraftRecipeFile);
+    });
+  }
+
   const plant = {
-    id: plantId, name: pName.value.trim(), audioRef,
-    paths: plantDraftPaths, color: garden.meta.colors.seed,
-    x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: false,
+    id: plantId, name: pName.value.trim(), audioRef, recipeImage,
+    paths: plantDraftPaths, color: existing?.color || garden.meta.colors.seed,
+    x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: existing?.pinned || false,
   };
-  localPlantAudioRefs[plantId] = audioRef;
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
   renderPlantSlots();
   hidePlantModal();
-  pSaveBtn.disabled = false; pSaveBtn.textContent = "plant it";
+  pSaveBtn.disabled = false; pSaveBtn.textContent = "plant";
 });
 
 /* planting is only allowed on a hot spot — a fixed grid spread evenly across
@@ -1141,7 +1216,11 @@ function nearestHotSpot(x, y){
   const occupied = Object.values(garden.plants || {});
   let best = null, bestDist = Infinity;
   for(const s of hotSpotPositions()){
-    if(occupied.some(p => Math.hypot(p.x - s.x, p.y - s.y) < 2)) continue;
+    // a hot spot within an existing plant's own 140x140 footprint is never
+    // offered — being near a plant means dragging it, not planting a new
+    // one on top of it, wherever it's actually sitting now (not just its
+    // original grid spot, since it may have been dragged since)
+    if(occupied.some(p => Math.abs(p.x - s.x) <= HOTSPOT_HALF && Math.abs(p.y - s.y) <= HOTSPOT_HALF)) continue;
     if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
     const d = Math.hypot(x - s.x, y - s.y);
     if(d < bestDist){ bestDist = d; best = s; }
