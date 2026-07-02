@@ -85,7 +85,7 @@
   #patternLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
   /* seed slots — fixed positions on a pattern-specific grid (never move once
-     the pattern is set). An empty one is a "+ add sound" invitation; a
+     the pattern is set). An empty one is a "+ add seed" invitation; a
      filled one shows its title/artist and previews on hover, like a plant. */
   #seedSlots{ position:absolute; inset:0; }
   /* the dot is the real anchor — sized+centered on its own, so toggling the
@@ -94,7 +94,7 @@
   .seedslot.empty{ cursor:pointer; }
   .seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
   .seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
-  /* empty seeds invite a click: the "+ add sound" text pulses in size while
+  /* empty seeds invite a click: the "+ add seed" text pulses in size while
      its own gradient fill (seed color <-> white) slides through it — both
      stop the instant a seed is added, since only .empty gets these. */
   @keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.1); } }
@@ -371,7 +371,7 @@
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub">add a sound to this seed.</p>
+      <p class="sub">seeds are the source of this garden only. others will be able to download and propogate them with other seed sounds.</p>
 
       <label>track title</label>
       <input type="text" id="sTitle" placeholder="track title">
@@ -588,7 +588,7 @@ function renderSeedSlots(){
     dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
     label.className = "txt";
-    label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add sound";
+    label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
     el.appendChild(dot); el.appendChild(label);
 
     if(seed){
