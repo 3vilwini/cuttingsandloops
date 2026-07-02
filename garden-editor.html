@@ -33,6 +33,11 @@
     background:var(--paper); color:var(--ink); padding:0;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; font-family:inherit; font-size:inherit; text-align:center;
+    /* without this the browser's native button chrome (a subtle bezel/
+       shadow baked into appearance:auto) shows through on top of our own
+       1px border, especially on :active — doubled-up stroke + a shadow
+       that was never actually in our CSS */
+    appearance:none; -webkit-appearance:none; outline:none; box-shadow:none;
   }
   .navbtn:first-child{ border-top:none; }
   .navbtn:active{ background:#000; color:var(--paper); }
