@@ -109,7 +109,7 @@
   @keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.1); } }
   @keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
   .seedslot.empty .txt{
-    background:linear-gradient(90deg, var(--glow,#fff) 0%, #fff 50%, var(--glow,#fff) 100%);
+    background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
     background-size:200% 100%;
     -webkit-background-clip:text; background-clip:text; color:transparent;
     animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
@@ -593,6 +593,8 @@ function renderSeedSlots(){
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
     el.style.setProperty("--glow", garden.meta.colors.seed);
+    el.style.setProperty("--text-color", garden.meta.colors.text);
+    el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     const dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
