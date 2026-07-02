@@ -758,8 +758,8 @@ function renderConnections(){
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", garden.meta.colors.seed);
-    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke", garden.meta.colors.text);
+    path.setAttribute("stroke-width", "1");
     path.setAttribute("stroke-dasharray", "6 5");
     path.setAttribute("vector-effect", "non-scaling-stroke");
     svg.appendChild(path);
