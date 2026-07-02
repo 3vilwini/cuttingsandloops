@@ -1,0 +1,266 @@
+/* sound garden — lean / full-bleed
+   the garden fills the screen; a quiet grey HUD floats above it.
+   colour lives in the plants; the chrome stays out of the way. */
+
+:root{
+  /* the field: a muted, dusk-green garden so grey text reads over it */
+  --field:       #15241c;
+  --field-deep:  #0e1a14;
+  --field-shadow:#0a140f;
+
+  /* the only real colour, kept for the living things (plants, you) */
+  --bloom:       #d11fa0;
+  --bloom-soft:  #ef72cf;
+  --seed:        #e0a32f;   /* seeds + roots: an earthier amber */
+  --seed-soft:   #f1c46b;
+
+  /* the HUD: neutral sans, grey, slightly transparent (the alpha = transparency) */
+  --hud:         rgba(236,236,238,.55);
+  --hud-strong:  rgba(236,236,238,.85);
+  --hud-faint:   rgba(236,236,238,.32);
+  --hud-line:    rgba(236,236,238,.16);
+
+  --sans: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, sans-serif;
+}
+
+*{ box-sizing:border-box; }
+html,body{
+  margin:0; padding:0; height:100%;
+  overflow:hidden;                 /* the page itself never scrolls — only the garden does */
+  background: var(--field-deep);
+  font-family: var(--sans);
+}
+
+/* =========================================================
+   LAYER 1 — the garden, fixed to fill the whole screen
+   ========================================================= */
+.viewport{
+  position: fixed; inset: 0;        /* top:0 right:0 bottom:0 left:0 → full screen */
+  z-index: 0;
+  overflow: auto;                   /* the big field scrolls inside this fixed window */
+  cursor: crosshair;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;            /* hide scrollbars for the lean look… */
+}
+.viewport::-webkit-scrollbar{ display:none; }   /* …keep it scrollable, just invisible */
+.viewport:focus-visible{ outline: none; }
+
+/* the field is larger than the viewport (size set by garden.js). Uneven dusk light. */
+.field{
+  position: relative;
+  background:
+    radial-gradient(460px 380px at 18% 22%, rgba(239,114,207,.06), transparent 70%),
+    radial-gradient(560px 520px at 76% 38%, rgba(236,236,238,.035), transparent 70%),
+    radial-gradient(420px 560px at 40% 78%, rgba(239,114,207,.05), transparent 70%),
+    radial-gradient(640px 640px at 88% 84%, rgba(236,236,238,.025), transparent 72%),
+    var(--field);
+}
+
+/* the roots: an SVG layer behind the plants, linking seeds → plants */
+.roots{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; overflow:visible; }
+.roots path{ fill:none; stroke: var(--seed); stroke-width:2; opacity:.4; stroke-linecap:round; stroke-dasharray:3 7; }
+
+/* a plant — organic, playful, the one bit of colour. (border-radius set per plot inline) */
+.plot{
+  position:absolute; margin:0; padding:0; border:0;
+  width:76px; height:76px; font-size:34px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  background: var(--field-shadow);
+  color: var(--hud-strong);
+  cursor:pointer;
+  z-index:2;                              /* above the roots layer */
+  border-radius: 48% 52% 57% 43% / 53% 47% 53% 47%;
+  box-shadow: 0 2px 10px rgba(8,16,12,.5);
+  transition: opacity .5s ease, filter .35s ease, box-shadow .35s ease;
+  will-change: transform, opacity; outline:none;
+}
+.plot:focus-visible{ box-shadow: 0 0 0 3px var(--bloom-soft); z-index:6; }
+.plot.empty{ background:transparent; border:1.5px dashed var(--hud-line); font-size:0; }
+.plot.empty::after{ content:"·"; font-size:30px; color: var(--hud-faint); }
+.plot.planted{ border:1.5px solid rgba(209,31,160,.5); }
+.plot.pinned{ border-color: var(--bloom); box-shadow: 0 0 0 2px var(--bloom), 0 0 22px rgba(209,31,160,.55); }
+.plot.near{ filter: saturate(1.3) brightness(1.08); box-shadow: 0 0 26px rgba(239,114,207,.45); }
+
+/* seeds: the earthier, amber kind */
+.plot.seed{ border-color: rgba(224,163,47,.55); }
+.plot.seed.pinned{ border-color: var(--seed); box-shadow: 0 0 0 2px var(--seed), 0 0 22px rgba(224,163,47,.55); }
+.plot.seed.near{ box-shadow: 0 0 26px rgba(241,196,107,.5); }
+.plot.seed .fresh > i{ background: var(--seed-soft); }
+
+.plot .fresh{ position:absolute; left:18%; right:18%; bottom:8%; height:3px; border-radius:2px; background: rgba(236,236,238,.16); overflow:hidden; }
+.plot .fresh > i{ display:block; height:100%; background: var(--bloom-soft); }
+.plot.empty .fresh{ display:none; }
+
+@media (prefers-reduced-motion: no-preference){
+  .plot.near{ animation: sway 3.2s ease-in-out infinite; }
+  @keyframes sway{ 0%,100%{ rotate:-2deg; } 50%{ rotate:2deg; } }
+}
+
+/* you, the listener */
+.listener{
+  position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px;
+  border-radius:50%; background: var(--bloom);
+  box-shadow: 0 0 0 2px rgba(236,236,238,.7);
+  pointer-events:none; z-index:7;
+}
+@media (prefers-reduced-motion: no-preference){
+  .listener::after{ content:""; position:absolute; inset:-6px; border-radius:50%; border:2px solid rgba(239,114,207,.55); animation: ripple 2.4s ease-out infinite; }
+  @keyframes ripple{ 0%{ transform:scale(.5); opacity:.8 } 100%{ transform:scale(3.2); opacity:0 } }
+}
+
+/* =========================================================
+   LAYER 2 — the HUD: fixed, floats above, ignores scroll
+   ========================================================= */
+.hud{
+  position: fixed; inset: 0; z-index: 10;
+  pointer-events: none;            /* clicks fall THROUGH the empty HUD to the garden… */
+  padding: clamp(14px, 2.4vw, 26px);
+}
+/* …only the actual interactive chips catch clicks again */
+.hud button, .hud #title, .hud .filelabel{ pointer-events: auto; }
+
+.hud-corner{ position:absolute; }
+.hud-corner.tl{ top: clamp(14px,2.4vw,26px); left: clamp(14px,2.4vw,26px); max-width: min(40ch, 60vw); }
+.hud-corner.tr{ top: clamp(14px,2.4vw,26px); right: clamp(14px,2.4vw,26px); }
+.hud-corner.bl{ bottom: clamp(14px,2.4vw,26px); left: clamp(14px,2.4vw,26px); max-width: min(50ch, 70vw); }
+.hud-corner.br{ bottom: clamp(14px,2.4vw,26px); right: clamp(14px,2.4vw,26px); max-width: min(46ch, 64vw); text-align:right; }
+
+#title{
+  font-family: var(--sans);
+  font-weight: 400; font-size: clamp(13px, 1.5vw, 15px);
+  letter-spacing: .015em; color: var(--hud-strong);
+  margin: 0 0 .5em; line-height: 1.3;
+}
+#title:focus-visible{ outline:none; color: var(--bloom-soft); }
+#title::after{ content:" ✎"; color: var(--hud-faint); }
+
+.intro{ margin:0; font-size: 12px; line-height:1.5; color: var(--hud); }
+
+.controls{ display:flex; flex-wrap:wrap; gap: 2px 4px; justify-content:flex-end; max-width: min(64vw, 620px); }
+.ctl{
+  pointer-events:auto;
+  background: none; border: 0;
+  padding: 3px 7px; border-radius: 7px;   /* real hit area, so hover matches the text */
+  font-family: var(--sans); font-size: 12px; letter-spacing:.01em;
+  color: var(--hud); cursor: pointer;
+  transition: color .15s ease, background .15s ease;
+}
+.ctl:hover{ color: var(--hud-strong); background: rgba(236,236,238,.08); }
+.ctl:focus-visible{ outline: 1px solid var(--bloom-soft); outline-offset: 2px; color: var(--hud-strong); }
+.ctl[aria-pressed="true"]{ color: var(--bloom-soft); }
+.filelabel{ position:relative; }
+.filelabel input{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+
+.status{ margin:0; font-size:12px; color: var(--hud); }
+footer{ margin:0; font-size:11px; line-height:1.6; color: var(--hud-faint); }
+kbd{ font-family: var(--sans); color: var(--hud); border:1px solid var(--hud-line); border-radius:3px; padding:0 4px; font-size:.92em; }
+
+/* =========================================================
+   LAYER 3 — planting dialog (kept lean too)
+   ========================================================= */
+.scrim{ position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:16px; background: rgba(8,16,12,.82); }
+.scrim.open{ display:flex; }
+.dialog{ background: var(--field-deep); border:1px solid var(--hud-line); border-radius:14px; padding: clamp(18px,3vw,28px); width:min(440px,100%); color: var(--hud-strong); }
+.dialog h2{ font-family:var(--sans); font-weight:500; color: var(--hud-strong); margin:0 0 4px; font-size:16px; letter-spacing:.01em; }
+.dialog p.sub{ margin:0 0 18px; font-size:12px; color: var(--hud); }
+.field-row{ margin-bottom:13px; }
+.field-row label{ display:block; font-size:11px; color: var(--hud); margin-bottom:5px; letter-spacing:.02em; }
+.field-row input[type=text]{ width:100%; background: var(--field-shadow); border:1px solid var(--hud-line); border-radius:8px; color: var(--hud-strong); padding:9px 11px; font-family:var(--sans); font-size:13px; }
+.field-row input:focus-visible{ outline:1px solid var(--bloom-soft); }
+.glyphs{ display:flex; flex-wrap:wrap; gap:6px; }
+.glyphs button{ font-size:22px; background:var(--field-shadow); border:1px solid transparent; border-radius:8px; padding:4px 8px; cursor:pointer; }
+.glyphs button[aria-pressed="true"]{ border-color: var(--bloom); }
+
+.muted{ color: var(--hud-faint); font-weight:400; }
+.kindpick{ display:flex; gap:6px; }
+.kindpick button{ flex:1; font-family:var(--sans); font-size:12px; color:var(--hud); background:var(--field-shadow); border:1px solid var(--hud-line); border-radius:8px; padding:8px 10px; cursor:pointer; }
+.kindpick button[aria-pressed="true"]{ color:var(--hud-strong); border-color:var(--bloom); }
+.kindpick button[data-kind="seed"][aria-pressed="true"]{ border-color:var(--seed); }
+.kindpick button:disabled{ opacity:.5; cursor:default; }
+.seedlist{ display:flex; flex-wrap:wrap; gap:6px; max-height:120px; overflow:auto; }
+.seedchip{ font-family:var(--sans); font-size:12px; color:var(--hud); background:var(--field-shadow); border:1px solid var(--hud-line); border-radius:999px; padding:5px 10px; cursor:pointer; }
+.seedchip[aria-pressed="true"]{ color:var(--field-deep); background:var(--seed); border-color:var(--seed); }
+.capture{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin: 6px 0 4px; }
+.capture button, .capture .filelabel{ font-family:var(--sans); font-size:12px; background:var(--field-shadow); color: var(--hud-strong); border:1px solid var(--hud-line); border-radius:999px; padding:8px 14px; cursor:pointer; }
+.capture button.recording{ background: var(--bloom); color:#fff; border-color:var(--bloom); }
+.capstatus{ font-size:12px; color: var(--hud); min-height:1.3em; }
+.dialog .row{ display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+.dialog .row button{ font-family:var(--sans); font-size:13px; border-radius:999px; padding:9px 18px; cursor:pointer; }
+.dialog .row .plant{ background: var(--bloom); color:#fff; border:1px solid var(--bloom); font-weight:500; }
+.dialog .row .plant:disabled{ opacity:.35; cursor:not-allowed; }
+.dialog .row .cancel{ background:transparent; color: var(--hud); border:1px solid var(--hud-line); }
+
+/* tighten the corners a touch on small screens so they don't collide */
+@media (max-width: 640px){
+  .hud-corner.tl{ max-width: 70vw; }
+  .controls{ max-width: 70vw; }
+  .intro{ display:none; }   /* drop the tagline on phones to keep it clean */
+}
+
+/* ---- mix screenshots (plants only): badge · peek · lightbox · upload ---- */
+/* the badge: a tiny "frame" in the corner, marking a plant that carries a mix shot.
+   JS only adds .has-shot in provenance views, so it's invisible in the default plants view. */
+.plot.has-shot::after{
+  content:""; position:absolute; top:7px; left:9px;
+  width:10px; height:8px; border-radius:2px;
+  border:1.5px solid var(--bloom-soft);
+  background: rgba(14,26,20,.5);
+  box-shadow: 0 0 0 2px rgba(14,26,20,.35);
+}
+
+/* the floating thumbnail that peeks on hover / focus */
+.shot-peek{
+  position:fixed; z-index:40; display:none; padding:5px;
+  background:var(--field-deep); border:1px solid var(--bloom);
+  border-radius:10px; box-shadow:0 10px 34px rgba(0,0,0,.55);
+  pointer-events:auto; cursor:zoom-in;
+}
+.shot-peek.open{ display:block; }
+.shot-peek img{ display:block; max-width:240px; max-height:178px; border-radius:6px; }
+
+/* the full-size lightbox */
+.shot-box{
+  position:fixed; inset:0; z-index:60; display:none;
+  align-items:center; justify-content:center;
+  background: rgba(5,12,9,.92); padding:24px; cursor:zoom-out;
+}
+.shot-box.open{ display:flex; }
+.shot-box img{ max-width:92vw; max-height:90vh; border-radius:10px; box-shadow:0 14px 60px rgba(0,0,0,.6); }
+
+/* the upload row inside the planting / editing dialog */
+.shotpick{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.shot-thumb{ max-width:88px; max-height:58px; border-radius:6px; border:1px solid var(--hud-line); object-fit:cover; }
+.ghost{
+  font-family:var(--sans); font-size:12px; color:var(--hud);
+  background:none; border:1px solid var(--hud-line);
+  border-radius:999px; padding:6px 12px; cursor:pointer;
+}
+.ghost:hover{ color:var(--hud-strong); }
+
+/* weather button ON: a slow muted sky, painted only on the glyphs */
+#weatherBtn[aria-pressed="true"]{
+  color:transparent;
+  -webkit-text-fill-color:transparent;     /* Safari */
+  background-image: linear-gradient(
+    100deg,
+    #9fb1c4 0%,    /* nuageux — bleu-gris */
+    #c2c8d0 9%,    /* gris nuage */
+    #e6a8b0 26%,   /* couchant — rose poudré */
+    #e8a36b 38%,   /* couchant — orangé doux */
+    #3a4066 57%,   /* nuit — bleu nuit */
+    #14151f 70%,   /* nuit — presque noir */
+    #6f8298 86%,   /* l'aube revient */
+    #9fb1c4 100%   /* nuageux — identique au début, boucle invisible */
+  );
+  -webkit-background-clip:text;
+  background-clip:text;
+  background-size:300% 100%;
+  animation: weather-sky 18s linear infinite;
+}
+@keyframes weather-sky{
+  from{ background-position:0%   50%; }
+  to  { background-position:100% 50%; }
+}
+@media (prefers-reduced-motion: reduce){
+  #weatherBtn[aria-pressed="true"]{ animation:none; }
+}

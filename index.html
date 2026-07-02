@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sound garden</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- LAYER 1 — the garden fills the whole screen and scrolls underneath -->
+<div class="viewport" id="viewport" tabindex="0"
+     aria-label="Sound field. Arrow keys to wander, Tab to move between planted sounds.">
+  <div class="field" id="field">
+    <svg class="roots" id="roots" aria-hidden="true"></svg>
+    <div class="listener" id="listener" aria-hidden="true"></div>
+    <!-- plots injected by garden.js -->
+  </div>
+</div>
+
+<!-- LAYER 2 — the HUD: fixed, floats above, doesn't scroll with the garden -->
+<div class="hud">
+
+  <div class="hud-corner tl">
+    <h1 id="title" contenteditable="true" spellcheck="false" aria-label="Garden title, editable">jardin I </h1>
+    <p class="intro">a  garden to cut sound plants. <br> wander around and encounter seeds and plants left by others. <br>click bare ground to start sowing.</p>
+  </div>
+
+  <div class="hud-corner tr controls">
+    <button class="ctl" id="weatherBtn" aria-pressed="false" title="Sounds slowly dry out and fade. Water to revive them.">𓂃 ོ☼𓂃 weather</button>
+    <button class="ctl" id="sowBtn" title="Plant a sound where you're standing">𓇢𓆸 sow</button>
+    <button class="ctl" id="viewBtn" title="Cycle layers: plants then seeds then no roots then all">᭄᭡ plants</button>
+    <button class="ctl" id="stopBtn" title="Unpin everything and let the field fall quiet">༄ quiet</button>
+    <button class="ctl" id="exportBtn" title="Download this whole field as one garden.json file">જ⁀➴ export</button>
+    <label class="ctl filelabel" id="openLabel" tabindex="0" title="Open a saved field file">୨ৎ open
+      <input type="file" id="importInput" accept="application/json,.json">
+    </label>
+    <button class="ctl" id="clearBtn" title="Empty the field and forget the saved one">𓍼 clear</button>
+  </div>
+
+  <p class="hud-corner bl status" id="status" aria-live="polite">a field, bigger than the screen. wander in.</p>
+
+  <footer class="hud-corner br">
+    <kbd>&larr; &uarr; &rarr; &darr;</kbd> wander &middot; <kbd>tab</kbd> between sounds &middot; drag a sound to move it (height = pitch) &middot;
+    double-click or <kbd>e</kbd> edit &middot; <kbd>enter</kbd> plant / pin &middot; <kbd>w</kbd> water &middot;
+    <kbd>shift</kbd>+click or <kbd>d</kbd> download &middot; <kbd>alt</kbd>+click or <kbd>del</kbd> remove (it fades &mdash; <kbd>w</kbd> to keep) &middot;
+    <kbd>v</kbd> view a plant&rsquo;s mix (outside the plants layer) &middot; <kbd>p</kbd> sow &middot; <kbd>esc</kbd> close &middot; saves itself as you go
+  </footer>
+
+</div>
+
+<!-- hover/focus preview of a plant's mix screenshot -->
+<div class="shot-peek" id="shotPeek" aria-hidden="true"><img alt="mix screenshot preview"></div>
+<!-- full-size lightbox -->
+<div class="shot-box" id="shotBox" role="dialog" aria-modal="true" aria-hidden="true"><img alt="mix screenshot"></div>
+
+<!-- LAYER 3 — the planting / editing dialog, above everything -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dialog">
+    <h2 id="dlgTitle">plant a sound</h2>
+    <p class="sub">planting is publishing. say what it is and who made it.</p>
+
+    <div class="field-row">
+      <label>kind</label>
+      <div class="kindpick" id="kindPick">
+        <button type="button" data-kind="plant" aria-pressed="true">𖀧 plant — a composition</button>
+        <button type="button" data-kind="seed" aria-pressed="false">𓇢 seed — a source sound</button>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <label for="fName">name of the sound</label>
+      <input type="text" id="fName" placeholder="e.g. kettle drone">
+    </div>
+    <div class="field-row">
+      <label for="fBy">planted by</label>
+      <input type="text" id="fBy" placeholder="your name / handle">
+    </div>
+    <div class="field-row">
+      <label>glyph</label>
+      <div class="glyphs" id="glyphPicker"></div>
+    </div>
+
+    <div class="field-row" id="seedsRow">
+      <label>sampled from <span class="muted">&mdash; check the seeds you used (1&ndash;4)</span></label>
+      <div class="seedlist" id="seedList"></div>
+    </div>
+
+    <div class="field-row" id="shotRow">
+      <label>mix screenshot <span class="muted">&mdash; optional &middot; how the seeds were assembled</span></label>
+      <div class="shotpick">
+        <label class="filelabel" id="shotLabel" tabindex="0">add image&hellip;
+          <input type="file" id="shotInput" accept="image/*">
+        </label>
+        <button type="button" class="ghost" id="shotClear" hidden>remove</button>
+        <img class="shot-thumb" id="shotPreview" alt="mix screenshot preview" hidden>
+      </div>
+    </div>
+
+    <div class="field-row" id="captureRow">
+      <label>the sound itself</label>
+      <div class="capture">
+        <button id="recBtn">&#9679; record</button>
+        <label class="filelabel" tabindex="0">load file&hellip;
+          <input type="file" id="fileInput" accept="audio/*">
+        </label>
+      </div>
+      <div class="capstatus" id="capStatus" aria-live="polite">no sound captured yet.</div>
+    </div>
+
+    <div class="row">
+      <button class="cancel" id="cancelBtn">cancel</button>
+      <button class="plant" id="plantBtn" disabled>plant</button>
+    </div>
+  </div>
+</div>
+
+<script src="garden.js" defer></script>
+</body>
+</html>
