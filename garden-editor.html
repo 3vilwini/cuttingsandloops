@@ -119,8 +119,8 @@
      actual plant. Each .plantmark re-enables pointer-events on itself. */
   #plantSlots{ position:absolute; inset:0; pointer-events:none; }
 
-  /* dashed curved lines from a clicked seed to every plant sampled from it
-     — see toggleSeedConnections/renderConnections */
+  /* dashed curved lines from every seed to the plants sampled from it —
+     shown/hidden by the "roots" toggle, see applyViewToggles/renderConnections */
   #connectionsLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
   /* a plant is its own freehand drawing on the map — no square/border
@@ -629,10 +629,10 @@ function renderSeedSlots(){
         audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
       });
       el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
-      // click toggles the dashed connection lines to every plant sampled
-      // from this seed — same stopPropagation reasoning as the empty-seed
-      // click below, since this can also sit near a plant hot spot
-      el.addEventListener("click", e => { e.stopPropagation(); toggleSeedConnections(i); });
+      // click flips the same "roots" switch the bottom bar has — same
+      // stopPropagation reasoning as the empty-seed click below, since this
+      // can also sit near a plant hot spot
+      el.addEventListener("click", e => { e.stopPropagation(); toggleView("roots"); });
     } else {
       // stopPropagation matters here — without it this click also bubbles to
       // the field's own click handler, which independently checks proximity
@@ -732,42 +732,43 @@ function renderPlantSlots(){
   renderConnections();   // plants (and their positions) may have changed
 }
 
-/* clicking a filled seed shows dashed curved lines to every plant whose
-   sampledFrom includes it — click the same seed again (or a different one)
-   to change/clear it. Only one seed's connections show at a time. */
-let activeConnectionSeed = null;   // seed slot index (number), or null
-function toggleSeedConnections(i){
-  activeConnectionSeed = (activeConnectionSeed === i) ? null : i;
-  renderConnections();
-}
+/* dashed curved lines from every filled seed to each plant whose
+   sampledFrom includes it. Always rendered (same as the seed/plant/label
+   layers) — visibility is purely VIEW_STATE.roots via applyViewToggles, the
+   same "roots" switch in the bottom bar. Clicking a filled seed doesn't
+   pick which one to show anymore — it just flips that same switch, via
+   toggleView, exactly like clicking the bottom-bar button does. */
 function renderConnections(){
   const svg = document.getElementById("connectionsLayer");
   svg.innerHTML = "";
   svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
-  if(activeConnectionSeed === null) return;
-  const seed = garden.seeds[activeConnectionSeed];
-  if(!seed) return;
-  const label = `${seed.title} - ${seed.artist}`;
-  const o = seedFieldOffsets()[activeConnectionSeed];
-  const from = { x: CX + o.dx, y: CY + o.dy };
-  const connected = Object.values(garden.plants || {}).filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
-  for(const p of connected){
-    // bow the line out to the side, perpendicular to the straight path
-    // between them, so overlapping connections stay visually distinct
-    // instead of stacking as straight lines
-    const dx = p.x - from.x, dy = p.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const bow = 40;
-    const midX = (from.x + p.x) / 2 - (dy / len) * bow;
-    const midY = (from.y + p.y) / 2 + (dx / len) * bow;
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", p.color);
-    path.setAttribute("stroke-width", "1");
-    path.setAttribute("stroke-dasharray", "6 5");
-    path.setAttribute("vector-effect", "non-scaling-stroke");
-    svg.appendChild(path);
+  const offsets = seedFieldOffsets();
+  const plants = Object.values(garden.plants || {});
+  for(const i in garden.seeds){
+    const seed = garden.seeds[i];
+    if(!seed) continue;
+    const label = `${seed.title} - ${seed.artist}`;
+    const o = offsets[i];
+    const from = { x: CX + o.dx, y: CY + o.dy };
+    const connected = plants.filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
+    for(const p of connected){
+      // bow the line out to the side, perpendicular to the straight path
+      // between them, so overlapping connections stay visually distinct
+      // instead of stacking as straight lines
+      const dx = p.x - from.x, dy = p.y - from.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bow = 40;
+      const midX = (from.x + p.x) / 2 - (dy / len) * bow;
+      const midY = (from.y + p.y) / 2 + (dx / len) * bow;
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", p.color);
+      path.setAttribute("stroke-width", "1");
+      path.setAttribute("stroke-dasharray", "6 5");
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(path);
+    }
   }
 }
 
@@ -963,14 +964,18 @@ function applyViewToggles(){
   document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
     .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
 }
+// shared by the bottom-bar buttons themselves and anything else that wants
+// to flip one of these (a filled seed's click uses this same function for
+// "roots" — same mechanism, not a separate parallel toggle)
+function toggleView(key){
+  VIEW_STATE[key] = !VIEW_STATE[key];
+  document.querySelectorAll(`#viewToggles button[data-key="${key}"]`)
+    .forEach(b => b.setAttribute("data-on", String(VIEW_STATE[key])));
+  applyViewToggles();
+}
 document.querySelectorAll("#viewToggles button").forEach(b => {
   b.setAttribute("data-on", "true");
-  b.addEventListener("click", () => {
-    const key = b.dataset.key;
-    VIEW_STATE[key] = !VIEW_STATE[key];
-    b.setAttribute("data-on", String(VIEW_STATE[key]));
-    applyViewToggles();
-  });
+  b.addEventListener("click", () => toggleView(b.dataset.key));
 });
 
 const viewportEl = document.getElementById("viewport");
