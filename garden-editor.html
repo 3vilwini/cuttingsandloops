@@ -93,11 +93,21 @@
 
   #plantSlots{ position:absolute; inset:0; }
 
+  /* a plant is its own freehand drawing on the map — no square/border
+     around it, just the strokes themselves at a true 3px on-screen width
+     (vector-effect:non-scaling-stroke on each polyline keeps that width
+     constant no matter how much the viewBox is scaled down for display) */
   .plantmark{
-    position:absolute; width:34px; height:34px; transform:translate(-50%,-50%);
-    border:2px solid #000; cursor:pointer; background-size:cover; background-position:center;
+    position:absolute; width:50px; height:50px; transform:translate(-50%,-50%);
+    cursor:pointer;
   }
-  .plantmark.pinned{ box-shadow: 0 0 0 3px rgba(0,0,0,.35); }
+  .plantmark svg{ width:100%; height:100%; overflow:visible; }
+  .plantmark.pinned{ filter:drop-shadow(0 0 2px rgba(0,0,0,.6)); }
+  /* fallback for a plant saved with an empty canvas — nothing was drawn,
+     so there's no path data to show */
+  .plantmark .fallback{
+    position:absolute; inset:0; border:2px solid #000;
+  }
   /* shown only when hovering a plantable hot spot (see seedHotSpots) —
      border color is set inline to the garden's current seed color */
   .hoversquare{
@@ -373,7 +383,7 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, drawing (dataURL), color, x, y, pinned }
+  plants: {},   // plantId -> { id, name, audioRef, paths ([[{x,y},...],...]), color, x, y, pinned }
 };
 
 // declared here (not down by connectChannels(), where they conceptually
@@ -487,6 +497,8 @@ function renderSeedSlots(){
   });
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 function renderPlantSlots(){
   const layer = document.getElementById("plantSlots");
   layer.innerHTML = "";
@@ -494,9 +506,30 @@ function renderPlantSlots(){
     const el = document.createElement("div");
     el.className = "plantmark" + (p.pinned ? " pinned" : "");
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
-    el.style.background = p.color;
-    if(p.drawing) el.style.backgroundImage = `url(${p.drawing})`;
     el.title = p.name;
+
+    if(p.paths && p.paths.length){
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", `0 0 ${pCanvas.width} ${pCanvas.height}`);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      p.paths.forEach(stroke => {
+        if(stroke.length < 2) return;
+        const poly = document.createElementNS(SVG_NS, "polyline");
+        poly.setAttribute("points", stroke.map(pt => `${pt.x},${pt.y}`).join(" "));
+        poly.setAttribute("fill", "none");
+        poly.setAttribute("stroke", p.color);
+        poly.setAttribute("stroke-width", "3");
+        poly.setAttribute("stroke-linecap", "round");
+        poly.setAttribute("vector-effect", "non-scaling-stroke");
+        svg.appendChild(poly);
+      });
+      el.appendChild(svg);
+    } else {
+      const fallback = document.createElement("div");
+      fallback.className = "fallback";
+      fallback.style.background = p.color;
+      el.appendChild(fallback);
+    }
     let audioEl = null;
     el.addEventListener("mouseenter", () => {
       const ref = p.audioRef || localPlantAudioRefs[p.id];
@@ -909,14 +942,34 @@ let pendingPlantPos = null;
 const pctx = pCanvas.getContext("2d");
 pctx.lineWidth = 3; pctx.lineCap = "round";
 let drawing = false;
+// the canvas is just live drawing feedback in the modal — what actually gets
+// saved/rendered on the map is the raw stroke points themselves (see
+// renderPlantSlots), as SVG polylines, so the marker is the drawing itself
+// instead of a rasterized square thumbnail.
+let plantDraftPaths = [];
+let currentStroke = null;
 function canvasPos(e){
   const r = pCanvas.getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
-pCanvas.addEventListener("pointerdown", e => { drawing = true; const p = canvasPos(e); pctx.beginPath(); pctx.moveTo(p.x, p.y); });
-pCanvas.addEventListener("pointermove", e => { if(!drawing) return; const p = canvasPos(e); pctx.lineTo(p.x, p.y); pctx.stroke(); });
+pCanvas.addEventListener("pointerdown", e => {
+  drawing = true;
+  const p = canvasPos(e);
+  currentStroke = [p];
+  plantDraftPaths.push(currentStroke);
+  pctx.beginPath(); pctx.moveTo(p.x, p.y);
+});
+pCanvas.addEventListener("pointermove", e => {
+  if(!drawing) return;
+  const p = canvasPos(e);
+  currentStroke.push(p);
+  pctx.lineTo(p.x, p.y); pctx.stroke();
+});
 window.addEventListener("pointerup", () => { drawing = false; });
-pClearCanvas.addEventListener("click", () => pctx.clearRect(0, 0, pCanvas.width, pCanvas.height));
+pClearCanvas.addEventListener("click", () => {
+  pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  plantDraftPaths = [];
+});
 
 pFile.addEventListener("change", () => {
   plantDraftFile = pFile.files[0] || null;
@@ -934,7 +987,7 @@ function openPlantModal(pos){
   pendingPlantPos = pos || { x: CX, y: CY };
   plantDraftFile = null;
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
-  pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
   validatePlant();
   hideBuilder();
   plantScrim.classList.add("open");
@@ -951,7 +1004,7 @@ pSaveBtn.addEventListener("click", async () => {
   });
   const plant = {
     id: plantId, name: pName.value.trim(), audioRef,
-    drawing: pCanvas.toDataURL(), color: garden.meta.colors.seed,
+    paths: plantDraftPaths, color: garden.meta.colors.seed,
     x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: false,
   };
   localPlantAudioRefs[plantId] = audioRef;
