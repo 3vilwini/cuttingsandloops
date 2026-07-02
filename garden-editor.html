@@ -94,8 +94,23 @@
   .seedslot.empty{ cursor:pointer; }
   .seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
   .seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
+  /* empty seeds invite a click: the "+ add sound" text pulses in size while
+     its own gradient fill (seed color <-> white) slides through it — both
+     stop the instant a seed is added, since only .empty gets these. */
+  @keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.1); } }
+  @keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
+  .seedslot.empty .txt{
+    background:linear-gradient(90deg, var(--glow,#fff) 0%, #fff 50%, var(--glow,#fff) 100%);
+    background-size:200% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
+  }
 
-  #plantSlots{ position:absolute; inset:0; }
+  /* the layer itself must not capture pointer events — it's the full size
+     of the field, and would otherwise sit on top of everything (including
+     the seed slots underneath) and swallow clicks even where there's no
+     actual plant. Each .plantmark re-enables pointer-events on itself. */
+  #plantSlots{ position:absolute; inset:0; pointer-events:none; }
 
   /* a plant is its own freehand drawing on the map — no square/border
      around it, just the strokes themselves, at the exact same scale they
@@ -105,7 +120,7 @@
      each polyline is just a safety net in case that ever changes. */
   .plantmark{
     position:absolute; width:140px; height:140px; transform:translate(-50%,-50%);
-    cursor:grab;
+    cursor:grab; pointer-events:auto;
   }
   .plantmark:active{ cursor:grabbing; }
   .plantmark svg{ width:100%; height:100%; overflow:visible; }
@@ -156,7 +171,6 @@
     position:fixed; top:2.5rem; left:calc(2.5rem + 2.3rem + .6rem); z-index:2;
     width:100%; max-width:250px; background:var(--paper); color:var(--ink);
     border:2px solid #000; border-radius:0;
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
   }
   /* docks under the swirl button's own panel, next to the seed-list nav
      icon right below it — same left offset, shifted down to that row */
@@ -171,7 +185,6 @@
   .titlebar{
     height:18px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
     background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
-    cursor:move;
   }
   .titlebar .closebox{ width:9px; height:9px; border:1px solid #000; background:var(--paper); flex-shrink:0; }
   .cardbody{ padding:.8rem .9rem; }
@@ -237,7 +250,6 @@
   .modal{
     width:100%; max-width:680px; max-height:85vh; overflow:auto;
     background:var(--paper); color:var(--ink); border:2px solid #000; border-radius:0;
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
   }
   .modal .cardbody{ padding:1.6rem; }
   .modal h2{ margin:0 0 .2rem; font-size:inherit; }
@@ -257,7 +269,7 @@
   }
   .filelabel input{ display:none; }
   .filelabel.has-file{ color:#000; font-weight:600; }
-  #pCanvas{ border:1px solid #000; cursor:crosshair; touch-action:none; background:var(--paper); }
+  #pCanvas{ border:2px solid #000; cursor:crosshair; touch-action:none; background:var(--paper); }
 </style>
 </head>
 <body>
@@ -573,6 +585,7 @@ function renderSeedSlots(){
     el.className = "seedslot" + (seed ? "" : " empty");
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
+    el.style.setProperty("--glow", garden.meta.colors.seed);
     const dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
@@ -589,7 +602,12 @@ function renderSeedSlots(){
       });
       el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
     } else {
-      el.addEventListener("click", () => openSeedModal(i));
+      // stopPropagation matters here — without it this click also bubbles to
+      // the field's own click handler, which independently checks proximity
+      // to a *plant* hot spot (a completely different, denser grid) and
+      // would immediately close this seed modal and open the plant one
+      // instead, since a seed slot and a plant hot spot can easily overlap
+      el.addEventListener("click", e => { e.stopPropagation(); openSeedModal(i); });
     }
     layer.appendChild(el);
   });
@@ -616,7 +634,7 @@ function renderPlantSlots(){
         poly.setAttribute("points", stroke.map(pt => `${pt.x},${pt.y}`).join(" "));
         poly.setAttribute("fill", "none");
         poly.setAttribute("stroke", p.color);
-        poly.setAttribute("stroke-width", "3");
+        poly.setAttribute("stroke-width", "2");
         poly.setAttribute("stroke-linecap", "butt");
         poly.setAttribute("stroke-linejoin", "miter");
         poly.setAttribute("vector-effect", "non-scaling-stroke");
@@ -937,25 +955,6 @@ function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAt
 // closed by default for every visitor — opened only via the nav swirl icon
 hideBuilder();
 
-/* ---- drag the builder by its titlebar, like a real Mac window ---- */
-(function makeDraggable(handle, card){
-  let dragging = false, startX, startY, startLeft, startTop;
-  handle.addEventListener("mousedown", e => {
-    dragging = true;
-    const r = card.getBoundingClientRect();
-    card.style.left = r.left + "px";
-    card.style.top = r.top + "px";
-    startX = e.clientX; startY = e.clientY; startLeft = r.left; startTop = r.top;
-    e.preventDefault();
-  });
-  document.addEventListener("mousemove", e => {
-    if(!dragging) return;
-    card.style.left = (startLeft + e.clientX - startX) + "px";
-    card.style.top = (startTop + e.clientY - startY) + "px";
-  });
-  document.addEventListener("mouseup", () => { dragging = false; });
-})(builderCardEl.querySelector(".titlebar"), builderCardEl);
-
 /* ---- nav stack (icon-only): toggle the builder window ---- */
 navToggleBtn.addEventListener("click", () => {
   const hidden = builderCardEl.style.display === "none";
@@ -1134,7 +1133,7 @@ let editingPlantId = null;   // null while planting new — set to a plant's id 
 const pctx = pCanvas.getContext("2d");
 // butt cap/miter join (canvas defaults) instead of round — jagged edges,
 // no smoothing, matching the field's SVG polylines exactly
-pctx.lineWidth = 3; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
+pctx.lineWidth = 2; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
 let drawing = false;
 // the canvas is just live drawing feedback in the modal — what actually gets
 // saved/rendered on the map is the raw stroke points themselves (see
