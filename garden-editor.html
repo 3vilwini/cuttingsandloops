@@ -125,6 +125,7 @@
     width:100%; max-width:520px; background:var(--paper); color:var(--ink);
     border:2px solid #000; border-radius:0;
     box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    zoom:.5;
   }
   .titlebar{
     height:20px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
@@ -735,6 +736,12 @@ createBtn.addEventListener("click", hideBuilder);   // no seed-library step anym
 
 /* ---- drag the builder by its titlebar, like a real Mac window ---- */
 (function makeDraggable(handle, card){
+  // the card is CSS-zoomed to half size (see .card{zoom:.5}) — zoom scales
+  // an element's OWN left/top offsets too, not just its content, so a raw
+  // viewport-px value written to card.style.left renders at half that
+  // distance. Dividing by CARD_ZOOM before writing cancels that out
+  // (confirmed by testing: writing 510/.5 renders at exactly 510).
+  const CARD_ZOOM = .5;
   let dragging = false, startX, startY, startLeft, startTop;
   handle.addEventListener("mousedown", e => {
     dragging = true;
@@ -742,16 +749,16 @@ createBtn.addEventListener("click", hideBuilder);   // no seed-library step anym
     // switch out of the centered flex layout into free positioning, anchored
     // at its current on-screen spot so the drag doesn't jump
     card.style.position = "fixed";
-    card.style.left = r.left + "px";
-    card.style.top = r.top + "px";
+    card.style.left = (r.left / CARD_ZOOM) + "px";
+    card.style.top = (r.top / CARD_ZOOM) + "px";
     card.style.margin = "0";
     startX = e.clientX; startY = e.clientY; startLeft = r.left; startTop = r.top;
     e.preventDefault();
   });
   document.addEventListener("mousemove", e => {
     if(!dragging) return;
-    card.style.left = (startLeft + e.clientX - startX) + "px";
-    card.style.top = (startTop + e.clientY - startY) + "px";
+    card.style.left = ((startLeft + e.clientX - startX) / CARD_ZOOM) + "px";
+    card.style.top = ((startTop + e.clientY - startY) / CARD_ZOOM) + "px";
   });
   document.addEventListener("mouseup", () => { dragging = false; });
 })(builderCardEl.querySelector(".titlebar"), builderCardEl);
