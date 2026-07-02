@@ -95,8 +95,10 @@
     border:2px solid #000; cursor:pointer; background-size:cover; background-position:center;
   }
   .plantmark.pinned{ box-shadow: 0 0 0 3px rgba(0,0,0,.35); }
+  /* shown only when hovering a plantable hot spot (see seedHotSpots) —
+     border color is set inline to the garden's current seed color */
   .hoversquare{
-    position:absolute; width:34px; height:34px; border:1px dashed #000;
+    position:absolute; width:58px; height:58px; border:2px solid #000;
     transform:translate(-50%,-50%); pointer-events:none; display:none;
   }
 
@@ -455,14 +457,21 @@ function arraySlotOffsets(scale){
 }
 const SEED_LABELS = ["~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops","~* cuttings","~* loops"];
 
+/* the current pattern's seed positions, in field coordinates — these double
+   as the only plantable hot spots (see seedHotSpots below), so this is the
+   single source of truth both renderSeedSlots and the field's hover/click
+   handling read from. */
+function seedFieldOffsets(){
+  const scale = garden.meta.scale || 1;
+  return garden.meta.pattern === "array"
+    ? arraySlotOffsets(scale)
+    : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
+}
+
 function renderSeedSlots(){
   const layer = document.getElementById("seedSlots");
   layer.innerHTML = "";
-  const scale = garden.meta.scale || 1;
-  const offsets = garden.meta.pattern === "array"
-    ? arraySlotOffsets(scale)
-    : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
-  offsets.forEach((o, i) => {
+  seedFieldOffsets().forEach((o, i) => {
     const el = document.createElement("div");
     el.className = "seedslot";
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
@@ -953,19 +962,38 @@ pSaveBtn.addEventListener("click", async () => {
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant it";
 });
 
-/* hover square — not shown over an existing plant marker */
+/* planting is only allowed on a hot spot — the same fixed positions the
+   decorative seed markers already sit on (see seedFieldOffsets) — not just
+   anywhere on the field. A spot with a plant in it already is excluded, so
+   hovering/clicking an existing plant never offers it as a target. */
+const HOTSPOT_RADIUS = 40;
+function nearestHotSpot(x, y){
+  const occupied = Object.values(garden.plants || {});
+  let best = null, bestDist = HOTSPOT_RADIUS;
+  for(const o of seedFieldOffsets()){
+    const sx = CX + o.dx, sy = CY + o.dy;
+    if(occupied.some(p => Math.hypot(p.x - sx, p.y - sy) < 2)) continue;
+    const d = Math.hypot(x - sx, y - sy);
+    if(d < bestDist){ bestDist = d; best = { x:sx, y:sy }; }
+  }
+  return best;
+}
+
 fieldEl.addEventListener("mousemove", e => {
-  if(e.target.closest(".plantmark")){ hoverSquare.style.display = "none"; return; }
   const r = fieldEl.getBoundingClientRect();
-  hoverSquare.style.left = (e.clientX - r.left) + "px";
-  hoverSquare.style.top = (e.clientY - r.top) + "px";
-  hoverSquare.style.display = "";
+  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
+  if(!spot){ hoverSquare.style.display = "none"; return; }
+  hoverSquare.style.left = spot.x + "px";
+  hoverSquare.style.top = spot.y + "px";
+  hoverSquare.style.borderColor = garden.meta.colors.seed;
+  hoverSquare.style.display = "block";
 });
 fieldEl.addEventListener("mouseleave", () => { hoverSquare.style.display = "none"; });
 fieldEl.addEventListener("click", e => {
-  if(e.target.closest(".plantmark")) return;
   const r = fieldEl.getBoundingClientRect();
-  openPlantModal({ x: e.clientX - r.left, y: e.clientY - r.top });
+  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
+  if(!spot) return;   // clicking away from a hot spot does nothing now
+  openPlantModal(spot);
 });
 
 // connectChannels() runs async (after playhtml.init resolves) and re-renders
