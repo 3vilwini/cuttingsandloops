@@ -175,11 +175,11 @@
   }
   .tag[data-selected="true"]{ background:#000; color:var(--paper); }
   .tag:disabled{ opacity:.35; cursor:not-allowed; }
-  .tagcustom{ display:flex; gap:.4rem; }
+  .tagcustom{ display:flex; gap:.4rem; align-items:stretch; }
   .tagcustom input{ flex:1; }
   .tagcustom button{
-    padding:0 .7rem; border-radius:999px; border:1px solid #000; background:var(--paper); color:var(--ink);
-    font-family:inherit; cursor:pointer;
+    padding:.4rem .7rem; border-radius:999px; border:1px solid #000; background:var(--paper); color:var(--ink);
+    font-family:inherit; font-size:inherit; cursor:pointer;
   }
 
   /* colors — one per row, keeps the whole panel narrow and tall */
@@ -529,7 +529,8 @@ function renderPlantSlots(){
         poly.setAttribute("fill", "none");
         poly.setAttribute("stroke", p.color);
         poly.setAttribute("stroke-width", "3");
-        poly.setAttribute("stroke-linecap", "round");
+        poly.setAttribute("stroke-linecap", "butt");
+        poly.setAttribute("stroke-linejoin", "miter");
         poly.setAttribute("vector-effect", "non-scaling-stroke");
         svg.appendChild(poly);
       });
@@ -962,7 +963,9 @@ let plantDraftFile = null;
 let pendingPlantPos = null;
 
 const pctx = pCanvas.getContext("2d");
-pctx.lineWidth = 3; pctx.lineCap = "round";
+// butt cap/miter join (canvas defaults) instead of round — jagged edges,
+// no smoothing, matching the field's SVG polylines exactly
+pctx.lineWidth = 3; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
 let drawing = false;
 // the canvas is just live drawing feedback in the modal — what actually gets
 // saved/rendered on the map is the raw stroke points themselves (see
