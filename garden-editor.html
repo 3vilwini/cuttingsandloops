@@ -36,8 +36,6 @@
   }
   .navbtn:first-child{ border-top:none; }
   .navbtn:active{ background:#000; color:var(--paper); }
-  .navbtn:disabled{ opacity:.35; cursor:not-allowed; }
-  .navbtn:disabled:active{ background:var(--paper); color:var(--ink); }
 
   /* ---- chosen weather tags (top-center, mirrors the picker in the card, read-only) ---- */
   .tagdisplay{
@@ -49,17 +47,17 @@
     padding:.5rem .9rem; font-family:inherit; font-size:inherit;
   }
 
-  /* ---- live visitor count (bottom-right) ---- */
+  /* ---- live visitor count (top-right) ---- */
   .visitorcount{
-    position:fixed; bottom:2.5rem; right:2.5rem; z-index:3;
+    position:fixed; top:2.5rem; right:2.5rem; z-index:3;
     display:flex; align-items:center; gap:.5rem;
     border:1px solid #000; background:var(--paper); color:var(--ink); padding:.5rem .8rem;
   }
   .visitorcount .dot{ width:8px; height:8px; border-radius:50%; background:#3ab704; flex-shrink:0; }
 
-  /* ---- arrow-key pad (top-right, perfect squares, gap kept between them) ---- */
+  /* ---- arrow-key pad (bottom-right, perfect squares, gap kept between them) ---- */
   .arrowpad{
-    position:fixed; top:2.5rem; right:2.5rem; z-index:3;
+    position:fixed; bottom:2.5rem; right:2.5rem; z-index:3;
     display:grid; grid-template-columns:repeat(3, 2.3rem); grid-template-rows:repeat(2, 2.3rem);
     gap:.3rem;
   }
@@ -104,7 +102,7 @@
 
   /* ---- bottom toggle bar: label, then pill switch, black/white (inverted vs before) ---- */
   .viewtoggles{
-    position:fixed; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
+    position:fixed; bottom:2.5rem; left:2.5rem; z-index:3;
     display:flex; gap:2.2rem; align-items:center;
   }
   .toggle{
@@ -232,10 +230,6 @@
 <div class="navstack">
   <div class="navgroup">
     <button type="button" class="navbtn" id="navToggleBtn" title="open/close">𖦹</button>
-  </div>
-  <div class="navgroup">
-    <button type="button" class="navbtn" id="plantBtn" title="plant" disabled>⚘</button>
-    <button type="button" class="navbtn" id="waterBtn" title="water" disabled>𓄹</button>
   </div>
 </div>
 
@@ -882,12 +876,6 @@ async function uploadSeedFile(file, key){
   return url;
 }
 
-// plant/water are just always available now — there's no seed-library
-// fullness gate anymore since there's no seed library.
-const plantBtn = document.getElementById("plantBtn");
-const waterBtn = document.getElementById("waterBtn");
-plantBtn.disabled = false;
-
 /* ==========================================================================
    PLANTING — a plant carries a small freehand drawing and gets placed
    wherever the user clicked on the field. Hovering an empty patch of ground
@@ -944,8 +932,6 @@ function openPlantModal(pos){
 }
 function hidePlantModal(){ plantScrim?.classList.remove("open"); }
 pCancelBtn.addEventListener("click", hidePlantModal);
-
-plantBtn.addEventListener("click", () => openPlantModal());
 
 pSaveBtn.addEventListener("click", async () => {
   pSaveBtn.disabled = true; pSaveBtn.textContent = "planting…";
