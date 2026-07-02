@@ -468,6 +468,14 @@ const garden = {
   plants: {},   // plantId -> { id, name, audioRef, sampledFrom:[seedIndex,...], drawing (dataURL), color, x, y, pinned }
 };
 
+// declared here (not down by connectChannels(), where they conceptually
+// belong) because applyColors() runs at top-level during initial page load
+// and calls syncMeta(), which reads metaChannel — see the note near
+// connectChannels() for the ReferenceError this caused when declared later.
+let seedSlotsChannel = null;
+let plantSlotsChannel = null;
+let metaChannel = null;
+
 /* persist the garden's own settings (not the seed/plant channels — those are
    already synced via playhtml) so refreshing or revisiting doesn't
    re-randomize the colors of a garden that's already been saved. */
@@ -712,7 +720,7 @@ function toggleTag(t){
   if(i>=0) garden.meta.tags.splice(i,1);
   else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
   renderTagBank();
-  // SYNC: draft room's meta.tags updates for everyone watching the create flow (only relevant if drafting is itself collaborative before the garden exists — otherwise this stays local until createGarden()).
+  syncMeta();
 }
 document.getElementById("tagCustomBtn").addEventListener("click", () => {
   const input = document.getElementById("tagCustomInput");
@@ -721,6 +729,7 @@ document.getElementById("tagCustomBtn").addEventListener("click", () => {
   garden.meta.tags.push(v);
   input.value = "";
   renderTagBank();
+  syncMeta();
 });
 
 /* ---- colors ---- */
@@ -729,6 +738,7 @@ const cText = document.getElementById("cText"), cSeed = document.getElementById(
 function applyColors(){
   garden.meta.colors = { background:[cBg1.value, cBg2.value], text:cText.value, seed:cSeed.value };
   renderField();
+  syncMeta();
 }
 [cBg1,cBg2,cText,cSeed].forEach(el => el.addEventListener("input", applyColors));
 
@@ -739,7 +749,7 @@ fieldScale.addEventListener("input", () => {
   garden.meta.scale = parseFloat(fieldScale.value);
   fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
   renderField();
-  // SYNC: room.setData(draft => { draft.meta.scale = garden.meta.scale; })
+  syncMeta();
 });
 
 /* ---- pattern picker ---- */
@@ -754,7 +764,7 @@ function renderPatternBank(){
       garden.meta.pattern = p.id;
       renderPatternBank();
       renderField();
-      // SYNC: room.setData(draft => { draft.meta.pattern = p.id; })
+      syncMeta();
     });
     patternBankEl.appendChild(b);
   }
@@ -911,8 +921,13 @@ function renderVisitorCount(){
   }
 })();
 
-let seedSlotsChannel = null;
-let plantSlotsChannel = null;
+// (seedSlotsChannel/plantSlotsChannel/metaChannel are declared much earlier
+// in the script now — see near the top — because applyColors() runs at
+// top-level during initial page load and calls syncMeta(), which reads
+// metaChannel; a `let` declared this late created a real temporal-dead-zone
+// ReferenceError that silently aborted all script execution after it,
+// including every event listener below. Found this by testing, not by
+// inspection — every button appeared to just stop working.)
 // BUG FOUND DURING TESTING: right after a local save, an onUpdate echo
 // carrying the pre-save default (from the initial server handshake, before
 // our write had round-tripped) came back and clobbered the local slot —
@@ -946,6 +961,34 @@ function connectChannels(){
   plantSlotsChannel = playhtml.createPageData(`garden-${garden.id}-plants`, garden.plants);
   garden.plants = plantSlotsChannel.getData();
   plantSlotsChannel.onUpdate(data => { garden.plants = data; renderPlantSlots(); });
+
+  // colors/tags/pattern/scale — previously local-only (just this browser's
+  // localStorage), so a second visitor never actually saw the same garden.
+  // Whole-object/array replacement is fine here (confirmed against the real
+  // build) — it's only *index* assignment into a top-level array that
+  // playhtml's Page Data rejects, and meta is a plain object throughout.
+  metaChannel = playhtml.createPageData(`garden-${garden.id}-meta`, garden.meta);
+  garden.meta = metaChannel.getData();
+  applyMetaToUI();
+  metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
+}
+
+/* pushes garden.meta as a whole to everyone else in the room */
+function syncMeta(){ metaChannel?.setData(draft => Object.assign(draft, garden.meta)); }
+
+/* the reverse of applyColors()/etc — takes garden.meta (just replaced by an
+   incoming sync, or restored on connect) and pushes it into the actual
+   inputs + re-renders, instead of reading the inputs to build garden.meta. */
+function applyMetaToUI(){
+  cBg1.value = garden.meta.colors.background[0];
+  cBg2.value = garden.meta.colors.background[1];
+  cSeed.value = garden.meta.colors.seed;
+  cText.value = garden.meta.colors.text;
+  fieldScale.value = garden.meta.scale;
+  fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
+  renderTagBank();
+  renderPatternBank();
+  renderField();
 }
 
 /* local-only fallback for when UPLOAD_ENDPOINT isn't set (or the upload
