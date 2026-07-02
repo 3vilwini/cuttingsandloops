@@ -962,19 +962,33 @@ pSaveBtn.addEventListener("click", async () => {
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant it";
 });
 
-/* planting is only allowed on a hot spot — the same fixed positions the
-   decorative seed markers already sit on (see seedFieldOffsets) — not just
-   anywhere on the field. A spot with a plant in it already is excluded, so
-   hovering/clicking an existing plant never offers it as a target. */
+/* planting is only allowed on a hot spot — a fixed grid spread evenly across
+   the field, unrelated to the decorative seed markers (those are clickable
+   some other way, not this). A spot with a plant in it already is excluded,
+   so hovering/clicking an existing plant never offers it as a target. */
+const HOTSPOT_COLS = 6, HOTSPOT_ROWS = 4, HOTSPOT_MARGIN = 200;
+function hotSpotPositions(){
+  const usableW = FIELD_W - HOTSPOT_MARGIN * 2, usableH = FIELD_H - HOTSPOT_MARGIN * 2;
+  const spots = [];
+  for(let row = 0; row < HOTSPOT_ROWS; row++){
+    for(let col = 0; col < HOTSPOT_COLS; col++){
+      spots.push({
+        x: HOTSPOT_MARGIN + (usableW * col) / (HOTSPOT_COLS - 1),
+        y: HOTSPOT_MARGIN + (usableH * row) / (HOTSPOT_ROWS - 1),
+      });
+    }
+  }
+  return spots;
+}
+
 const HOTSPOT_RADIUS = 40;
 function nearestHotSpot(x, y){
   const occupied = Object.values(garden.plants || {});
   let best = null, bestDist = HOTSPOT_RADIUS;
-  for(const o of seedFieldOffsets()){
-    const sx = CX + o.dx, sy = CY + o.dy;
-    if(occupied.some(p => Math.hypot(p.x - sx, p.y - sy) < 2)) continue;
-    const d = Math.hypot(x - sx, y - sy);
-    if(d < bestDist){ bestDist = d; best = { x:sx, y:sy }; }
+  for(const s of hotSpotPositions()){
+    if(occupied.some(p => Math.hypot(p.x - s.x, p.y - s.y) < 2)) continue;
+    const d = Math.hypot(x - s.x, y - s.y);
+    if(d < bestDist){ bestDist = d; best = s; }
   }
   return best;
 }
