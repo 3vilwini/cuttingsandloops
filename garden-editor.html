@@ -129,6 +129,7 @@
   .titlebar{
     height:20px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
     background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
+    cursor:move;
   }
   .titlebar .closebox{ width:11px; height:11px; border:1px solid #000; background:var(--paper); flex-shrink:0; }
   .cardbody{ padding:1.5rem 1.6rem; }
@@ -262,7 +263,7 @@
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
     <div class="row">
-      <label>what's the weather here? <span id="tagCountLabel">(0/3)</span></label>
+      <label>feels like <span id="tagCountLabel">(0/3)</span></label>
       <div class="tagbank" id="tagBank"></div>
       <div class="tagcustom">
         <input type="text" id="tagCustomInput" placeholder="add your own…">
@@ -301,7 +302,6 @@
     </div>
 
     <div class="actions">
-      <button type="button" class="ghost" id="cancelBtn">cancel</button>
       <button type="button" class="primary" id="createBtn">save</button>
     </div>
   </div>
@@ -455,7 +455,7 @@ const SEED_SLOTS_BASE = {
 function arraySlotOffsets(scale){
   // same spiral formula the pattern itself uses, so seeds land along its arms
   return Array.from({length:10}, (_,i) => {
-    const t = 1 + i*0.9, r = 26*t*scale;
+    const t = 1 + i*0.9, r = 44*t*scale;
     return { dx:r*Math.cos(t), dy:r*Math.sin(t) };
   });
 }
@@ -732,7 +732,29 @@ function hideBuilder(){ builderCardEl.style.display = "none"; }
 hideBuilder();
 
 createBtn.addEventListener("click", hideBuilder);   // no seed-library step anymore — saving just reveals the field
-document.getElementById("cancelBtn").addEventListener("click", hideBuilder);
+
+/* ---- drag the builder by its titlebar, like a real Mac window ---- */
+(function makeDraggable(handle, card){
+  let dragging = false, startX, startY, startLeft, startTop;
+  handle.addEventListener("mousedown", e => {
+    dragging = true;
+    const r = card.getBoundingClientRect();
+    // switch out of the centered flex layout into free positioning, anchored
+    // at its current on-screen spot so the drag doesn't jump
+    card.style.position = "fixed";
+    card.style.left = r.left + "px";
+    card.style.top = r.top + "px";
+    card.style.margin = "0";
+    startX = e.clientX; startY = e.clientY; startLeft = r.left; startTop = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e => {
+    if(!dragging) return;
+    card.style.left = (startLeft + e.clientX - startX) + "px";
+    card.style.top = (startTop + e.clientY - startY) + "px";
+  });
+  document.addEventListener("mouseup", () => { dragging = false; });
+})(builderCardEl.querySelector(".titlebar"), builderCardEl);
 
 /* ---- nav stack (icon-only): toggle the builder window ---- */
 const navToggleBtn = document.getElementById("navToggleBtn");
