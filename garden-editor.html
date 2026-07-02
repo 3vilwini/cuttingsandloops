@@ -95,8 +95,7 @@
   #seedSlots{ position:absolute; inset:0; }
   /* the dot is the real anchor — sized+centered on its own, so toggling the
      label's visibility never shifts a seed's actual planted position. */
-  .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; }
-  .seedslot.empty{ cursor:pointer; }
+  .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer; }
   /* glows the dot + label together as one shape, in the garden's seed
      color — drop-shadow (not box-shadow) so it follows the label's actual
      text/gradient silhouette instead of a rectangular box around it */
@@ -120,6 +119,10 @@
      the seed slots underneath) and swallow clicks even where there's no
      actual plant. Each .plantmark re-enables pointer-events on itself. */
   #plantSlots{ position:absolute; inset:0; pointer-events:none; }
+
+  /* dashed curved lines from a clicked seed to every plant sampled from it
+     — see toggleSeedConnections/renderConnections */
+  #connectionsLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
   /* a plant is its own freehand drawing on the map — no square/border
      around it, just the strokes themselves, at the exact same scale they
@@ -288,6 +291,7 @@
     <svg id="patternLayer" aria-hidden="true"></svg>
     <div id="seedSlots" aria-hidden="true"></div>
     <div id="plantSlots" aria-hidden="true"></div>
+    <svg id="connectionsLayer" aria-hidden="true"></svg>
     <div id="hoverSquare" class="hoversquare" aria-hidden="true"></div>
   </div>
 </div>
@@ -610,6 +614,10 @@ function renderSeedSlots(){
         audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
       });
       el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
+      // click toggles the dashed connection lines to every plant sampled
+      // from this seed — same stopPropagation reasoning as the empty-seed
+      // click below, since this can also sit near a plant hot spot
+      el.addEventListener("click", e => { e.stopPropagation(); toggleSeedConnections(i); });
     } else {
       // stopPropagation matters here — without it this click also bubbles to
       // the field's own click handler, which independently checks proximity
@@ -706,6 +714,46 @@ function renderPlantSlots(){
     layer.appendChild(el);
   });
   applyViewToggles();
+  renderConnections();   // plants (and their positions) may have changed
+}
+
+/* clicking a filled seed shows dashed curved lines to every plant whose
+   sampledFrom includes it — click the same seed again (or a different one)
+   to change/clear it. Only one seed's connections show at a time. */
+let activeConnectionSeed = null;   // seed slot index (number), or null
+function toggleSeedConnections(i){
+  activeConnectionSeed = (activeConnectionSeed === i) ? null : i;
+  renderConnections();
+}
+function renderConnections(){
+  const svg = document.getElementById("connectionsLayer");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
+  if(activeConnectionSeed === null) return;
+  const seed = garden.seeds[activeConnectionSeed];
+  if(!seed) return;
+  const label = `${seed.title} - ${seed.artist}`;
+  const o = seedFieldOffsets()[activeConnectionSeed];
+  const from = { x: CX + o.dx, y: CY + o.dy };
+  const connected = Object.values(garden.plants || {}).filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
+  for(const p of connected){
+    // bow the line out to the side, perpendicular to the straight path
+    // between them, so overlapping connections stay visually distinct
+    // instead of stacking as straight lines
+    const dx = p.x - from.x, dy = p.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const bow = 40;
+    const midX = (from.x + p.x) / 2 - (dy / len) * bow;
+    const midY = (from.y + p.y) / 2 + (dx / len) * bow;
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", garden.meta.colors.seed);
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-dasharray", "6 5");
+    path.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(path);
+  }
 }
 
 /* draws the current garden.meta.colors/pattern onto the field (gradient)
@@ -1077,6 +1125,7 @@ function onSeedsChanged(){
   renderSeedSlots();
   renderSeedList();
   renderSampledFromBank();
+  renderConnections();
 }
 
 /* pushes garden.meta as a whole to everyone else in the room */
