@@ -90,8 +90,12 @@
 
   /* seed slots — fixed positions on a pattern-specific grid (never move once
      the pattern is set). An empty one is a "+ add seed" invitation; a
-     filled one shows its title/artist and previews on hover, like a plant. */
-  #seedSlots{ position:absolute; inset:0; }
+     filled one shows its title/artist and previews on hover, like a plant.
+     Same pointer-events split as #plantSlots: the full-field container must
+     not capture clicks itself (it would win hit-tests over anything drawn
+     later, like a plant's overflowing label, everywhere it isn't actually
+     covering an actual seed) — each .seedslot re-enables it individually. */
+  #seedSlots{ position:absolute; inset:0; pointer-events:none; }
   /* the dot is the real anchor — sized+centered on its own, so toggling the
      label's visibility never shifts a seed's actual planted position. */
   .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer; }
@@ -626,14 +630,18 @@ function renderSeedSlots(){
       let audioEl = null;
       el.addEventListener("mouseenter", () => {
         const ref = seed.audioRef || localSeedAudioRefs[i];
-        if(!ref) return;
-        audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
+        if(ref){ audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {}); }
+        // peek at the roots regardless of the persistent toggle state —
+        // mouseleave reverts to whatever that toggle actually says
+        document.getElementById("connectionsLayer").style.display = "";
       });
-      el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
-      // click flips the same "roots" switch the bottom bar has — same
-      // stopPropagation reasoning as the empty-seed click below, since this
-      // can also sit near a plant hot spot
-      el.addEventListener("click", e => { e.stopPropagation(); toggleView("roots"); });
+      el.addEventListener("mouseleave", () => {
+        audioEl?.pause(); audioEl = null;
+        applyViewToggles();
+      });
+      // click opens the seed list panel instead of touching roots at all —
+      // hover is what shows them now, see mouseenter/mouseleave above
+      el.addEventListener("click", e => { e.stopPropagation(); showSeedList(); });
     } else {
       // stopPropagation matters here — without it this click also bubbles to
       // the field's own click handler, which independently checks proximity
