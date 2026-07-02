@@ -318,6 +318,7 @@
   <button type="button" class="toggle" data-key="seeds"><span>seeds</span><span class="switch"><span class="knob"></span></span></button>
   <button type="button" class="toggle" data-key="plants"><span>plants</span><span class="switch"><span class="knob"></span></span></button>
   <button type="button" class="toggle" data-key="labels"><span>labels</span><span class="switch"><span class="knob"></span></span></button>
+  <button type="button" class="toggle" data-key="roots"><span>roots</span><span class="switch"><span class="knob"></span></span></button>
 </div>
 
 <div class="visitorcount" aria-hidden="true">
@@ -515,6 +516,14 @@ function hexToRgb(hex){
   return m.join(",");
 }
 
+/* true color inversion (255-channel), for the empty-seed hover glow — the
+   literal "opposite color" of the seed color used for a planted seed's glow */
+function invertHex(hex){
+  const [r,g,b] = hex.replace("#","").match(/.{2}/g).map(h => parseInt(h,16));
+  const toHex = n => (255-n).toString(16).padStart(2,"0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 const randInt = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
 
 /* hsl -> hex, so random defaults can be constrained to sane saturation/lightness
@@ -596,7 +605,9 @@ function renderSeedSlots(){
     el.className = "seedslot" + (seed ? "" : " empty");
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
-    el.style.setProperty("--glow", garden.meta.colors.seed);
+    // a planted seed glows its own seed color on hover; an empty one glows
+    // the exact opposite (inverted) color, so the two states read distinctly
+    el.style.setProperty("--glow", seed ? garden.meta.colors.seed : invertHex(garden.meta.colors.seed));
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     const dot = document.createElement("span");
@@ -940,10 +951,11 @@ renderTagBank();
 renderPatternBank();
 
 /* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
-const VIEW_STATE = { seeds:true, plants:true, labels:true };
+const VIEW_STATE = { seeds:true, plants:true, labels:true, roots:true };
 function applyViewToggles(){
   document.getElementById("seedSlots").style.display = VIEW_STATE.seeds ? "" : "none";
   document.getElementById("plantSlots").style.display = VIEW_STATE.plants ? "" : "none";
+  document.getElementById("connectionsLayer").style.display = VIEW_STATE.roots ? "" : "none";
   document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
     .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
 }
