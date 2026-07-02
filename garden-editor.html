@@ -419,9 +419,7 @@
       </label>
 
       <label style="margin-top:1rem;">sampled from (optional)</label>
-      <select id="pSampledFrom">
-        <option value="">none</option>
-      </select>
+      <div class="tagbank" id="pSampledFromBank"></div>
 
       <label style="margin-top:1rem;">planted by</label>
       <input type="text" id="pName" placeholder="your name">
@@ -473,7 +471,7 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom, paths ([[{x,y},...],...]), color, x, y, pinned }
+  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y, pinned }
   seeds: {},    // slot index (string "0".."9") -> { title, artist, audioRef }
 };
 
@@ -1060,7 +1058,7 @@ function connectChannels(){
 function onSeedsChanged(){
   renderSeedSlots();
   renderSeedList();
-  renderSampledFromOptions();
+  renderSampledFromBank();
 }
 
 /* pushes garden.meta as a whole to everyone else in the room */
@@ -1115,7 +1113,7 @@ const pFileLabelText = document.getElementById("pFileLabelText");
 const pRecipeFile = document.getElementById("pRecipeFile");
 const pRecipeLabel = document.getElementById("pRecipeLabel");
 const pRecipeLabelText = document.getElementById("pRecipeLabelText");
-const pSampledFrom = document.getElementById("pSampledFrom");
+const pSampledFromBank = document.getElementById("pSampledFromBank");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
 const pName = document.getElementById("pName");
@@ -1129,6 +1127,7 @@ let plantDraftFile = null;
 let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
 let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
+let selectedSampledFrom = [];   // "title - artist" strings, multi-select chips — see renderSampledFromBank
 
 const pctx = pCanvas.getContext("2d");
 // butt cap/miter join (canvas defaults) instead of round — jagged edges,
@@ -1206,19 +1205,33 @@ function redrawPaths(paths){
 /* "sampled from" options are just every filled seed's "title - artist"
    text, doubling as the option's own value — reused as-is in both the
    plant modal and the seed-list panel (see renderSeedList). */
-function renderSampledFromOptions(){
-  const selected = pSampledFrom.value;
-  pSampledFrom.innerHTML = "";
-  const none = document.createElement("option");
-  none.value = ""; none.textContent = "none";
-  pSampledFrom.appendChild(none);
-  for(const seed of Object.values(garden.seeds || {})){
-    const label = `${seed.title} - ${seed.artist}`;
-    const opt = document.createElement("option");
-    opt.value = label; opt.textContent = label;
-    pSampledFrom.appendChild(opt);
+/* chip multi-select, same look/interaction as the "feels like" tag bank —
+   one chip per filled seed, toggled on/off, tracked in selectedSampledFrom. */
+function renderSampledFromBank(){
+  pSampledFromBank.innerHTML = "";
+  const seeds = Object.values(garden.seeds || {});
+  if(!seeds.length){
+    const empty = document.createElement("span");
+    empty.className = "sub";
+    empty.style.margin = "0";
+    empty.textContent = "no seeds planted yet";
+    pSampledFromBank.appendChild(empty);
+    return;
   }
-  pSampledFrom.value = selected; // keep the current pick if it's still in the list
+  for(const seed of seeds){
+    const label = `${seed.title} - ${seed.artist}`;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = label;
+    b.setAttribute("data-selected", selectedSampledFrom.includes(label) ? "true" : "false");
+    b.addEventListener("click", () => toggleSampledFrom(label));
+    pSampledFromBank.appendChild(b);
+  }
+}
+function toggleSampledFrom(label){
+  const i = selectedSampledFrom.indexOf(label);
+  if(i >= 0) selectedSampledFrom.splice(i, 1);
+  else selectedSampledFrom.push(label);
+  renderSampledFromBank();
 }
 
 function openPlantModal(pos){
@@ -1230,7 +1243,8 @@ function openPlantModal(pos){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
-  pSampledFrom.value = "";
+  selectedSampledFrom = [];
+  renderSampledFromBank();
   validatePlant();
   hideBuilder(); hideSeedModal(); hideSeedList();
   plantScrim.classList.add("open");
@@ -1250,7 +1264,10 @@ function openPlantEditModal(p){
   pName.value = p.name;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
   redrawPaths(plantDraftPaths);
-  pSampledFrom.value = p.sampledFrom || "";
+  // backward-compat: sampledFrom used to be a single string before this
+  // became a multi-select
+  selectedSampledFrom = Array.isArray(p.sampledFrom) ? p.sampledFrom.slice() : (p.sampledFrom ? [p.sampledFrom] : []);
+  renderSampledFromBank();
   validatePlant();
   hideBuilder(); hideSeedModal(); hideSeedList();
   plantScrim.classList.add("open");
@@ -1283,7 +1300,7 @@ pSaveBtn.addEventListener("click", async () => {
 
   const plant = {
     id: plantId, name: pName.value.trim(), audioRef, recipeImage,
-    sampledFrom: pSampledFrom.value || null,
+    sampledFrom: selectedSampledFrom.slice(),
     paths: plantDraftPaths, color: existing?.color || garden.meta.colors.seed,
     x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: existing?.pinned || false,
   };
@@ -1450,7 +1467,7 @@ fieldEl.addEventListener("click", e => {
 renderSeedSlots();
 renderPlantSlots();
 renderSeedList();
-renderSampledFromOptions();
+renderSampledFromBank();
 </script>
 
 </body>
