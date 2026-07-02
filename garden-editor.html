@@ -425,6 +425,11 @@
         <button type="button" class="ghost" id="pClearCanvas" style="margin-left:.6rem; vertical-align:top;">clear</button>
       </div>
 
+      <label style="margin-top:1rem;">drawing color</label>
+      <div class="colorpick">
+        <input type="color" id="pColor" value="#000000">
+      </div>
+
       <label style="margin-top:1rem;">recipe screenshot (optional)</label>
       <label class="filelabel" id="pRecipeLabel" tabindex="0">
         <span id="pRecipeLabelText">choose image…</span>
@@ -661,7 +666,7 @@ function renderPlantSlots(){
         poly.setAttribute("points", stroke.map(pt => `${pt.x},${pt.y}`).join(" "));
         poly.setAttribute("fill", "none");
         poly.setAttribute("stroke", p.color);
-        poly.setAttribute("stroke-width", "2");
+        poly.setAttribute("stroke-width", "1.5");
         poly.setAttribute("stroke-linecap", "butt");
         poly.setAttribute("stroke-linejoin", "miter");
         poly.setAttribute("vector-effect", "non-scaling-stroke");
@@ -758,7 +763,7 @@ function renderConnections(){
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", garden.meta.colors.text);
+    path.setAttribute("stroke", p.color);
     path.setAttribute("stroke-width", "1");
     path.setAttribute("stroke-dasharray", "6 5");
     path.setAttribute("vector-effect", "non-scaling-stroke");
@@ -1194,6 +1199,7 @@ const pRecipeLabelText = document.getElementById("pRecipeLabelText");
 const pSampledFromBank = document.getElementById("pSampledFromBank");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
+const pColor = document.getElementById("pColor");
 const pName = document.getElementById("pName");
 const pSaveBtn = document.getElementById("pSaveBtn");
 const pCancelBtn = document.getElementById("pCancelBtn");
@@ -1210,7 +1216,8 @@ let selectedSampledFrom = [];   // "title - artist" strings, multi-select chips 
 const pctx = pCanvas.getContext("2d");
 // butt cap/miter join (canvas defaults) instead of round — jagged edges,
 // no smoothing, matching the field's SVG polylines exactly
-pctx.lineWidth = 2; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
+pctx.lineWidth = 1.5; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
+pColor.addEventListener("input", () => { pctx.strokeStyle = pColor.value; });
 let drawing = false;
 // the canvas is just live drawing feedback in the modal — what actually gets
 // saved/rendered on the map is the raw stroke points themselves (see
@@ -1321,6 +1328,7 @@ function openPlantModal(pos){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
+  pColor.value = garden.meta.colors.seed; pctx.strokeStyle = pColor.value;
   selectedSampledFrom = [];
   renderSampledFromBank();
   validatePlant();
@@ -1340,6 +1348,7 @@ function openPlantEditModal(p){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file… (keeps current if left blank)"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = p.recipeImage ? "choose image… (keeps current if left blank)" : "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = p.name;
+  pColor.value = p.color; pctx.strokeStyle = p.color;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
   redrawPaths(plantDraftPaths);
   // backward-compat: sampledFrom used to be a single string before this
@@ -1379,7 +1388,7 @@ pSaveBtn.addEventListener("click", async () => {
   const plant = {
     id: plantId, name: pName.value.trim(), audioRef, recipeImage,
     sampledFrom: selectedSampledFrom.slice(),
-    paths: plantDraftPaths, color: existing?.color || garden.meta.colors.seed,
+    paths: plantDraftPaths, color: pColor.value,
     x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: existing?.pinned || false,
   };
   garden.plants[plantId] = plant;
