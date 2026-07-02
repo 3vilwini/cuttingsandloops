@@ -97,6 +97,10 @@
      label's visibility never shifts a seed's actual planted position. */
   .seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; }
   .seedslot.empty{ cursor:pointer; }
+  /* glows the dot + label together as one shape, in the garden's seed
+     color — drop-shadow (not box-shadow) so it follows the label's actual
+     text/gradient silhouette instead of a rectangular box around it */
+  .seedslot:hover{ filter: drop-shadow(0 0 6px var(--glow, transparent)); }
   .seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
   .seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
   /* empty seeds invite a click: the "+ add seed" text pulses in size while
