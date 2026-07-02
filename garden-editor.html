@@ -122,10 +122,13 @@
   .plantmark .fallback{
     position:absolute; inset:0; border:2px solid #000;
   }
-  /* shown only when hovering a plantable hot spot (see seedHotSpots) —
-     border color is set inline to the garden's current seed color */
+  /* shown only when hovering a plantable hot spot (see nearestHotSpot) —
+     border color is set inline to the garden's current seed color. Sized to
+     match .plantmark/pCanvas (140x140) exactly, and nearestHotSpot's hit
+     test uses that same 140x140 box, so the square appears/disappears
+     right at its own visible edge instead of some smaller invisible area. */
   .hoversquare{
-    position:absolute; width:116px; height:116px; border:1px solid #000;
+    position:absolute; width:140px; height:140px; border:1px solid #000;
     transform:translate(-50%,-50%); pointer-events:none; display:none;
   }
 
@@ -719,7 +722,7 @@ function checkTagPresses(data){
   for(const t in data){
     const recent = (data[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
     if(new Set(recent.map(e => e.clientId)).size >= 2){
-      window.location.href = "index.html";
+      window.location.href = `https://soundcloud.com/search?q=${encodeURIComponent(t)}`;
       return;
     }
   }
@@ -1128,12 +1131,17 @@ function hotSpotPositions(){
   return spots;
 }
 
-const HOTSPOT_RADIUS = 40;
+// half of the hover square's 140x140 footprint (matches .hoversquare/
+// .plantmark/pCanvas) — a square hit test, not a circular radius, so the
+// square appears/disappears exactly at its own visible edge, not some
+// smaller invisible area inside it.
+const HOTSPOT_HALF = 70;
 function nearestHotSpot(x, y){
   const occupied = Object.values(garden.plants || {});
-  let best = null, bestDist = HOTSPOT_RADIUS;
+  let best = null, bestDist = Infinity;
   for(const s of hotSpotPositions()){
     if(occupied.some(p => Math.hypot(p.x - s.x, p.y - s.y) < 2)) continue;
+    if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
     const d = Math.hypot(x - s.x, y - s.y);
     if(d < bestDist){ bestDist = d; best = s; }
   }
