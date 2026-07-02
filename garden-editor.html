@@ -696,6 +696,7 @@ function renderTagDisplay(){
   for(const t of garden.meta.tags){
     const s = document.createElement("span");
     s.textContent = t;
+    s.title = "invite a friend";   // hints at the two-person press below
     s.style.setProperty("--glow", garden.meta.colors.seed);
     s.addEventListener("click", () => pressTag(t));
     tagDisplayEl.appendChild(s);
@@ -722,7 +723,7 @@ function checkTagPresses(data){
   for(const t in data){
     const recent = (data[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
     if(new Set(recent.map(e => e.clientId)).size >= 2){
-      window.location.href = `https://soundcloud.com/search?q=${encodeURIComponent(t)}`;
+      window.location.href = `http://soundcloud.com/tags/${encodeURIComponent(t)}`;
       return;
     }
   }
