@@ -386,23 +386,9 @@ const garden = {
 let plantSlotsChannel = null;
 let metaChannel = null;
 
-/* persist the garden's own settings (not the plant channel — that's
-   already synced via playhtml) so refreshing or revisiting doesn't
-   re-randomize the colors of a garden that's already been saved. */
-const STORAGE_KEY = "soundGarden.current";
-function saveGardenLocally(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ id:garden.id, meta:garden.meta })); }
-  catch(e){ console.warn("couldn't persist garden locally:", e); }
-}
-function loadGardenLocally(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return false;
-    const saved = JSON.parse(raw);
-    garden.id = saved.id; garden.meta = saved.meta;
-    return true;
-  }catch(e){ return false; }
-}
+/* garden.meta itself now lives in playhtml's synced Page Data (see
+   connectChannels below) — that's the real persistence, shared across every
+   visitor to this URL, not just this browser. No localStorage needed. */
 
 function newId(len=8){
   return crypto.randomUUID ? crypto.randomUUID().slice(0,len) : Math.random().toString(36).slice(2,2+len);
@@ -701,21 +687,10 @@ const fieldEl = document.getElementById("field");
 fieldEl.style.width = FIELD_W + "px";
 fieldEl.style.height = FIELD_H + "px";
 
-// a garden already saved locally keeps its own colors on refresh/revisit —
-// only a brand-new (never-saved) garden gets randomized defaults
-const restoredGarden = loadGardenLocally();
-if(restoredGarden){
-  cBg1.value = garden.meta.colors.background[0];
-  cBg2.value = garden.meta.colors.background[1];
-  cSeed.value = garden.meta.colors.seed;
-  cText.value = garden.meta.colors.text;
-  fieldScale.value = garden.meta.scale;
-  fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
-  renderTagBank();
-  renderPatternBank();
-}else{
-  randomizeDefaultColors();
-}
+// these local defaults only matter for whoever connects to this garden's
+// shared channel first ever — connectChannels() below immediately overwrites
+// garden.meta with whatever's already synced for everyone else on this URL.
+randomizeDefaultColors();
 applyColors();
 
 /* ---- arrow-key / arrow-pad panning, same idea as the main garden view ---- */
@@ -741,10 +716,10 @@ requestAnimationFrame(() => {
 });
 
 /* ---- create garden ---- */
-function ensureGardenId(){
-  if(garden.id) return;
-  garden.id = newId();
-}
+// purely a namespace for this garden's uploaded files (see uploadSeedFile's
+// X-Garden-Id header) — no longer decides which synced room a visitor joins,
+// see connectChannels below.
+garden.id = newId();
 
 const builderCardEl = document.getElementById("builderCard");
 const createBtn = document.getElementById("createBtn");   // "save"
@@ -753,12 +728,10 @@ const createBtn = document.getElementById("createBtn");   // "save"
 function showBuilder(){ hidePlantModal(); builderCardEl.style.display = ""; }
 function hideBuilder(){ builderCardEl.style.display = "none"; }
 
-createBtn.addEventListener("click", () => {
-  ensureGardenId();
-  connectChannels();
-  saveGardenLocally();   // "save" is the moment this garden stops being randomized on future visits
-  hideBuilder();          // no seed-library step anymore — saving just reveals the field
-});
+// closed by default for every visitor — opened only via the nav swirl icon
+hideBuilder();
+
+createBtn.addEventListener("click", hideBuilder);   // no seed-library step anymore — saving just reveals the field
 document.getElementById("cancelBtn").addEventListener("click", hideBuilder);
 
 /* ---- nav stack (icon-only): toggle the builder window ---- */
@@ -788,7 +761,15 @@ navToggleBtn.addEventListener("click", () => {
    own source: `if(!e.enabled){ return; }` gates the whole cursor client).
    Passing `{}` previously meant cursors were silently never turned on.
    ========================================================================== */
-playhtml.init({ cursors: { enabled: true } });
+// init() returns a promise, and createPageData() (called inside
+// connectChannels) isn't usable until it resolves — calling it either
+// before init() or immediately after the (synchronous-looking) init() call
+// throws "not available before init()", confirmed by testing directly
+// against the real build. That was an uncaught top-level error that
+// silently aborted the rest of the script (same class of bug as the
+// earlier metaChannel TDZ issue), which is why the plant modal broke too.
+// Chaining .then() is the fix.
+playhtml.init({ cursors: { enabled: true } }).then(connectChannels);
 
 /* live visitor count — window.cursors.allColors is playhtml's own list of
    currently-connected players in this room (confirmed against the real
@@ -817,21 +798,25 @@ function renderVisitorCount(){
 // listener below. Found this by testing, not by inspection — every button
 // appeared to just stop working.)
 
-/* connect once per garden — guarded so repeated calls (nav icons, save
-   button, etc.) are no-ops after the first. */
+/* connect once, immediately on load — guarded so a stray repeat call is a
+   no-op. Channel names are fixed (not per-visitor garden.id) so every
+   visitor on this same URL joins the same synced documents, exactly like
+   playhtml's cursor room already does by default (it's scoped to
+   location.pathname + search). Using garden.id here was the actual bug:
+   each browser generated its own random id, so no two visitors were ever
+   in the same room for colors/tags/plants even though cursors worked. */
 function connectChannels(){
   if(plantSlotsChannel) return;
 
-  plantSlotsChannel = playhtml.createPageData(`garden-${garden.id}-plants`, garden.plants);
+  plantSlotsChannel = playhtml.createPageData("garden-plants", garden.plants);
   garden.plants = plantSlotsChannel.getData();
   plantSlotsChannel.onUpdate(data => { garden.plants = data; renderPlantSlots(); });
 
-  // colors/tags/pattern/scale — previously local-only (just this browser's
-  // localStorage), so a second visitor never actually saw the same garden.
-  // Whole-object/array replacement is fine here (confirmed against the real
-  // build) — it's only *index* assignment into a top-level array that
-  // playhtml's Page Data rejects, and meta is a plain object throughout.
-  metaChannel = playhtml.createPageData(`garden-${garden.id}-meta`, garden.meta);
+  // colors/tags/pattern/scale. Whole-object/array replacement is fine here
+  // (confirmed against the real build) — it's only *index* assignment into
+  // a top-level array that playhtml's Page Data rejects, and meta is a
+  // plain object throughout.
+  metaChannel = playhtml.createPageData("garden-meta", garden.meta);
   garden.meta = metaChannel.getData();
   applyMetaToUI();
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
@@ -975,15 +960,11 @@ fieldEl.addEventListener("click", e => {
   openPlantModal({ x: e.clientX - r.left, y: e.clientY - r.top });
 });
 
-/* a garden restored from localStorage already exists — skip the "new
-   season" builder entirely and connect straight to its live plant/meta
-   state so the field shows real data right away. */
-if(restoredGarden){
-  hideBuilder();
-  connectChannels();
-  renderSeedSlots();
-  renderPlantSlots();
-}
+// connectChannels() runs async (after playhtml.init resolves) and re-renders
+// on its own once the real synced data arrives — these are just the
+// unsynced first paint using local defaults.
+renderSeedSlots();
+renderPlantSlots();
 </script>
 
 </body>
