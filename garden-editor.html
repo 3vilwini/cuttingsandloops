@@ -404,6 +404,7 @@
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
     <label>seed list</label>
+    <p class="sub">download seeds to propogate your own sounds, then plant them in the garden</p>
     <div id="seedListItems"></div>
   </div>
 </div>
@@ -413,7 +414,7 @@
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub">seeds are the source of this garden only. others will be able to download and propogate them with other seed sounds.</p>
+      <p class="sub">seeds are the source of this garden. others will be able to download and propogate them with other seed sounds.</p>
 
       <label>track title</label>
       <input type="text" id="sTitle" placeholder="track title">
@@ -440,7 +441,7 @@
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub" id="pSub">plant something new in this garden.</p>
+      <p class="sub" id="pSub">plant your own sound mixed from the seedlist, and watch it grow next to others.</p>
 
       <label>the sound</label>
       <label class="filelabel" id="pFileLabel" tabindex="0">
@@ -1406,7 +1407,7 @@ function toggleSampledFrom(label){
 
 function openPlantModal(pos){
   editingPlantId = null;
-  pSub.textContent = "plant something new in this garden.";
+  pSub.textContent = "plant your own sound mixed from the seedlist, and watch it grow next to others.";
   pSaveBtn.textContent = "plant";
   pendingPlantPos = pos || { x: CX, y: CY };
   plantDraftFile = null; plantDraftRecipeFile = null;
@@ -1666,14 +1667,37 @@ function occupiedBoxes(){
     };
   });
 }
+// same idea as occupiedBoxes above, but for seed slots — a hot spot whose
+// square would cover a seed's own clickable area (dot + label) is skipped,
+// so hovering near a seed always reads as "click the seed", never "plant
+// here". Unlike occupiedBoxes this is a box-vs-square overlap test rather
+// than a point-in-box test, since a seed's dot is much smaller than a hot
+// spot's 140x140 square and a point test would almost never catch it.
+function seedOccupiedBoxes(){
+  const fieldRect = fieldEl.getBoundingClientRect();
+  return Array.from(document.querySelectorAll("#seedSlots .seedslot")).map(m => {
+    const dotRect = m.getBoundingClientRect();
+    const txtEl = m.querySelector(".txt");
+    const txtRect = txtEl ? txtEl.getBoundingClientRect() : dotRect;
+    const left = Math.min(dotRect.left, txtRect.left), right = Math.max(dotRect.right, txtRect.right);
+    const top = Math.min(dotRect.top, txtRect.top), bottom = Math.max(dotRect.bottom, txtRect.bottom);
+    return {
+      left: left - fieldRect.left, right: right - fieldRect.left,
+      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
+    };
+  });
+}
 function nearestHotSpot(x, y){
   const boxes = occupiedBoxes();
+  const seedBoxes = seedOccupiedBoxes();
   let best = null, bestDist = Infinity;
   for(const s of hotSpotPositions()){
     // a hot spot inside an existing plant's real rendered box (drawing +
     // label) is never offered — being near a plant means dragging it, not
     // planting a new one on top of it
     if(boxes.some(b => s.x >= b.left && s.x <= b.right && s.y >= b.top && s.y <= b.bottom)) continue;
+    const sqLeft = s.x - HOTSPOT_HALF, sqRight = s.x + HOTSPOT_HALF, sqTop = s.y - HOTSPOT_HALF, sqBottom = s.y + HOTSPOT_HALF;
+    if(seedBoxes.some(b => sqLeft < b.right && sqRight > b.left && sqTop < b.bottom && sqBottom > b.top)) continue;
     if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
     const d = Math.hypot(x - s.x, y - s.y);
     if(d < bestDist){ bestDist = d; best = s; }
@@ -1681,20 +1705,25 @@ function nearestHotSpot(x, y){
   return best;
 }
 
+const NO_SEEDS_MSG = "you can’t plant just yet! add at least one seed as the source before other plants can grow";
 fieldEl.addEventListener("mousemove", e => {
   const r = fieldEl.getBoundingClientRect();
   const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
-  if(!spot){ hoverSquare.style.display = "none"; return; }
+  if(!spot){ hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; return; }
+  const hasSeeds = Object.keys(garden.seeds || {}).length > 0;
   hoverSquare.style.left = spot.x + "px";
   hoverSquare.style.top = spot.y + "px";
   hoverSquare.style.borderColor = garden.meta.colors.seed;
   hoverSquare.style.display = "block";
+  fieldEl.style.cursor = hasSeeds ? "" : "not-allowed";
+  fieldEl.title = hasSeeds ? "" : NO_SEEDS_MSG;
 });
-fieldEl.addEventListener("mouseleave", () => { hoverSquare.style.display = "none"; });
+fieldEl.addEventListener("mouseleave", () => { hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; });
 fieldEl.addEventListener("click", e => {
   const r = fieldEl.getBoundingClientRect();
   const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
   if(!spot) return;   // clicking away from a hot spot does nothing now
+  if(!Object.keys(garden.seeds || {}).length) return;   // can't plant until at least one seed exists
   openPlantModal(spot);
 });
 
