@@ -1,0 +1,305 @@
+@font-face{
+  font-family: "Deer Diary";
+  src: url("fonts/deer-diary.ttf") format("truetype");
+  font-display: swap;
+}
+:root{
+  --ink:#000; --paper:#fff; --muted:#555;
+}
+*{ box-sizing:border-box; }
+html, body{ height:100%; }
+body{
+  margin:0; color:var(--ink);
+  font-family: "Deer Diary", "Courier New", monospace;
+  font-size:.65rem;                          /* single size for all text on the page — matches the builder panel */
+  display:flex; align-items:center; justify-content:center; padding:2.5rem;
+  position:relative; overflow:hidden;
+}
+
+/* ---- nav stack (top-left, always on top) ---- */
+.navstack{ position:fixed; top:2.5rem; left:2.5rem; z-index:3; display:flex; flex-direction:column; gap:.6rem; }
+/* plain squares, each with its own full black border — not stuck together,
+   since each group only ever holds one button now */
+.navgroup{ display:flex; flex-direction:column; width:2.3rem; }
+.navbtn{
+  width:2.3rem; height:2.3rem; border:1px solid #000;
+  background:var(--paper); color:var(--ink); padding:0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-family:inherit; font-size:inherit; text-align:center;
+  /* without this the browser's native button chrome (a subtle bezel/
+     shadow baked into appearance:auto) shows through on top of our own
+     border, especially on :active — doubled-up stroke + a shadow
+     that was never actually in our CSS */
+  appearance:none; -webkit-appearance:none; outline:none; box-shadow:none;
+}
+.navbtn:active{ background:#000; color:var(--paper); }
+#navToggleBtn{ font-size:1.6rem; }
+#seedListToggleBtn{ font-size:1.6rem; }
+/* pressed-looking while the panel it toggles is open, so it's obvious
+   this same button is what closes it again */
+.navbtn[data-open="true"]{ background:#000; color:var(--paper); }
+
+/* ---- chosen weather tags (top-center, mirrors the picker in the card) ----
+   clickable — see pressTag/checkTagPresses: two different people clicking
+   the same one within a couple seconds sends everyone to another page. */
+.tagdisplay{
+  position:fixed; top:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:.5rem;
+}
+.tagdisplay span{
+  display:inline-block; border:1px solid #000; border-radius:999px; background:var(--paper); color:var(--ink);
+  padding:.5rem .9rem; font-family:inherit; font-size:inherit; cursor:pointer;
+}
+.tagdisplay span:hover{ box-shadow: 0 0 10px 3px var(--glow, transparent); }
+
+/* ---- live visitor count (top-right) ---- */
+.visitorcount{
+  position:fixed; top:2.5rem; right:2.5rem; z-index:3;
+  display:flex; align-items:center; gap:.5rem;
+  border:1px solid #000; background:var(--paper); color:var(--ink); padding:.5rem .8rem;
+}
+.visitorcount .dot{ width:8px; height:8px; border-radius:50%; background:#3ab704; flex-shrink:0; }
+
+/* ---- arrow-key pad (bottom-right, perfect squares, gap kept between them) ---- */
+.arrowpad{
+  position:fixed; bottom:2.5rem; right:2.5rem; z-index:3;
+  display:grid; grid-template-columns:repeat(3, 2.3rem); grid-template-rows:repeat(2, 2.3rem);
+  gap:.3rem;
+}
+.arrowpad button{
+  grid-column:2; width:2.3rem; height:2.3rem; border:1px solid #000; background:var(--paper); color:var(--ink);
+  display:flex; align-items:center; justify-content:center; padding:0;
+  cursor:pointer; font-family:inherit; font-size:inherit;
+}
+.arrowpad button:active{ background:#000; color:var(--paper); }
+.arrowpad #panUp{ grid-row:1; }
+.arrowpad #panLeft{ grid-row:2; grid-column:1; }
+.arrowpad #panDown{ grid-row:2; grid-column:2; }
+.arrowpad #panRight{ grid-row:2; grid-column:3; }
+
+/* ---- the pannable field: bigger than the viewport, arrow keys / pad scroll it ---- */
+#viewport{ position:fixed; inset:0; z-index:0; overflow:auto; }
+#field{ position:relative; }
+#patternLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+/* seed slots — fixed positions on a pattern-specific grid (never move once
+   the pattern is set). An empty one is a "+ add seed" invitation; a
+   filled one shows its title/artist and previews on hover, like a plant.
+   Same pointer-events split as #plantSlots: the full-field container must
+   not capture clicks itself (it would win hit-tests over anything drawn
+   later, like a plant's overflowing label, everywhere it isn't actually
+   covering an actual seed) — each .seedslot re-enables it individually. */
+#seedSlots{ position:absolute; inset:0; pointer-events:none; }
+/* the dot is the real anchor — sized+centered on its own, so toggling the
+   label's visibility never shifts a seed's actual planted position. */
+.seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer; }
+/* glows the dot + label together as one shape, in the garden's seed
+   color — drop-shadow (not box-shadow) so it follows the label's actual
+   text/gradient silhouette instead of a rectangular box around it */
+.seedslot:hover{ filter: drop-shadow(0 0 6px var(--glow, transparent)); }
+.seedslot .dot{ position:absolute; inset:0; border-radius:50%; border:1px solid #000; }
+.seedslot .txt{ position:absolute; left:14px; top:50%; transform:translateY(-50%); white-space:nowrap; }
+/* empty seeds invite a click: the "+ add seed" text pulses in size while
+   its own gradient fill (seed color <-> white) slides through it — both
+   stop the instant a seed is added, since only .empty gets these. */
+@keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.1); } }
+@keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
+.seedslot.empty .txt{
+  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
+}
+
+/* the layer itself must not capture pointer events — it's the full size
+   of the field, and would otherwise sit on top of everything (including
+   the seed slots underneath) and swallow clicks even where there's no
+   actual plant. Each .plantmark re-enables pointer-events on itself. */
+#plantSlots{ position:absolute; inset:0; pointer-events:none; }
+
+/* dashed curved lines from every seed to the plants sampled from it —
+   shown/hidden by the "roots" toggle, see applyViewToggles/renderConnections */
+#connectionsLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+/* a plant is its own freehand drawing on the map — no square/border
+   around it, just the strokes themselves, at the exact same scale they
+   were drawn at in the modal. width/height here must match pCanvas's
+   width/height attribute (140x140) 1:1, so the viewBox maps directly to
+   screen pixels with no scaling — vector-effect:non-scaling-stroke on
+   each polyline is just a safety net in case that ever changes. */
+.plantmark{
+  position:absolute; width:140px; height:140px; transform:translate(-50%,-50%);
+  cursor:grab; pointer-events:auto;
+}
+.plantmark:active{ cursor:grabbing; }
+.plantmark svg{ width:100%; height:100%; overflow:visible; }
+/* a small dot in the plant's own color, right before its name — same
+   visual language as a seed's dot. Stays visible even when the "labels"
+   toggle hides the name text next to it, same as a seed's dot does. */
+.plantmark .labeldot{
+  position:absolute; top:50%; left:100%; transform:translateY(-50%);
+  margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
+}
+@keyframes plantPinPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.6); } }
+.plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
+/* the plant's name, shown/hidden together with the seed labels via the
+   same "labels" toggle — stroked so it stays readable over any field
+   background or drawing color underneath it */
+.plantmark .txt{
+  position:absolute; top:50%; left:100%; transform:translateY(-50%);
+  margin-left:calc(.4rem + 10px + .35rem); white-space:nowrap; pointer-events:none;
+}
+/* fallback for a plant saved with an empty canvas — nothing was drawn,
+   so there's no path data to show */
+.plantmark .fallback{
+  position:absolute; inset:0; border:2px solid #000;
+}
+/* recipe screenshot — only added to the DOM while actually hovering (see
+   mouseenter/mouseleave), sat above the marker like a tooltip */
+.plantmark .recipepreview{
+  position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+  margin-bottom:.4rem; max-width:140px; max-height:140px;
+  border:2px solid #000; background:var(--paper); pointer-events:none;
+}
+/* shown only when hovering a plantable hot spot (see nearestHotSpot) —
+   border color is set inline to the garden's current seed color. Sized to
+   match .plantmark/pCanvas (140x140) exactly, and nearestHotSpot's hit
+   test uses that same 140x140 box, so the square appears/disappears
+   right at its own visible edge instead of some smaller invisible area. */
+.hoversquare{
+  position:absolute; width:140px; height:140px; border:1px solid #000;
+  transform:translate(-50%,-50%); pointer-events:none; display:none;
+}
+
+/* ---- bottom toggle bar: label, then pill switch, black/white (inverted vs before) ---- */
+.viewtoggles{
+  position:fixed; bottom:2.5rem; left:2.5rem; z-index:3;
+  display:flex; gap:2.2rem; align-items:center;
+}
+/* tablet and narrower: stack the toggles vertically instead of running
+   them in a row, since a 4-wide row starts crowding a narrower viewport */
+@media (max-width:768px){
+  .viewtoggles{ flex-direction:column; align-items:flex-start; gap:.6rem; }
+}
+.toggle{
+  display:flex; align-items:center; gap:.5rem; border:none; background:none;
+  cursor:pointer; font-family:inherit; font-size:inherit; color:var(--ink); padding:0;
+}
+.toggle .switch{
+  position:relative; width:26px; height:14px; border-radius:999px;
+  border:1px solid #000; background:#000; flex-shrink:0;
+}
+.toggle .knob{ position:absolute; top:1px; left:1px; width:10px; height:10px; border-radius:50%; background:var(--paper); }
+.toggle[data-on="true"] .switch{ background:var(--paper); }
+.toggle[data-on="true"] .knob{ left:13px; background:#000; }
+
+/* ---- vintage mac window chrome ---- */
+/* opens right next to the swirl nav button that toggles it, top-aligned
+   with that same button — not centered on the page */
+.card{
+  position:fixed; top:2.5rem; left:calc(2.5rem + 2.3rem + .6rem); z-index:2;
+  width:100%; max-width:250px; background:var(--paper); color:var(--ink);
+  border:2px solid #000; border-radius:0;
+}
+/* docks under the swirl button's own panel, next to the seed-list nav
+   icon right below it — same left offset, shifted down to that row */
+#seedListCard{ top:calc(2.5rem + 2.3rem + .6rem); max-width:220px; }
+#seedListItems{ display:flex; flex-direction:column; gap:.5rem; max-height:220px; overflow-y:auto; }
+.seedlistitem{
+  display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+  border:1px solid #000; padding:.4rem .5rem;
+}
+.seedlistitem span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.seedlistitem a{ color:var(--ink); flex-shrink:0; }
+.seedlistdelete{
+  border:none; background:none; padding:0; margin:0; flex-shrink:0;
+  cursor:pointer; font-size:inherit; line-height:1;
+}
+.titlebar{
+  height:18px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
+  background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
+}
+.titlebar .closebox{ width:9px; height:9px; border:1px solid #000; background:var(--paper); flex-shrink:0; }
+.cardbody{ padding:.8rem .9rem; }
+
+.sub{ color:var(--muted); margin:0 0 1.6rem; line-height:1.4; }
+label{ display:block; color:var(--muted); margin-bottom:.3rem; }
+.row{ margin-bottom:.8rem; }
+input[type="text"], select{
+  width:100%; padding:.4rem .5rem; border-radius:0; border:1px solid #000;
+  background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit;
+}
+
+/* tags */
+.tagbank{ display:flex; flex-wrap:wrap; gap:.3rem; margin-bottom:.5rem; }
+.tag{
+  padding:.2rem .55rem; border-radius:999px; border:1px solid #000;
+  background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit; cursor:pointer;
+}
+.tag[data-selected="true"]{ background:#000; color:var(--paper); }
+.tag:disabled{ opacity:.35; cursor:not-allowed; }
+.tagcustom{ display:flex; gap:.4rem; align-items:stretch; }
+.tagcustom input{ flex:1; }
+.tagcustom button{
+  padding:.4rem .7rem; border-radius:999px; border:1px solid #000; background:var(--paper); color:var(--ink);
+  font-family:inherit; font-size:inherit; cursor:pointer;
+}
+
+/* colors — one per row, keeps the whole panel narrow and tall */
+.colorgrid{ display:grid; grid-template-columns:1fr; gap:.5rem; }
+.colorpick span{ color:var(--muted); }
+.colorpick{ display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; }
+.colorpick input[type="color"]{
+  width:100%; height:24px; border:1px solid #000; border-radius:0; background:none; padding:2px; cursor:pointer;
+}
+
+/* pattern picker */
+.patternbank{ display:flex; gap:.35rem; margin-bottom:.7rem; }
+.patternbtn{
+  flex:1; padding:.4rem .3rem; border:1px solid #000; background:var(--paper); color:var(--ink);
+  font-family:inherit; font-size:inherit; cursor:pointer; text-align:center; border-radius:0;
+}
+.patternbtn[data-selected="true"]{ background:#000; color:var(--paper); }
+
+/* scale slider */
+.scalerow{ display:flex; align-items:center; gap:.5rem; }
+.scalerow input[type="range"]{ flex:1; accent-color:#000; }
+.scalerow span{ color:var(--muted); width:2.4rem; text-align:right; }
+
+.actions{ display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem; }
+button.primary{
+  padding:.45rem 1rem; border-radius:999px; border:1px solid #000; background:#000; color:var(--paper);
+  font-family:inherit; font-size:inherit; cursor:pointer; font-weight:600;
+}
+button.primary:active{ background:var(--paper); color:#000; }
+button.primary:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* modal (seed uploader) */
+.scrim{
+  display:none; position:fixed; inset:0;
+  align-items:center; justify-content:center; padding:1.5rem; z-index:2;
+}
+.scrim.open{ display:flex; }
+.modal{
+  width:100%; max-width:680px; max-height:85vh; overflow:auto;
+  background:var(--paper); color:var(--ink); border:2px solid #000; border-radius:0;
+}
+.modal .cardbody{ padding:1.6rem; }
+.modal h2{ margin:0 0 .2rem; font-size:inherit; }
+.modal .sub{ margin-bottom:1.2rem; }
+
+.modal .actions{ margin-top:1.5rem; justify-content:flex-end; }
+button.ghost{
+  background:none; border:1px solid #000; color:var(--ink); border-radius:999px;
+  padding:.3rem .8rem; cursor:pointer; font-size:inherit; font-family:inherit;
+}
+button.ghost:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* ---- add-plant modal ---- */
+.filelabel{
+  display:flex; align-items:center; gap:.5rem; padding:.5rem .7rem;
+  border:1px dashed #000; cursor:pointer; font-size:inherit; color:var(--muted); margin-bottom:.2rem;
+}
+.filelabel input{ display:none; }
+.filelabel.has-file{ color:#000; font-weight:600; }
+#pCanvas{ border:2px solid #000; cursor:crosshair; touch-action:none; background:var(--paper); }
