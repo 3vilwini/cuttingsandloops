@@ -152,6 +152,13 @@
   .plantmark .fallback{
     position:absolute; inset:0; border:2px solid #000;
   }
+  /* recipe screenshot — only added to the DOM while actually hovering (see
+     mouseenter/mouseleave), sat above the marker like a tooltip */
+  .plantmark .recipepreview{
+    position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+    margin-bottom:.4rem; max-width:140px; max-height:140px;
+    border:2px solid #000; background:var(--paper); pointer-events:none;
+  }
   /* shown only when hovering a plantable hot spot (see nearestHotSpot) —
      border color is set inline to the garden's current seed color. Sized to
      match .plantmark/pCanvas (140x140) exactly, and nearestHotSpot's hit
@@ -698,22 +705,32 @@ function renderPlantSlots(){
     el.appendChild(label);
 
     let audioEl = null;
+    let recipeImgEl = null;
     el.addEventListener("mouseenter", () => {
       const ref = p.audioRef || localPlantAudioRefs[p.id];
-      if(!ref) return;
-      audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {});
+      if(ref){ audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {}); }
+      if(p.recipeImage){
+        recipeImgEl = document.createElement("img");
+        recipeImgEl.className = "recipepreview";
+        recipeImgEl.src = p.recipeImage;
+        el.appendChild(recipeImgEl);
+      }
     });
-    el.addEventListener("mouseleave", () => { audioEl?.pause(); audioEl = null; });
+    el.addEventListener("mouseleave", () => {
+      audioEl?.pause(); audioEl = null;
+      recipeImgEl?.remove(); recipeImgEl = null;
+    });
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
 
     // drag to reposition (from anywhere on the marker) — persists for
     // everyone via plantSlotsChannel. A mousedown that never actually moves
-    // is a plain click instead: on the label text it opens this plant for
-    // editing, on the drawing itself it toggles pinned.
+    // is a plain click instead: toggles pinned. A second one landing soon
+    // after (hand-rolled double-click detection, not the native dblclick
+    // event, so it isn't thrown off by renderPlantSlots rebuilding this
+    // element's DOM node in between) opens this plant for editing.
     el.addEventListener("mousedown", e => {
       e.stopPropagation();
       e.preventDefault();
-      const clickedLabel = !!e.target.closest(".txt");
       const startX = e.clientX, startY = e.clientY;
       const origX = p.x, origY = p.y;
       let moved = false;
@@ -730,9 +747,11 @@ function renderPlantSlots(){
         if(moved){
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
-        } else if(clickedLabel){
+        } else if(Date.now() - (lastPlantClickTimes[p.id] || 0) < 350){
+          lastPlantClickTimes[p.id] = 0;
           openPlantEditModal(p);
         } else {
+          lastPlantClickTimes[p.id] = Date.now();
           p.pinned = !p.pinned;
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
@@ -1229,6 +1248,10 @@ const hoverSquare = document.getElementById("hoverSquare");
 
 const localPlantAudioRefs = {};
 const localSeedAudioRefs = {};
+// keyed by plant id, not a per-marker closure variable — a pin-toggle click
+// re-renders the whole plant layer (fresh DOM node, fresh closure) before a
+// second click could ever land, so timing has to survive that rebuild
+const lastPlantClickTimes = {};
 let plantDraftFile = null;
 let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
