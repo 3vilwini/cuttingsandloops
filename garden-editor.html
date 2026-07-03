@@ -29,7 +29,7 @@
      since each group only ever holds one button now */
   .navgroup{ display:flex; flex-direction:column; width:2.3rem; }
   .navbtn{
-    width:2.3rem; height:2.3rem; border:2px solid #000;
+    width:2.3rem; height:2.3rem; border:1px solid #000;
     background:var(--paper); color:var(--ink); padding:0;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; font-family:inherit; font-size:inherit; text-align:center;
@@ -41,6 +41,7 @@
   }
   .navbtn:active{ background:#000; color:var(--paper); }
   #navToggleBtn{ font-size:1.6rem; }
+  #seedListToggleBtn{ font-size:1.6rem; }
   /* pressed-looking while the panel it toggles is open, so it's obvious
      this same button is what closes it again */
   .navbtn[data-open="true"]{ background:#000; color:var(--paper); }
@@ -315,7 +316,7 @@
     <button type="button" class="navbtn" id="navToggleBtn" title="open/close">𖦹</button>
   </div>
   <div class="navgroup">
-    <button type="button" class="navbtn" id="seedListToggleBtn" title="seed list">⇩</button>
+    <button type="button" class="navbtn" id="seedListToggleBtn" title="seed list">❦</button>
   </div>
 </div>
 
