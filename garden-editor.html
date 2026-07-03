@@ -480,6 +480,20 @@
   </div>
 </div>
 
+<!-- generic yes/no confirmation, currently used for seed delete -->
+<div class="scrim" id="confirmScrim">
+  <div class="modal" style="max-width:360px;">
+    <div class="titlebar"><span class="closebox"></span></div>
+    <div class="cardbody">
+      <p class="sub" id="confirmMsg" style="margin-bottom:1.2rem;"></p>
+      <div class="actions">
+        <button type="button" class="ghost" id="confirmCancelBtn">cancel</button>
+        <button type="button" class="primary" id="confirmOkBtn">delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 "use strict";
 import { playhtml } from "https://unpkg.com/playhtml";
@@ -1060,7 +1074,7 @@ document.getElementById("panRight").addEventListener("click", () => panBy(STEP,0
 
 document.addEventListener("keydown", e => {
   const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
-  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open")) return;
+  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open") || document.getElementById("confirmScrim").classList.contains("open")) return;
   const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
   if(move){ e.preventDefault(); panBy(move[0], move[1]); }
 });
@@ -1069,6 +1083,7 @@ document.addEventListener("keydown", e => {
 // panels' own fields, unlike the arrow-key panning guard above.
 document.addEventListener("keydown", e => {
   if(e.key !== "Escape") return;
+  if(document.getElementById("confirmScrim").classList.contains("open")){ hideConfirmDialog(false); return; }
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
 });
 
@@ -1521,6 +1536,26 @@ function openSeedModal(slotIndex){
 function hideSeedModal(){ seedScrim?.classList.remove("open"); }
 sCancelBtn.addEventListener("click", hideSeedModal);
 
+/* generic yes/no confirmation — resolves true if the user confirms, false
+   if they cancel/Escape/click away. One shared modal, re-used for every
+   confirmation in the app rather than a bespoke dialog per action. */
+const confirmScrim = document.getElementById("confirmScrim");
+const confirmMsg = document.getElementById("confirmMsg");
+const confirmOkBtn = document.getElementById("confirmOkBtn");
+const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+let resolveConfirm = null;
+function confirmDialog(message){
+  confirmMsg.textContent = message;
+  confirmScrim.classList.add("open");
+  return new Promise(resolve => { resolveConfirm = resolve; });
+}
+function hideConfirmDialog(result){
+  confirmScrim.classList.remove("open");
+  if(resolveConfirm){ resolveConfirm(result); resolveConfirm = null; }
+}
+confirmOkBtn.addEventListener("click", () => hideConfirmDialog(true));
+confirmCancelBtn.addEventListener("click", () => hideConfirmDialog(false));
+
 sSaveBtn.addEventListener("click", async () => {
   sSaveBtn.disabled = true; sSaveBtn.textContent = "adding…";
   const slot = pendingSeedSlot;
@@ -1570,7 +1605,9 @@ function renderSeedList(){
     const del = document.createElement("button");
     del.type = "button"; del.className = "seedlistdelete"; del.textContent = "🗑";
     del.title = "delete this seed";
-    del.addEventListener("click", () => {
+    del.addEventListener("click", async () => {
+      const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
+      if(!ok) return;
       delete garden.seeds[i];
       seedsChannel?.setData(draft => { delete draft[i]; });
       onSeedsChanged();
