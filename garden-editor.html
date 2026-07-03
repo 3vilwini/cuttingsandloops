@@ -175,6 +175,11 @@
     position:fixed; bottom:2.5rem; left:2.5rem; z-index:3;
     display:flex; gap:2.2rem; align-items:center;
   }
+  /* tablet and narrower: stack the toggles vertically instead of running
+     them in a row, since a 4-wide row starts crowding a narrower viewport */
+  @media (max-width:768px){
+    .viewtoggles{ flex-direction:column; align-items:flex-start; gap:.6rem; }
+  }
   .toggle{
     display:flex; align-items:center; gap:.5rem; border:none; background:none;
     cursor:pointer; font-family:inherit; font-size:inherit; color:var(--ink); padding:0;
