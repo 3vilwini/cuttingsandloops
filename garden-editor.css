@@ -39,16 +39,14 @@ body{
    this same button is what closes it again */
 .navbtn[data-open="true"]{ background:#000; color:var(--paper); }
 
-/* ---- chosen weather tags (top-center, mirrors the picker in the card) ----
-   clickable — see pressTag/checkTagPresses: two different people clicking
-   the same one within a couple seconds sends everyone to another page. */
+/* ---- chosen weather tags (top-center, mirrors the picker in the card) ---- */
 .tagdisplay{
   position:fixed; top:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
   display:flex; gap:.5rem;
 }
 .tagdisplay span{
   display:inline-block; border:1px solid #000; border-radius:999px; background:var(--paper); color:var(--ink);
-  padding:.5rem .9rem; font-family:inherit; font-size:inherit; cursor:pointer;
+  padding:.5rem .9rem; font-family:inherit; font-size:inherit;
 }
 .tagdisplay span:hover{ box-shadow: 0 0 10px 3px var(--glow, transparent); }
 
