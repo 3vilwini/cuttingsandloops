@@ -140,13 +140,21 @@
   }
   .plantmark:active{ cursor:grabbing; }
   .plantmark svg{ width:100%; height:100%; overflow:visible; }
-  .plantmark.pinned{ filter:drop-shadow(0 0 2px rgba(0,0,0,.6)); }
+  /* a small dot in the plant's own color, right before its name — same
+     visual language as a seed's dot. Stays visible even when the "labels"
+     toggle hides the name text next to it, same as a seed's dot does. */
+  .plantmark .labeldot{
+    position:absolute; top:50%; left:100%; transform:translateY(-50%);
+    margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
+  }
+  @keyframes plantPinPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.6); } }
+  .plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
   /* the plant's name, shown/hidden together with the seed labels via the
      same "labels" toggle — stroked so it stays readable over any field
      background or drawing color underneath it */
   .plantmark .txt{
     position:absolute; top:50%; left:100%; transform:translateY(-50%);
-    margin-left:.4rem; white-space:nowrap; pointer-events:none;
+    margin-left:calc(.4rem + 10px + .35rem); white-space:nowrap; pointer-events:none;
   }
   /* fallback for a plant saved with an empty canvas — nothing was drawn,
      so there's no path data to show */
@@ -705,6 +713,13 @@ function renderPlantSlots(){
       fallback.style.background = p.color;
       el.appendChild(fallback);
     }
+
+    // a small dot in the plant's own color, next to its name — pulses
+    // while the plant is pinned instead of the old drop-shadow
+    const labelDot = document.createElement("span");
+    labelDot.className = "labeldot";
+    labelDot.style.background = p.color;
+    el.appendChild(labelDot);
 
     // the planter's name — same "txt" class the seed labels use, so the
     // existing "labels" toggle shows/hides this one too for free
