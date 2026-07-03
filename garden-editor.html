@@ -66,17 +66,6 @@
   }
   .visitorcount .dot{ width:8px; height:8px; border-radius:50%; background:#3ab704; flex-shrink:0; }
 
-  /* ---- activity log (bottom-center) — most recent plant/pin/unpin events ---- */
-  .activitylog{
-    position:fixed; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:3;
-    border:1px solid #000; background:var(--paper); color:var(--ink);
-    padding:.5rem .8rem; width:260px; max-height:80px; overflow-y:auto;
-  }
-  .activitylog .entry{
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    padding:.1rem 0;
-  }
-
   /* ---- arrow-key pad (bottom-right, perfect squares, gap kept between them) ---- */
   .arrowpad{
     position:fixed; bottom:2.5rem; right:2.5rem; z-index:3;
@@ -350,10 +339,6 @@
   <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
-<div class="activitylog" id="activityLog" aria-hidden="true">
-  <div id="activityLogItems"></div>
-</div>
-
 <!-- ============ STEP 1 — creation form ============ -->
 <div class="card" id="builderCard">
   <div class="titlebar"><span class="closebox"></span></div>
@@ -532,8 +517,6 @@ let plantSlotsChannel = null;
 let metaChannel = null;
 let tagPressChannel = null;
 let seedsChannel = null;
-let activityLogChannel = null;
-let activityLog = {};   // entryId -> { action: "planted"|"pinned"|"unpinned", plantName, ts } — see logActivity
 
 /* garden.meta itself now lives in playhtml's synced Page Data (see
    connectChannels below) — that's the real persistence, shared across every
@@ -776,7 +759,6 @@ function renderPlantSlots(){
           p.pinned = !p.pinned;
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
-          logActivity(p.pinned ? "pinned" : "unpinned", p.name);
           renderPlantSlots();
         }
       }
@@ -1194,43 +1176,6 @@ function connectChannels(){
   garden.seeds = seedsChannel.getData();
   onSeedsChanged();
   seedsChannel.onUpdate(data => { garden.seeds = data; onSeedsChanged(); });
-
-  activityLogChannel = playhtml.createPageData("activity-log", activityLog);
-  activityLog = activityLogChannel.getData();
-  renderActivityLog();
-  activityLogChannel.onUpdate(data => { activityLog = data; renderActivityLog(); });
-}
-
-/* records a plant/pin/unpin event, trimmed to the most recent 30 so the
-   synced blob doesn't grow forever. Whole-object key assignment (not
-   index-mutation into an array), same safe pattern as garden.plants/seeds. */
-function logActivity(action, plantName){
-  const id = newId();
-  activityLogChannel?.setData(draft => {
-    draft[id] = { action, plantName, ts: Date.now() };
-    const byAge = Object.entries(draft).sort((a, b) => a[1].ts - b[1].ts);
-    const MAX = 30;
-    for(const [oldId] of byAge.slice(0, byAge.length - MAX)) delete draft[oldId];
-  });
-}
-
-function renderActivityLog(){
-  const container = document.getElementById("activityLogItems");
-  const entries = Object.values(activityLog || {}).sort((a, b) => b.ts - a.ts).slice(0, 5);
-  container.innerHTML = "";
-  if(!entries.length){
-    const empty = document.createElement("div");
-    empty.className = "entry";
-    empty.textContent = "nothing planted yet";
-    container.appendChild(empty);
-    return;
-  }
-  for(const e of entries){
-    const line = document.createElement("div");
-    line.className = "entry";
-    line.textContent = `${e.action} "${e.plantName}"`;
-    container.appendChild(line);
-  }
 }
 
 /* re-renders everywhere seed title/artist text shows up: the field markers
@@ -1508,7 +1453,6 @@ pSaveBtn.addEventListener("click", async () => {
   };
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
-  if(!isEdit) logActivity("planted", plant.name);
   renderPlantSlots();
   hidePlantModal();
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant";
