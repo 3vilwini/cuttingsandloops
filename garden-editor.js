@@ -553,10 +553,13 @@ requestAnimationFrame(() => {
 });
 
 /* ---- create garden ---- */
-// purely a namespace for this garden's uploaded files (see uploadSeedFile's
-// X-Garden-Id header) — no longer decides which synced room a visitor joins,
-// see connectChannels below.
-garden.id = newId();
+// a namespace for this garden's uploaded files (see uploadSeedFile's
+// X-Garden-Id header) — does not decide which synced room a visitor joins,
+// see connectChannels below. Derived from the page's own path rather than a
+// random id per load, so every visitor to the same garden page uploads into
+// the same stable folder (and re-uploading to a slot correctly overwrites
+// the old file there, instead of leaving it orphaned under a new random id).
+garden.id = location.pathname.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
 
 const builderCardEl = document.getElementById("builderCard");
 // declared here (not down by the click listener below) because hideBuilder()
