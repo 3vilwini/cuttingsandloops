@@ -665,7 +665,7 @@ button.ghost:disabled{
   overflow:auto;
   background:var(--paper); 
   color:var(--ink); 
-  border:1px solid #000; 
+  border:2px solid #000; 
   border-radius:0;
 }
 
