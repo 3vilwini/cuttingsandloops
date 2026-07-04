@@ -1,12 +1,10 @@
 import { playhtml } from "https://unpkg.com/playhtml";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
-// set this to your deployed Worker's URL once you've run `wrangler deploy`
-// in upload-worker/ (e.g. "https://sound-garden-uploads.YOUR-SUBDOMAIN.workers.dev").
-// left empty, plant uploads fall back to session-only blob URLs (same as
-// before) — the app still works for local testing, it just can't share
-// files across users yet.
-const UPLOAD_ENDPOINT = "";
+// the deployed Worker (upload-worker/worker.js) that streams uploads into
+// R2 — left empty, plant/seed uploads fall back to session-only blob URLs
+// instead, which still work locally but can't be shared across visitors.
+const UPLOAD_ENDPOINT = "https://sound-garden-uploads.renxchristiane.workers.dev";
 const MAX_TAGS = 3;
 const PATTERNS = [
   { id:"lattice", label:"lattice" },   // grid of very thin light lines

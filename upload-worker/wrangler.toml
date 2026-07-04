@@ -1,0 +1,17 @@
+name = "sound-garden-uploads"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[r2_buckets]]
+binding = "SEEDS"
+bucket_name = "cuttings-loops"
+
+[vars]
+# after creating the bucket, enable "Public Access" (r2.dev subdomain, or a
+# custom domain) in the Cloudflare dashboard and paste that base URL here —
+# it's what makes uploaded files downloadable by anyone with the link.
+PUBLIC_BUCKET_URL = "https://REPLACE-ME.r2.dev"
+
+# lock this to your real site's origin once you know it (e.g. the URL this
+# HTML ends up hosted at) — "*" is fine while you're testing locally.
+ALLOWED_ORIGIN = "*"
