@@ -68,12 +68,12 @@ body{
 }
 
 /* adjusts the size of this lil swirly ꩜ on the weather nav button */
-#navtogglebtn{ 
+#navToggleBtn{ 
   font-size:1.6rem; 
 }
 
 /* adjusts the size of this lil seed ❦ on the seedlist nav button */
-#seedlisttogglebtn{ 
+#seedListToggleBtn{ 
   font-size:1.6rem; 
 }
 
