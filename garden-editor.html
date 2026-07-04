@@ -10,26 +10,22 @@
 
 <div id="viewport">
   <div id="field">
-    <svg id="patternLayer" aria-hidden="true"></svg>
-    <div id="seedSlots" aria-hidden="true"></div>
-    <div id="plantSlots" aria-hidden="true"></div>
-    <svg id="connectionsLayer" aria-hidden="true"></svg>
-    <div id="hoverSquare" class="hoversquare" aria-hidden="true"></div>
+    <svg id="patternLayer"></svg>
+    <div id="seedSlots"></div>
+    <div id="plantSlots"></div>
+    <svg id="connectionsLayer"></svg>
+    <div id="hoverSquare" class="hoversquare"></div>
   </div>
 </div>
 
 <div class="navstack">
-  <div class="navgroup">
-    <button type="button" class="navbtn" id="navToggleBtn" title="open/close">𖦹</button>
-  </div>
-  <div class="navgroup">
+    <button type="button" class="navbtn" id="navtogglebtn" title="open/close">𖦹</button>
     <button type="button" class="navbtn" id="seedListToggleBtn" title="seed list">❦</button>
-  </div>
 </div>
 
 <div class="tagdisplay" id="tagDisplay"></div>
 
-<div class="arrowpad" aria-hidden="true">
+<div class="arrowpad">
   <button type="button" id="panUp" title="up">↑</button>
   <button type="button" id="panLeft" title="left">←</button>
   <button type="button" id="panDown" title="down">↓</button>
@@ -47,7 +43,7 @@
   <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
-<!-- ============ STEP 1 — creation form ============ -->
+<!-- feels like -->
 <div class="card" id="builderCard">
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
@@ -55,8 +51,8 @@
       <label>feels like <span id="tagCountLabel">(0/3)</span></label>
       <div class="tagbank" id="tagBank"></div>
       <div class="tagcustom">
-        <input type="text" id="tagCustomInput" placeholder="add your own…">
-        <button type="button" id="tagCustomBtn">add</button>
+        <input type="text" id="tagCustomInput" placeholder="something else...">
+        <button type="button" id="tagCustomBtn">+</button>
       </div>
     </div>
 
@@ -92,13 +88,12 @@
   </div>
 </div>
 
-<!-- seed list — every seed sound added so far, downloadable. Docks below
-     the builder card, same left offset. -->
+<!-- seed list -->
 <div class="card" id="seedListCard">
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
     <label>seed list</label>
-    <p class="sub">download seeds to propogate your own sounds, then plant them in the garden</p>
+    <p class="sub">~* start with these seeds to propogate your own sounds, then plant them in the garden *~</p>
     <div id="seedListItems"></div>
   </div>
 </div>
@@ -116,9 +111,9 @@
       <label style="margin-top:1rem;">artist</label>
       <input type="text" id="sArtist" placeholder="artist">
 
-      <label style="margin-top:1rem;">the sound</label>
+      <label style="margin-top:1rem;">audio file</label>
       <label class="filelabel" id="sFileLabel" tabindex="0">
-        <span id="sFileLabelText">choose audio file…</span>
+        <span id="sFileLabelText">select file (.mp3, .wav, .flac)</span>
         <input type="file" id="sFile" accept="audio/*" hidden>
       </label>
 
@@ -130,7 +125,7 @@
   </div>
 </div>
 
-<!-- ============ STEP 2 — plant a hybrid sound ============ -->
+<!-- plant a sound -->
 <div class="scrim" id="plantScrim">
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
@@ -143,7 +138,7 @@
         <input type="file" id="pFile" accept="audio/*" hidden>
       </label>
 
-      <label style="margin-top:1rem;">draw it</label>
+      <label style="margin-top:1rem;">give your plant a form</label>
       <div>
         <canvas id="pCanvas" width="140" height="140"></canvas>
         <button type="button" class="ghost" id="pClearCanvas" style="margin-left:.6rem; vertical-align:top;">clear</button>
@@ -154,13 +149,13 @@
         <input type="color" id="pColor" value="#000000">
       </div>
 
-      <label style="margin-top:1rem;">recipe screenshot (optional)</label>
+      <label style="margin-top:1rem;">add recipe screenshot (optional)</label>
       <label class="filelabel" id="pRecipeLabel" tabindex="0">
-        <span id="pRecipeLabelText">choose image…</span>
+        <span id="pRecipeLabelText">add screenshot (optional)</span>
         <input type="file" id="pRecipeFile" accept="image/*" hidden>
       </label>
 
-      <label style="margin-top:1rem;">sampled from (optional)</label>
+      <label style="margin-top:1rem;">sampled from</label>
       <div class="tagbank" id="pSampledFromBank"></div>
 
       <label style="margin-top:1rem;">planted by</label>
@@ -175,7 +170,7 @@
   </div>
 </div>
 
-<!-- generic yes/no confirmation, currently used for seed delete -->
+<!-- delete seed confirmation -->
 <div class="scrim" id="confirmScrim">
   <div class="modal" style="max-width:360px;">
     <div class="titlebar"><span class="closebox"></span></div>
