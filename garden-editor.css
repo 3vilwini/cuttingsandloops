@@ -293,8 +293,14 @@ body{
   pointer-events:auto;
 }
 
-.plantmark:active{ 
-  cursor:grabbing; 
+.plantmark:active{
+  cursor:grabbing;
+}
+
+/* opposite color from a filled seed's own hover glow, so hovering a plant
+   reads as a distinct action from hovering a seed */
+.plantmark:hover{
+  filter: drop-shadow(0 0 6px var(--glow, transparent));
 }
 
 .plantmark svg{ 

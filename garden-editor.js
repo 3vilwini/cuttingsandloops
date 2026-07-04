@@ -27,7 +27,8 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y, pinned }
+  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y }
+  // note: "pinned" is intentionally not part of this shape — see pinnedPlantIds
   seeds: {},    // slot index (string "0".."9") -> { title, artist, audioRef }
 };
 
@@ -186,9 +187,19 @@ function renderPlantSlots(){
   layer.innerHTML = "";
   Object.values(garden.plants || {}).forEach(p => {
     const el = document.createElement("div");
-    el.className = "plantmark" + (p.pinned ? " pinned" : "");
+    // pinned is local-only state (pinnedPlantIds), never read from the
+    // synced plant object — see the note by its declaration
+    el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
+    el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
     el.title = p.name;
+    // opposite of a filled seed's own hover glow color (see .seedslot:hover)
+    el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
+
+    // a re-render can happen mid-playback (another visitor dragging this
+    // same plant, for instance) — keep any already-playing audio in sync
+    // with wherever the plant actually is now, pinned or just hovered
+    if(activePlantAudio[p.id]) activePlantAudio[p.id].playbackRate = pitchForY(p.y);
 
     if(p.paths && p.paths.length){
       const svg = document.createElementNS(SVG_NS, "svg");
@@ -229,11 +240,9 @@ function renderPlantSlots(){
     label.style.color = garden.meta.colors.text;
     el.appendChild(label);
 
-    let audioEl = null;
     let recipeImgEl = null;
     el.addEventListener("mouseenter", () => {
-      const ref = p.audioRef || localPlantAudioRefs[p.id];
-      if(ref){ audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {}); }
+      playPlantAudio(p);
       if(p.recipeImage){
         recipeImgEl = document.createElement("img");
         recipeImgEl.className = "recipepreview";
@@ -242,7 +251,9 @@ function renderPlantSlots(){
       }
     });
     el.addEventListener("mouseleave", () => {
-      audioEl?.pause(); audioEl = null;
+      // a pinned plant keeps playing after the mouse leaves — only an
+      // unpinned (hover-only) sound stops here
+      if(!pinnedPlantIds.has(p.id)) stopPlantAudio(p.id);
       recipeImgEl?.remove(); recipeImgEl = null;
     });
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
@@ -265,11 +276,16 @@ function renderPlantSlots(){
         moved = true;
         p.x = origX + dx; p.y = origY + dy;
         el.style.left = p.x + "px"; el.style.top = p.y + "px";
+        // live pitch while dragging, not just after drop — matters when
+        // this plant's sound is already playing (hovered or pinned)
+        if(activePlantAudio[p.id]) activePlantAudio[p.id].playbackRate = pitchForY(p.y);
       }
       function onUp(){
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
         if(moved){
+          // position is real shared state — every visitor sees this move,
+          // and it's what drives everyone's pitch for this plant too
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
         } else if(Date.now() - (lastPlantClickTimes[p.id] || 0) < 350){
@@ -277,9 +293,14 @@ function renderPlantSlots(){
           openPlantEditModal(p);
         } else {
           lastPlantClickTimes[p.id] = Date.now();
-          p.pinned = !p.pinned;
-          garden.plants[p.id] = p;
-          plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
+          // pin/unpin is local-only — nothing written to plantSlotsChannel
+          if(pinnedPlantIds.has(p.id)){
+            pinnedPlantIds.delete(p.id);
+            stopPlantAudio(p.id);   // unpinning silences it until next hover/click
+          } else {
+            pinnedPlantIds.add(p.id);
+            playPlantAudio(p);
+          }
           renderPlantSlots();
         }
       }
@@ -304,6 +325,7 @@ function renderConnections(){
   svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
   const offsets = seedFieldOffsets();
   const plants = Object.values(garden.plants || {});
+  const fieldRect = fieldEl.getBoundingClientRect();
   for(const i in garden.seeds){
     const seed = garden.seeds[i];
     if(!seed) continue;
@@ -312,20 +334,32 @@ function renderConnections(){
     const from = { x: CX + o.dx, y: CY + o.dy };
     const connected = plants.filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
     for(const p of connected){
+      // ends on the plant's own labeldot, not its drawing's center — measured
+      // live (same idea as occupiedBoxes/seedOccupiedBoxes) rather than
+      // computed from margin/size constants, so it stays correct even if
+      // that dot's CSS changes. Falls back to the plant's raw x/y if the
+      // dot isn't actually rendered right now (e.g. the "plants" toggle is off).
+      const dotEl = document.querySelector(`#plantSlots .plantmark[data-plant-id="${p.id}"] .labeldot`);
+      const dotRect = dotEl?.getBoundingClientRect();
+      const toX = dotRect?.width ? dotRect.left + dotRect.width/2 - fieldRect.left : p.x;
+      const toY = dotRect?.width ? dotRect.top + dotRect.height/2 - fieldRect.top : p.y;
       // bow the line out to the side, perpendicular to the straight path
       // between them, so overlapping connections stay visually distinct
       // instead of stacking as straight lines
-      const dx = p.x - from.x, dy = p.y - from.y;
+      const dx = toX - from.x, dy = toY - from.y;
       const len = Math.hypot(dx, dy) || 1;
       const bow = 40;
-      const midX = (from.x + p.x) / 2 - (dy / len) * bow;
-      const midY = (from.y + p.y) / 2 + (dx / len) * bow;
+      const midX = (from.x + toX) / 2 - (dy / len) * bow;
+      const midY = (from.y + toY) / 2 + (dx / len) * bow;
       const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${p.x} ${p.y}`);
+      path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${toX} ${toY}`);
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", p.color);
       path.setAttribute("stroke-width", "1");
-      path.setAttribute("stroke-dasharray", "6 5");
+      // tight dotted line: a near-zero dash length with a round cap draws a
+      // small dot at each point, spaced close together, instead of dashes
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-dasharray", "0.1 3");
       path.setAttribute("vector-effect", "non-scaling-stroke");
       svg.appendChild(path);
     }
@@ -723,6 +757,41 @@ const localSeedAudioRefs = {};
 // re-renders the whole plant layer (fresh DOM node, fresh closure) before a
 // second click could ever land, so timing has to survive that rebuild
 const lastPlantClickTimes = {};
+
+/* pinning is local/per-visitor only — deliberately never synced via
+   playhtml, so each person decides for themselves which plants keep
+   playing continuously. Keyed by plant id (not stored on the synced plant
+   object itself), so it survives renderPlantSlots() rebuilding the DOM on
+   every position sync from other visitors. */
+const pinnedPlantIds = new Set();
+// currently-playing plant audio, keyed by plant id — also survives
+// re-renders for the same reason, which is what lets a pinned sound keep
+// playing uninterrupted while someone else drags that same plant around.
+const activePlantAudio = {};
+
+/* pitch follows vertical position on the field: one octave higher at the
+   very top, one octave lower at the very bottom, unchanged at dead center.
+   playbackRate shifts pitch and tempo together — the simplest native way
+   to do this without building a real Web Audio pitch-shifting graph. */
+function pitchForY(y){
+  return Math.pow(2, (FIELD_H/2 - y) / (FIELD_H/2));
+}
+function playPlantAudio(p){
+  if(activePlantAudio[p.id]) return;
+  const ref = p.audioRef || localPlantAudioRefs[p.id];
+  if(!ref) return;
+  const audioEl = new Audio(ref);
+  audioEl.loop = true;
+  audioEl.playbackRate = pitchForY(p.y);
+  audioEl.play().catch(() => {});
+  activePlantAudio[p.id] = audioEl;
+}
+function stopPlantAudio(id){
+  const audioEl = activePlantAudio[id];
+  if(!audioEl) return;
+  audioEl.pause();
+  delete activePlantAudio[id];
+}
 let plantDraftFile = null;
 let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
@@ -916,7 +985,7 @@ pSaveBtn.addEventListener("click", async () => {
     id: plantId, name: pName.value.trim(), audioRef, recipeImage,
     sampledFrom: selectedSampledFrom.slice(),
     paths: plantDraftPaths, color: pColor.value,
-    x: pendingPlantPos.x, y: pendingPlantPos.y, pinned: existing?.pinned || false,
+    x: pendingPlantPos.x, y: pendingPlantPos.y,
   };
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
