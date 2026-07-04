@@ -159,8 +159,8 @@ body{
   justify-content: center; 
   padding: 0;
   cursor: pointer; 
-  font-family: courier; 
-  font-size: 2rem;
+  font-family: calibri; 
+  font-size: 1.6rem;
 }
 
 .arrowpad button:active{ 
