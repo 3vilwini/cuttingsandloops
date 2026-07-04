@@ -298,8 +298,10 @@ body{
 }
 
 /* opposite color from a filled seed's own hover glow, so hovering a plant
-   reads as a distinct action from hovering a seed */
-.plantmark:hover{
+   reads as a distinct action from hovering a seed — only the label dot and
+   name glow, not the drawing itself, unlike a seed's combined dot+label glow */
+.plantmark:hover .labeldot,
+.plantmark:hover .txt{
   filter: drop-shadow(0 0 6px var(--glow, transparent));
 }
 

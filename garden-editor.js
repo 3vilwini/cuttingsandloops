@@ -323,6 +323,9 @@ function renderConnections(){
   const svg = document.getElementById("connectionsLayer");
   svg.innerHTML = "";
   svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
+  const defs = document.createElementNS(SVG_NS, "defs");
+  svg.appendChild(defs);
+  let gradientCount = 0;
   const offsets = seedFieldOffsets();
   const plants = Object.values(garden.plants || {});
   const fieldRect = fieldEl.getBoundingClientRect();
@@ -351,11 +354,28 @@ function renderConnections(){
       const bow = 40;
       const midX = (from.x + toX) / 2 - (dy / len) * bow;
       const midY = (from.y + toY) / 2 + (dx / len) * bow;
+
+      // gradient from the seed's own dot color to this plant's dot color,
+      // so the line itself reads as flowing from one to the other — each
+      // connection needs its own gradient since the endpoints differ
+      const gradientId = `rootGradient-${gradientCount++}`;
+      const gradient = document.createElementNS(SVG_NS, "linearGradient");
+      gradient.setAttribute("id", gradientId);
+      gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+      gradient.setAttribute("x1", from.x); gradient.setAttribute("y1", from.y);
+      gradient.setAttribute("x2", toX); gradient.setAttribute("y2", toY);
+      const stop1 = document.createElementNS(SVG_NS, "stop");
+      stop1.setAttribute("offset", "0%"); stop1.setAttribute("stop-color", garden.meta.colors.seed);
+      const stop2 = document.createElementNS(SVG_NS, "stop");
+      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", p.color);
+      gradient.appendChild(stop1); gradient.appendChild(stop2);
+      defs.appendChild(gradient);
+
       const path = document.createElementNS(SVG_NS, "path");
       path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${toX} ${toY}`);
       path.setAttribute("fill", "none");
-      path.setAttribute("stroke", p.color);
-      path.setAttribute("stroke-width", "1");
+      path.setAttribute("stroke", `url(#${gradientId})`);
+      path.setAttribute("stroke-width", "2");
       // tight dotted line: a near-zero dash length with a round cap draws a
       // small dot at each point, spaced close together, instead of dashes
       path.setAttribute("stroke-linecap", "round");
