@@ -334,21 +334,6 @@ body{
   white-space:nowrap; pointer-events:none;
 }
 
-/* recipe screenshot — only added to the DOM while actually hovering (see
-   mouseenter/mouseleave), sat above the marker like a tooltip */
-.plantmark .recipepreview{
-  position:absolute; 
-  left:50%; 
-  bottom:100%; 
-  transform:translateX(-50%);
-  margin-bottom:.4rem; 
-  max-width:140px; 
-  max-height:140px;
-  border:2px solid #000; 
-  background:var(--paper); 
-  pointer-events:none;
-}
-
 /* hot soil spots */
 .hoversquare{
   position:absolute; 

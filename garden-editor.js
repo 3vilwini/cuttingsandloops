@@ -27,7 +27,7 @@ const garden = {
     pattern: "lattice",       // "lattice" | "array" | "furrow"
     scale: 1,                 // multiplies pattern spacing/dot size
   },
-  plants: {},   // plantId -> { id, name, audioRef, recipeImage, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y }
+  plants: {},   // plantId -> { id, name, audioRef, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y }
   // note: "pinned" is intentionally not part of this shape — see pinnedPlantIds
   seeds: {},    // slot index (string "0".."9") -> { title, artist, audioRef }
 };
@@ -241,21 +241,13 @@ function renderPlantSlots(){
     label.style.color = garden.meta.colors.text;
     el.appendChild(label);
 
-    let recipeImgEl = null;
     el.addEventListener("mouseenter", () => {
       playPlantAudio(p);
-      if(p.recipeImage){
-        recipeImgEl = document.createElement("img");
-        recipeImgEl.className = "recipepreview";
-        recipeImgEl.src = p.recipeImage;
-        el.appendChild(recipeImgEl);
-      }
     });
     el.addEventListener("mouseleave", () => {
       // a pinned plant keeps playing after the mouse leaves — only an
       // unpinned (hover-only) sound stops here
       if(!pinnedPlantIds.has(p.id)) stopPlantAudio(p.id);
-      recipeImgEl?.remove(); recipeImgEl = null;
     });
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
 
@@ -759,9 +751,6 @@ const pSub = document.getElementById("pSub");
 const pFile = document.getElementById("pFile");
 const pFileLabel = document.getElementById("pFileLabel");
 const pFileLabelText = document.getElementById("pFileLabelText");
-const pRecipeFile = document.getElementById("pRecipeFile");
-const pRecipeLabel = document.getElementById("pRecipeLabel");
-const pRecipeLabelText = document.getElementById("pRecipeLabelText");
 const pSampledFromBank = document.getElementById("pSampledFromBank");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
@@ -813,7 +802,6 @@ function stopPlantAudio(id){
   delete activePlantAudio[id];
 }
 let plantDraftFile = null;
-let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
 let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
 let selectedSampledFrom = [];   // "title - artist" strings, multi-select chips — see renderSampledFromBank
@@ -864,15 +852,6 @@ pFile.addEventListener("change", () => {
   validatePlant();
 });
 pFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pFile.click(); } });
-
-// optional — no validation gate, keeps whatever (if anything) was there
-// before when editing and nothing new is chosen
-pRecipeFile.addEventListener("change", () => {
-  plantDraftRecipeFile = pRecipeFile.files[0] || null;
-  pRecipeLabelText.textContent = plantDraftRecipeFile ? plantDraftRecipeFile.name : "choose image…";
-  pRecipeLabel.classList.toggle("has-file", !!plantDraftRecipeFile);
-});
-pRecipeLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pRecipeFile.click(); } });
 
 pName.addEventListener("input", validatePlant);
 function validatePlant(){
@@ -932,9 +911,8 @@ function openPlantModal(pos){
   pSub.textContent = "plant your own sound mixed from the seedlist, and watch it grow next to others.";
   pSaveBtn.textContent = "plant";
   pendingPlantPos = pos || { x: CX, y: CY };
-  plantDraftFile = null; plantDraftRecipeFile = null;
+  plantDraftFile = null;
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
-  pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
   plantDraftColor = invertHex(garden.meta.colors.seed); pctx.strokeStyle = plantDraftColor;
   pDeleteBtn.style.display = "none";
@@ -946,16 +924,15 @@ function openPlantModal(pos){
 }
 
 /* editing reuses the same modal — pre-filled with the plant's current
-   name/drawing, position unchanged. A new audio/recipe file is optional;
-   leaving either blank keeps what was already there (see pSaveBtn below). */
+   name/drawing, position unchanged. A new audio file is optional; leaving
+   it blank keeps what was already there (see pSaveBtn below). */
 function openPlantEditModal(p){
   editingPlantId = p.id;
   pSub.textContent = "edit this planting.";
   pSaveBtn.textContent = "save";
   pendingPlantPos = { x: p.x, y: p.y };
-  plantDraftFile = null; plantDraftRecipeFile = null;
+  plantDraftFile = null;
   pFile.value = ""; pFileLabelText.textContent = "choose audio file… (keeps current if left blank)"; pFileLabel.classList.remove("has-file");
-  pRecipeFile.value = ""; pRecipeLabelText.textContent = p.recipeImage ? "choose image… (keeps current if left blank)" : "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = p.name;
   plantDraftColor = p.color; pctx.strokeStyle = p.color;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
@@ -996,16 +973,8 @@ pSaveBtn.addEventListener("click", async () => {
     localPlantAudioRefs[plantId] = audioRef;
   }
 
-  let recipeImage = existing?.recipeImage || null;
-  if(plantDraftRecipeFile){
-    recipeImage = await uploadSeedFile(plantDraftRecipeFile, `plant-${plantId}-recipe`).catch(err => {
-      console.warn("recipe image upload failed, falling back to a local-only blob URL:", err);
-      return URL.createObjectURL(plantDraftRecipeFile);
-    });
-  }
-
   const plant = {
-    id: plantId, name: pName.value.trim(), audioRef, recipeImage,
+    id: plantId, name: pName.value.trim(), audioRef,
     sampledFrom: selectedSampledFrom.slice(),
     paths: plantDraftPaths, color: plantDraftColor,
     x: pendingPlantPos.x, y: pendingPlantPos.y,
