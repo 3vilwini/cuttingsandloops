@@ -112,7 +112,10 @@ const SEED_SLOTS_BASE = {
   // 3 / 4 / 3 rows — deliberately not the same grid as furrow, so the two
   // patterns' seed layouts actually look different from each other
   lattice: LATTICE_ROWS.flatMap(row => row.xs.map(dx => ({ dx, dy:row.dy }))),
-  furrow:  SEED_COLS.flatMap(dx => [{dx,dy:-90}, {dx,dy:90}]),
+  // seeds 2/4/6/8 (1-indexed) nudged further down than their neighbors, so
+  // a long name doesn't run into the seed sitting right next to it
+  furrow: SEED_COLS.flatMap(dx => [{dx,dy:-90}, {dx,dy:90}])
+    .map((o, i) => [1,3,5,7].includes(i) ? { ...o, dy: o.dy + 40 } : o),
 };
 function arraySlotOffsets(scale){
   // same spiral formula the pattern itself uses, so seeds land along its arms
