@@ -435,17 +435,16 @@ body{
   border-radius:0;
 }
 
-#seedListCard{ 
-  top:calc(2.5rem + 2.3rem + .6rem); 
-  max-width:220px; 
+#seedListCard{
+  top:calc(2.5rem + 2.3rem + .6rem);
 }
 
-#seedListItems{ 
-  display:flex; 
-  flex-direction:column; 
-  gap:.5rem; 
-  max-height:220px; 
-  overflow-y:auto; 
+#seedListItems{
+  display:flex;
+  flex-direction:column;
+  gap:.5rem;
+  max-height:400px;
+  overflow-y:auto;
 }
 
 .seedlistitem{
