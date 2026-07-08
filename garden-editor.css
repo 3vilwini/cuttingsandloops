@@ -168,22 +168,26 @@ body{
   color:var(--paper); 
 }
 
-.arrowpad #panUp{ 
-  grid-row: 1; 
+/* ➵ points right by default — rotated to face each button's own direction */
+.arrowpad #panUp{
+  grid-row: 1;
+  transform: rotate(-90deg);
 }
 
-.arrowpad #panLeft{ 
-  grid-row: 2; 
-  grid-column: 1; 
+.arrowpad #panLeft{
+  grid-row: 2;
+  grid-column: 1;
+  transform: rotate(180deg);
 }
 
-.arrowpad #panDown{ 
-  grid-row: 2; 
-  grid-column: 2; 
+.arrowpad #panDown{
+  grid-row: 2;
+  grid-column: 2;
+  transform: rotate(90deg);
 }
 
-.arrowpad #panRight{ 
-  grid-row:2; grid-column:3; 
+.arrowpad #panRight{
+  grid-row:2; grid-column:3;
 }
 
 
