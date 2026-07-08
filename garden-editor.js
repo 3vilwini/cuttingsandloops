@@ -197,11 +197,6 @@ function renderPlantSlots(){
     // opposite of a filled seed's own hover glow color (see .seedslot:hover)
     el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
 
-    // a re-render can happen mid-playback (another visitor dragging this
-    // same plant, for instance) — keep any already-playing audio in sync
-    // with wherever the plant actually is now, pinned or just hovered
-    if(activePlantAudio[p.id]) activePlantAudio[p.id].playbackRate = pitchForY(p.y);
-
     if(p.paths && p.paths.length){
       const svg = document.createElementNS(SVG_NS, "svg");
       svg.setAttribute("viewBox", `0 0 ${pCanvas.width} ${pCanvas.height}`);
@@ -241,14 +236,9 @@ function renderPlantSlots(){
     label.style.color = garden.meta.colors.text;
     el.appendChild(label);
 
-    el.addEventListener("mouseenter", () => {
-      playPlantAudio(p);
-    });
-    el.addEventListener("mouseleave", () => {
-      // a pinned plant keeps playing after the mouse leaves — only an
-      // unpinned (hover-only) sound stops here
-      if(!pinnedPlantIds.has(p.id)) stopPlantAudio(p.id);
-    });
+    // no per-element hover audio anymore — updateAmbientAudio() plays/fades
+    // every plant continuously based on distance from the cursor, so simply
+    // being near one (not necessarily directly over it) is enough
     el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
 
     // drag to reposition (from anywhere on the marker) — persists for
@@ -269,16 +259,15 @@ function renderPlantSlots(){
         moved = true;
         p.x = origX + dx; p.y = origY + dy;
         el.style.left = p.x + "px"; el.style.top = p.y + "px";
-        // live pitch while dragging, not just after drop — matters when
-        // this plant's sound is already playing (hovered or pinned)
-        if(activePlantAudio[p.id]) activePlantAudio[p.id].playbackRate = pitchForY(p.y);
+        // pitch/volume both update on their own every frame in
+        // updateAmbientAudio() — no need to touch audio here while dragging
       }
       function onUp(){
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
         if(moved){
           // position is real shared state — every visitor sees this move,
-          // and it's what drives everyone's pitch for this plant too
+          // and it's what drives everyone's pitch/volume for this plant too
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
         } else if(Date.now() - (lastPlantClickTimes[p.id] || 0) < 350){
@@ -286,14 +275,11 @@ function renderPlantSlots(){
           openPlantEditModal(p);
         } else {
           lastPlantClickTimes[p.id] = Date.now();
-          // pin/unpin is local-only — nothing written to plantSlotsChannel
-          if(pinnedPlantIds.has(p.id)){
-            pinnedPlantIds.delete(p.id);
-            stopPlantAudio(p.id);   // unpinning silences it until next hover/click
-          } else {
-            pinnedPlantIds.add(p.id);
-            playPlantAudio(p);
-          }
+          // pin/unpin is local-only — nothing written to plantSlotsChannel.
+          // updateAmbientAudio() picks up the change on its next frame, so
+          // no direct play/stop call is needed here either.
+          if(pinnedPlantIds.has(p.id)) pinnedPlantIds.delete(p.id);
+          else pinnedPlantIds.add(p.id);
           renderPlantSlots();
         }
       }
@@ -570,6 +556,10 @@ applyColors();
 /* ---- arrow-key / arrow-pad panning, same idea as the main garden view ---- */
 function panBy(dx, dy){
   viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
+  // ambient sound follows you even when you're navigating by keyboard/pad,
+  // not just when the mouse itself is moving over the field
+  listener.x = Math.max(0, Math.min(FIELD_W, listener.x + dx));
+  listener.y = Math.max(0, Math.min(FIELD_H, listener.y + dy));
 }
 document.getElementById("panUp").addEventListener("click", () => panBy(0,-STEP));
 document.getElementById("panDown").addEventListener("click", () => panBy(0,STEP));
@@ -773,10 +763,30 @@ const lastPlantClickTimes = {};
    object itself), so it survives renderPlantSlots() rebuilding the DOM on
    every position sync from other visitors. */
 const pinnedPlantIds = new Set();
-// currently-playing plant audio, keyed by plant id — also survives
-// re-renders for the same reason, which is what lets a pinned sound keep
-// playing uninterrupted while someone else drags that same plant around.
+
+/* ambient wandering sound: every plant's volume is a function of how far
+   the "listener" (wherever the cursor is, or wherever arrow-key panning has
+   taken you) currently is from it — recomputed continuously in
+   updateAmbientAudio() below, not gated by hovering any one element.
+   Multiple nearby plants can be audible at once (the "layering"), and each
+   one's volume glides toward its target every frame instead of snapping
+   (the "decay" as you wander away). */
+const listener = { x: CX, y: CY };
+const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
+const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
+const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
+const RELEASE_MS = 1200;      // how long a faded-out plant's Audio element survives before fully stopping
+const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame (0-1, higher = snappier)
+
+// currently-playing plant audio, keyed by plant id — survives re-renders
+// for the same reason pinnedPlantIds does, which is what lets a sound keep
+// fading/playing uninterrupted while someone else drags that plant around.
 const activePlantAudio = {};
+
+const smoothstep = t => t*t*(3-2*t);
+function volumeForDistance(dist){
+  return dist >= AUDIBLE_RADIUS ? 0 : smoothstep(1 - dist/AUDIBLE_RADIUS);
+}
 
 /* pitch follows vertical position on the field: one octave higher at the
    very top, one octave lower at the very bottom, unchanged at dead center.
@@ -785,22 +795,67 @@ const activePlantAudio = {};
 function pitchForY(y){
   return Math.pow(2, (FIELD_H/2 - y) / (FIELD_H/2));
 }
-function playPlantAudio(p){
+
+// creates a plant's Audio element once, starting silent — updateAmbientAudio
+// fades it in by raising targetVolume, so play() only ever happens here,
+// never repeatedly on every little hover in and out
+function ensurePlantAudio(p){
   if(activePlantAudio[p.id]) return;
   const ref = p.audioRef || localPlantAudioRefs[p.id];
   if(!ref) return;
   const audioEl = new Audio(ref);
   audioEl.loop = true;
+  audioEl.volume = 0;
   audioEl.playbackRate = pitchForY(p.y);
   audioEl.play().catch(() => {});
-  activePlantAudio[p.id] = audioEl;
+  activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, lastDesiredAt: performance.now() };
 }
 function stopPlantAudio(id){
-  const audioEl = activePlantAudio[id];
-  if(!audioEl) return;
-  audioEl.pause();
+  const entry = activePlantAudio[id];
+  if(!entry) return;
+  entry.audioEl.pause();
   delete activePlantAudio[id];
 }
+
+/* the one continuous audio update — recomputes every plant's distance from
+   the listener, decides who's audible (the closest MAX_VOICES within
+   range, plus anything pinned), and glides each one's volume toward its
+   target every frame instead of snapping. A plant that's fallen silent
+   keeps its Audio element alive for RELEASE_MS in case you wander back,
+   instead of tearing down and re-fetching the file on every back-and-forth. */
+function updateAmbientAudio(){
+  const now = performance.now();
+  const plants = Object.values(garden.plants || {});
+  for(const p of plants) p._dist = Math.hypot(p.x - listener.x, p.y - listener.y);
+
+  const inRange = plants.filter(p => p._dist < AUDIBLE_RADIUS).sort((a,b) => a._dist - b._dist);
+  const desired = new Set(inRange.slice(0, MAX_VOICES).map(p => p.id));
+  for(const id of pinnedPlantIds) desired.add(id);
+
+  for(const p of plants){
+    if(!desired.has(p.id)) continue;
+    ensurePlantAudio(p);
+    const entry = activePlantAudio[p.id];
+    if(!entry) continue;
+    entry.targetVolume = Math.max(volumeForDistance(p._dist), pinnedPlantIds.has(p.id) ? PIN_VOLUME : 0);
+    entry.lastDesiredAt = now;
+  }
+  for(const id in activePlantAudio){
+    if(!desired.has(id)) activePlantAudio[id].targetVolume = 0;
+  }
+  for(const id in activePlantAudio){
+    const entry = activePlantAudio[id];
+    entry.currentVolume += (entry.targetVolume - entry.currentVolume) * VOLUME_LERP;
+    entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
+    const p = garden.plants[id];
+    if(p) entry.audioEl.playbackRate = pitchForY(p.y);
+    if(!desired.has(id) && entry.currentVolume < 0.01 && now - entry.lastDesiredAt > RELEASE_MS){
+      stopPlantAudio(id);
+    }
+  }
+  requestAnimationFrame(updateAmbientAudio);
+}
+requestAnimationFrame(updateAmbientAudio);
 let plantDraftFile = null;
 let pendingPlantPos = null;
 let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
@@ -1197,6 +1252,10 @@ function nearestHotSpot(x, y){
 const NO_SEEDS_MSG = "you can’t plant just yet! add at least one seed as the source before other plants can grow";
 fieldEl.addEventListener("mousemove", e => {
   const r = fieldEl.getBoundingClientRect();
+  // ambient sound's "listener" position — same field-space coordinates as
+  // a plant's own x/y, so distance comparisons in updateAmbientAudio() just work
+  listener.x = e.clientX - r.left;
+  listener.y = e.clientY - r.top;
   const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
   if(!spot){ hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; return; }
   const hasSeeds = Object.keys(garden.seeds || {}).length > 0;
