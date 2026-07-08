@@ -153,10 +153,7 @@ function renderSeedSlots(){
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     const dot = document.createElement("span");
-    dot.className = "dot" + (seed ? " flower" : "");
-    // a filled seed blooms into a little flower instead of a plain dot
-    if(seed){ dot.textContent = "✿"; dot.style.color = garden.meta.colors.seed; }
-    else{ dot.style.background = garden.meta.colors.seed; }
+    dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
