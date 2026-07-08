@@ -769,7 +769,6 @@ const pRecipeLabelText = document.getElementById("pRecipeLabelText");
 const pSampledFromBank = document.getElementById("pSampledFromBank");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
-const pColor = document.getElementById("pColor");
 const pName = document.getElementById("pName");
 const pSaveBtn = document.getElementById("pSaveBtn");
 const pDeleteBtn = document.getElementById("pDeleteBtn");
@@ -822,12 +821,15 @@ let plantDraftRecipeFile = null;
 let pendingPlantPos = null;
 let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
 let selectedSampledFrom = [];   // "title - artist" strings, multi-select chips — see renderSampledFromBank
+// no color picker anymore — a new plant's drawing color is always the
+// inverse of the garden's current seed color; editing an existing plant
+// keeps whatever color it already has, so old and new strokes still match
+let plantDraftColor = "#000000";
 
 const pctx = pCanvas.getContext("2d");
 // butt cap/miter join (canvas defaults) instead of round — jagged edges,
 // no smoothing, matching the field's SVG polylines exactly
 pctx.lineWidth = 1.5; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
-pColor.addEventListener("input", () => { pctx.strokeStyle = pColor.value; });
 let drawing = false;
 // the canvas is just live drawing feedback in the modal — what actually gets
 // saved/rendered on the map is the raw stroke points themselves (see
@@ -938,7 +940,7 @@ function openPlantModal(pos){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
-  pColor.value = garden.meta.colors.seed; pctx.strokeStyle = pColor.value;
+  plantDraftColor = invertHex(garden.meta.colors.seed); pctx.strokeStyle = plantDraftColor;
   pDeleteBtn.style.display = "none";
   selectedSampledFrom = [];
   renderSampledFromBank();
@@ -959,7 +961,7 @@ function openPlantEditModal(p){
   pFile.value = ""; pFileLabelText.textContent = "choose audio file… (keeps current if left blank)"; pFileLabel.classList.remove("has-file");
   pRecipeFile.value = ""; pRecipeLabelText.textContent = p.recipeImage ? "choose image… (keeps current if left blank)" : "choose image…"; pRecipeLabel.classList.remove("has-file");
   pName.value = p.name;
-  pColor.value = p.color; pctx.strokeStyle = p.color;
+  plantDraftColor = p.color; pctx.strokeStyle = p.color;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
   redrawPaths(plantDraftPaths);
   // backward-compat: sampledFrom used to be a single string before this
@@ -1009,7 +1011,7 @@ pSaveBtn.addEventListener("click", async () => {
   const plant = {
     id: plantId, name: pName.value.trim(), audioRef, recipeImage,
     sampledFrom: selectedSampledFrom.slice(),
-    paths: plantDraftPaths, color: pColor.value,
+    paths: plantDraftPaths, color: plantDraftColor,
     x: pendingPlantPos.x, y: pendingPlantPos.y,
   };
   garden.plants[plantId] = plant;
