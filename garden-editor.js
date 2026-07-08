@@ -568,7 +568,7 @@ document.getElementById("panRight").addEventListener("click", () => panBy(STEP,0
 
 document.addEventListener("keydown", e => {
   const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
-  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open") || document.getElementById("confirmScrim").classList.contains("open")) return;
+  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open") || document.getElementById("confirmScrim").classList.contains("open") || document.getElementById("entryScrim").classList.contains("open")) return;
   const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
   if(move){ e.preventDefault(); panBy(move[0], move[1]); }
 });
@@ -578,7 +578,15 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keydown", e => {
   if(e.key !== "Escape") return;
   if(document.getElementById("confirmScrim").classList.contains("open")){ hideConfirmDialog(false); return; }
+  document.getElementById("entryScrim").classList.remove("open");
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
+});
+
+// the click (or Escape) that dismisses this is also what satisfies the
+// browser's autoplay-gesture requirement, so updateAmbientAudio()'s
+// eventual audio.play() calls are actually allowed to produce sound
+document.getElementById("enterBtn").addEventListener("click", () => {
+  document.getElementById("entryScrim").classList.remove("open");
 });
 
 // start centered on the field, like the main garden view does — deferred a

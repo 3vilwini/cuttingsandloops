@@ -650,9 +650,13 @@ button.ghost:disabled{
   z-index:2;
 }
 
-.scrim.open{ 
-  display:flex; 
+.scrim.open{
+  display:flex;
 }
+
+/* sits above every other layer (nav, toggles, arrow pad included), since
+   it's meant to fully gate the page until dismissed */
+#entryScrim{ z-index:10; }
 
 .modal{
   width:100%; 

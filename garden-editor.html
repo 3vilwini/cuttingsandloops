@@ -43,6 +43,20 @@
   <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
+<!-- entry gate — shown on every load; the click also satisfies the browser's
+     autoplay-gesture requirement so the ambient sound can actually play -->
+<div class="scrim open" id="entryScrim">
+  <div class="modal" style="max-width:360px;">
+    <div class="titlebar"><span class="closebox"></span></div>
+    <div class="cardbody">
+      <p class="sub" style="margin-bottom:1.2rem;">a shared garden of sound — wander through it and nearby plants start to play. turn your sound on to hear it.</p>
+      <div class="actions">
+        <button type="button" class="primary" id="enterBtn">enter the garden</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- feels like -->
 <div class="card" id="builderCard">
   <div class="titlebar"><span class="closebox"></span></div>
