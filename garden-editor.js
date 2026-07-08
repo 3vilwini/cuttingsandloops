@@ -153,7 +153,7 @@ function renderSeedSlots(){
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     const dot = document.createElement("span");
-    dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
+    dot.className = "dot"; dot.style.background = garden.meta.colors.text;
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
@@ -221,11 +221,11 @@ function renderPlantSlots(){
       el.appendChild(fallback);
     }
 
-    // a small dot in the plant's own color, next to its name — pulses
-    // while the plant is pinned instead of the old drop-shadow
+    // same label color as a seed's own dot, not the plant's drawing color —
+    // pulses while the plant is pinned instead of the old drop-shadow
     const labelDot = document.createElement("span");
     labelDot.className = "labeldot";
-    labelDot.style.background = p.color;
+    labelDot.style.background = garden.meta.colors.text;
     el.appendChild(labelDot);
 
     // the planter's name — same "txt" class the seed labels use, so the
@@ -374,6 +374,10 @@ function renderField(){
   fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
   fieldEl.style.color = text;
   renderSeedSlots();
+  // plant labeldots are colored from garden.meta.colors.text too — without
+  // this they'd keep whatever color was current when each plant last
+  // rendered, drifting out of sync with the seed dots the moment "labels" changes
+  renderPlantSlots();
 
   const svg = document.getElementById("patternLayer");
   svg.innerHTML = "";

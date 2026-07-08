@@ -318,6 +318,11 @@ body{
 .plantmark .labeldot{
   position:absolute; top:50%; left:100%; transform:translateY(-50%);
   margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
+  /* without this the 1px border adds outside the 10px box (no global
+     box-sizing:border-box reset in this file), rendering 12x12 — a seed's
+     own dot is sized via inset:0 instead, which doesn't have this problem,
+     so the two would otherwise visibly differ even at "the same" 10px */
+  box-sizing:border-box;
 }
 @keyframes plantPinPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.6); } }
 .plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
