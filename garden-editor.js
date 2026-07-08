@@ -156,20 +156,22 @@ function renderSeedSlots(){
     dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
     label.className = "txt";
-    label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
+    // a filled seed's name is truncated to 8 characters at rest and reveals
+    // in full on hover, so a long "title - artist" doesn't crowd its neighbors
+    const fullLabel = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
+    const truncatedLabel = seed && fullLabel.length > 8 ? fullLabel.slice(0, 8) + "…" : fullLabel;
+    label.textContent = truncatedLabel;
     el.appendChild(dot); el.appendChild(label);
 
     if(seed){
-      let audioEl = null;
       el.addEventListener("mouseenter", () => {
-        const ref = seed.audioRef || localSeedAudioRefs[i];
-        if(ref){ audioEl = new Audio(ref); audioEl.loop = true; audioEl.play().catch(() => {}); }
+        label.textContent = fullLabel;
         // peek at the roots regardless of the persistent toggle state —
         // mouseleave reverts to whatever that toggle actually says
         document.getElementById("connectionsLayer").style.display = "";
       });
       el.addEventListener("mouseleave", () => {
-        audioEl?.pause(); audioEl = null;
+        label.textContent = truncatedLabel;
         applyViewToggles();
       });
       // click opens the seed list panel instead of touching roots at all —
