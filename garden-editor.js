@@ -783,8 +783,8 @@ const listener = { x: CX, y: CY };
 const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
 const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
-const RELEASE_MS = 1200;      // how long a faded-out plant's Audio element survives before fully stopping
-const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame (0-1, higher = snappier)
+const STICK_MS = 4000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
+const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame, once fading (0-1, higher = snappier)
 
 // currently-playing plant audio, keyed by plant id — survives re-renders
 // for the same reason pinnedPlantIds does, which is what lets a sound keep
@@ -816,7 +816,7 @@ function ensurePlantAudio(p){
   audioEl.volume = 0;
   audioEl.playbackRate = pitchForY(p.y);
   audioEl.play().catch(() => {});
-  activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, lastDesiredAt: performance.now() };
+  activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, leftRangeAt: null };
 }
 function stopPlantAudio(id){
   const entry = activePlantAudio[id];
@@ -828,9 +828,10 @@ function stopPlantAudio(id){
 /* the one continuous audio update — recomputes every plant's distance from
    the listener, decides who's audible (the closest MAX_VOICES within
    range, plus anything pinned), and glides each one's volume toward its
-   target every frame instead of snapping. A plant that's fallen silent
-   keeps its Audio element alive for RELEASE_MS in case you wander back,
-   instead of tearing down and re-fetching the file on every back-and-forth. */
+   target every frame instead of snapping. A plant you've wandered away
+   from doesn't start fading immediately — it sticks at its last volume
+   for STICK_MS, then decays, and only gets torn down once it's actually
+   silent, instead of tearing down and re-fetching on every back-and-forth. */
 function updateAmbientAudio(){
   const now = performance.now();
   const plants = Object.values(garden.plants || {});
@@ -845,11 +846,17 @@ function updateAmbientAudio(){
     ensurePlantAudio(p);
     const entry = activePlantAudio[p.id];
     if(!entry) continue;
+    // in range (or pinned) — live volume, and reset the stick timer since
+    // it's not "away" anymore
     entry.targetVolume = Math.max(volumeForDistance(p._dist), pinnedPlantIds.has(p.id) ? PIN_VOLUME : 0);
-    entry.lastDesiredAt = now;
+    entry.leftRangeAt = null;
   }
   for(const id in activePlantAudio){
-    if(!desired.has(id)) activePlantAudio[id].targetVolume = 0;
+    const entry = activePlantAudio[id];
+    if(desired.has(id)) continue;
+    if(entry.leftRangeAt == null) entry.leftRangeAt = now;   // just left range this frame
+    if(now - entry.leftRangeAt >= STICK_MS) entry.targetVolume = 0;   // stuck long enough — now decay
+    // else: still within the stick window — leave targetVolume alone, holding at its last value
   }
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
@@ -857,7 +864,7 @@ function updateAmbientAudio(){
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
     const p = garden.plants[id];
     if(p) entry.audioEl.playbackRate = pitchForY(p.y);
-    if(!desired.has(id) && entry.currentVolume < 0.01 && now - entry.lastDesiredAt > RELEASE_MS){
+    if(!desired.has(id) && entry.targetVolume === 0 && entry.currentVolume < 0.01){
       stopPlantAudio(id);
     }
   }
