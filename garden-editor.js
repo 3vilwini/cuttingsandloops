@@ -115,7 +115,7 @@ const SEED_SLOTS_BASE = {
   // every other column (both its seeds together) nudged lower than its
   // neighbors, so a long name doesn't run into the column right next to it
   furrow: SEED_COLS.flatMap((dx, col) => {
-    const extra = col % 2 === 1 ? 70 : 0;
+    const extra = col % 2 === 1 ? 80 : 0;
     return [{dx,dy:-90+extra}, {dx,dy:90+extra}];
   }),
 };
