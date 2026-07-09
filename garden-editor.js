@@ -188,14 +188,18 @@ function renderPlantSlots(){
   layer.innerHTML = "";
   Object.values(garden.plants || {}).forEach(p => {
     const el = document.createElement("div");
-    // pinned is local-only state (pinnedPlantIds), never read from the
-    // synced plant object — see the note by its declaration
-    el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
+    // pinned/loading are local-only state, never read from the synced
+    // plant object — see the notes by their declarations
+    el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "") + (loadingPlantIds.has(p.id) ? " loading" : "");
     el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
     el.title = p.name;
     // opposite of a filled seed's own hover glow color (see .seedslot:hover)
     el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
+    // same two custom properties a seed slot sets, so .plantmark.loading .txt
+    // can reuse its exact pulsing-gradient CSS
+    el.style.setProperty("--text-color", garden.meta.colors.text);
+    el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
 
     if(p.paths && p.paths.length){
       const svg = document.createElementNS(SVG_NS, "svg");
@@ -777,6 +781,12 @@ const lastPlantClickTimes = {};
    every position sync from other visitors. */
 const pinnedPlantIds = new Set();
 
+/* plants whose Audio element exists but hasn't fired "canplay" yet — local
+   UI state only, same reasoning as pinnedPlantIds. Drives the "loading"
+   class in renderPlantSlots(), which reuses a seed's own empty-slot
+   pulsing-gradient CSS. */
+const loadingPlantIds = new Set();
+
 /* ambient wandering sound: every plant's volume is a function of how far
    the "listener" (wherever the cursor is, or wherever arrow-key panning has
    taken you) currently is from it — recomputed continuously in
@@ -820,6 +830,11 @@ function ensurePlantAudio(p){
   audioEl.loop = true;
   audioEl.volume = 0;
   audioEl.playbackRate = pitchForY(p.y);
+  loadingPlantIds.add(p.id);
+  renderPlantSlots();
+  const stopLoading = () => { if(loadingPlantIds.delete(p.id)) renderPlantSlots(); };
+  audioEl.addEventListener("canplay", stopLoading, { once: true });
+  audioEl.addEventListener("error", stopLoading, { once: true });
   audioEl.play().catch(() => {});
   activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, leftRangeAt: null };
 }
@@ -828,6 +843,7 @@ function stopPlantAudio(id){
   if(!entry) return;
   entry.audioEl.pause();
   delete activePlantAudio[id];
+  loadingPlantIds.delete(id);
 }
 
 /* the one continuous audio update — recomputes every plant's distance from

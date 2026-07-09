@@ -259,11 +259,14 @@ body{
 @keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
 
 
-.seedslot.empty .txt{
+/* same pulsing/gradient invitation, reused for a plant whose sound is
+   still buffering — see loadingPlantIds */
+.seedslot.empty .txt,
+.plantmark.loading .txt{
   background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
   background-size:200% 100%;
-  -webkit-background-clip:text; 
-  background-clip:text; 
+  -webkit-background-clip:text;
+  background-clip:text;
   color:transparent;
   animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
 }
