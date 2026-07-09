@@ -103,7 +103,7 @@ function svgEl(tag, attrs){
    always shows its seeds in the same arrangement, matching how that pattern
    reads visually (grid cells for lattice, spiral arms for array, rows for furrow). */
 const CX = FIELD_W/2, CY = FIELD_H/2;
-const SEED_COLS = [-400,-200,0,200,400];
+const SEED_COLS = [-600,-300,0,300,600];
 
 /* base offsets from field center, one fixed layout per pattern (10 seeds each) —
    actual on-screen position is these offsets times the current scale, so slot
@@ -120,14 +120,14 @@ const SEED_SLOTS_BASE = {
   // every other column (both its seeds together) nudged lower than its
   // neighbors, so a long name doesn't run into the column right next to it
   furrow: SEED_COLS.flatMap((dx, col) => {
-    const extra = col % 2 === 1 ? 90 : 0;
-    return [{dx,dy:-90+extra}, {dx,dy:90+extra}];
+    const extra = col % 2 === 1 ? 130 : 0;
+    return [{dx,dy:-130+extra}, {dx,dy:130+extra}];
   }),
 };
 function arraySlotOffsets(scale){
   // same spiral formula the pattern itself uses, so seeds land along its arms
   return Array.from({length:10}, (_,i) => {
-    const t = 1 + i*0.9, r = 44*t*scale;
+    const t = 1 + i*0.9, r = 52*t*scale;
     return { dx:r*Math.cos(t), dy:r*Math.sin(t) };
   });
 }
