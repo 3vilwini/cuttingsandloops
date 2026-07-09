@@ -478,9 +478,12 @@ body{
   flex:1; 
 }
 
-.seedlistitem a{ 
-  color:var(--ink); 
-  flex-shrink:0; 
+.seedlistitem a{
+  color:var(--ink);
+  flex-shrink:0;
+  text-decoration:none;
+  font-size:1.3em;
+  line-height:1;
 }
 
 .seedlistplay,

@@ -104,9 +104,9 @@ const SEED_COLS = [-400,-200,0,200,400];
    actual on-screen position is these offsets times the current scale, so slot
    placement spreads/tightens together with the pattern itself. */
 const LATTICE_ROWS = [
-  { dy:-360, xs:[-600, 0, 600] },
-  { dy:0,    xs:[-750, -250, 250, 750] },
-  { dy:360,  xs:[-600, 0, 600] },
+  { dy:-300, xs:[-500, 0, 500] },
+  { dy:0,    xs:[-625, -210, 210, 625] },
+  { dy:300,  xs:[-500, 0, 500] },
 ];
 const SEED_SLOTS_BASE = {
   // 3 / 4 / 3 rows — deliberately not the same grid as furrow, so the two
