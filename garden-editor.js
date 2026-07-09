@@ -863,6 +863,18 @@ async function uploadSeedFile(file, key){
   return url;
 }
 
+/* best-effort companion to uploadSeedFile — deleting a seed/plant from the
+   synced state doesn't touch the underlying R2 object on its own, so both
+   delete handlers below call this too. Silently skipped for a blob: ref
+   (session-only, never uploaded, nothing on R2 to delete) and swallows any
+   network failure — an orphaned file is a much smaller problem than a
+   delete button that errors out because the network hiccuped. */
+async function deleteR2File(audioRef){
+  if(!UPLOAD_ENDPOINT || !audioRef || audioRef.startsWith("blob:")) return;
+  const key = new URL(audioRef).pathname.replace(/^\//, "");
+  fetch(`${UPLOAD_ENDPOINT}/delete/${key}`, { method: "DELETE" }).catch(() => {});
+}
+
 /* ==========================================================================
    PLANTING — a plant carries a small freehand drawing and gets placed
    wherever the user clicked on the field. Hovering an empty patch of ground
@@ -1231,6 +1243,7 @@ pCancelBtn.addEventListener("click", hidePlantModal);
 pDeleteBtn.addEventListener("click", () => {
   if(!editingPlantId) return;
   const id = editingPlantId;
+  deleteR2File(garden.plants[id]?.audioRef);
   delete garden.plants[id];
   plantSlotsChannel?.setData(draft => { delete draft[id]; });
   renderPlantSlots();
@@ -1415,6 +1428,7 @@ function renderSeedList(){
     del.addEventListener("click", async () => {
       const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
       if(!ok) return;
+      deleteR2File(seed.audioRef);
       delete garden.seeds[i];
       seedsChannel?.setData(draft => { delete draft[i]; });
       onSeedsChanged();

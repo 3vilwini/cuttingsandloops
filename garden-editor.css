@@ -499,6 +499,10 @@ label{ display:block; color:var(--muted); margin-bottom:.3rem; }
 input[type="text"], select{
   width:100%; padding:.4rem .5rem; border-radius:0; border:1px solid #000;
   background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit;
+  /* without this, width:100% is the CONTENT width (no global box-sizing
+     reset in this file) — padding+border then add on top of that and
+     overflow past the modal's own right padding instead of respecting it */
+  box-sizing:border-box;
 }
 
 /* tags */

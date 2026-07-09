@@ -1,6 +1,6 @@
 /* sound-garden seed uploads
    ---------------------------------------------------------------------
-   Two routes:
+   Three routes:
    - POST /upload — receives a seed's audio file (raw bytes, streamed
      straight into R2 via the bucket binding, never buffered fully in
      memory) and returns the public URL to store in that slot's synced
@@ -11,6 +11,11 @@
      to it is silently ignored by the browser (it just opens/plays the
      file instead of saving it) — routing the download through here is
      what actually forces the browser's save dialog.
+   - DELETE /delete/<key> — removes that object from R2. Deleting a seed
+     or plant in the app only ever removed it from the synced playhtml
+     state before; the underlying file stayed in the bucket forever,
+     orphaned. This is what the app now calls alongside that so the
+     file itself actually goes away too.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
    with an R2 bucket bound as SEEDS and PUBLIC_BUCKET_URL/ALLOWED_ORIGIN
@@ -29,6 +34,9 @@ export default {
     if (request.method === "GET" && url.pathname.startsWith("/download/")) {
       return handleDownload(url, env);
     }
+    if (request.method === "DELETE" && url.pathname.startsWith("/delete/")) {
+      return handleDelete(url, env);
+    }
     return new Response("not found", { status: 404, headers: corsHeaders(env) });
   },
 };
@@ -36,7 +44,7 @@ export default {
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Garden-Id, X-Slot-Index, X-File-Name",
   };
 }
@@ -81,6 +89,12 @@ async function handleDownload(url, env) {
       "Content-Disposition": `attachment; filename="${fileName}"`,
     },
   });
+}
+
+async function handleDelete(url, env) {
+  const key = decodeURIComponent(url.pathname.slice("/delete/".length));
+  await env.SEEDS.delete(key);   // no-op (not an error) if the key doesn't exist
+  return new Response(null, { status: 204, headers: corsHeaders(env) });
 }
 
 function sanitize(name) {
