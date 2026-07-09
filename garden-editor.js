@@ -716,13 +716,18 @@ setTimeout(() => {
    gives up waiting on a slow/broken file, rather than blocking forever). */
 const ENTRY_PRELOAD_TIMEOUT_MS = 8000;
 function preloadGardenAudio(){
-  const refs = [
-    ...Object.values(garden.plants || {}).map(p => p.audioRef).filter(Boolean),
-    ...Object.values(garden.seeds || {}).map(s => s.audioRef).filter(Boolean),
-  ];
+  // {label, ref} instead of bare URLs, so a failed one can be reported by
+  // name — see the console.warn in finish() below, the one place to spot a
+  // dead sound (broken URL, stale blob: ref, etc.) without hunting for it
+  const items = [
+    ...Object.values(garden.plants || {}).map(p => ({ label:`plant "${p.name}"`, ref:p.audioRef })),
+    ...Object.values(garden.seeds || {}).map(s => ({ label:`seed "${s.title} - ${s.artist}"`, ref:s.audioRef })),
+  ].filter(item => item.ref);
+
   const bar = document.getElementById("entryProgressBar");
   const label = document.getElementById("entryProgressLabel");
   const enterBtn = document.getElementById("enterBtn");
+  const failed = [];
 
   let done = false;
   const finish = () => {
@@ -731,23 +736,27 @@ function preloadGardenAudio(){
     bar.style.width = "100%";
     label.textContent = "";
     enterBtn.disabled = false;
+    if(failed.length){
+      console.warn(`sound garden: ${failed.length} dead sound(s) — audio that never loaded:`,
+        failed.map(item => `${item.label}: ${item.ref}`));
+    }
   };
 
-  if(refs.length === 0){ finish(); return; }
+  if(items.length === 0){ finish(); return; }
 
   let loaded = 0;
   const bump = () => {
     loaded++;
-    bar.style.width = Math.round((loaded / refs.length) * 100) + "%";
-    label.textContent = `loading sounds... ${loaded}/${refs.length}`;
-    if(loaded >= refs.length) finish();
+    bar.style.width = Math.round((loaded / items.length) * 100) + "%";
+    label.textContent = `loading sounds... ${loaded}/${items.length}`;
+    if(loaded >= items.length) finish();
   };
-  for(const ref of refs){
+  for(const item of items){
     const a = new Audio();
     a.preload = "auto";
     a.addEventListener("canplaythrough", bump, { once:true });
-    a.addEventListener("error", bump, { once:true });   // don't let one bad file block everything else
-    a.src = ref;
+    a.addEventListener("error", () => { failed.push(item); bump(); }, { once:true });   // don't let one bad file block everything else
+    a.src = item.ref;
   }
   setTimeout(finish, ENTRY_PRELOAD_TIMEOUT_MS);
 }
