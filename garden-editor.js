@@ -477,7 +477,7 @@ function renderTagDisplay(){
   for(const t of garden.meta.tags){
     const s = document.createElement("span");
     s.textContent = t;
-    s.title = "click here with a friend";   // hints at the two-person press below
+    s.title = "click here with a friend ˚Ი⑅𐑼˖";   // hints at the two-person press below
     s.style.setProperty("--glow", garden.meta.colors.seed);
     s.addEventListener("click", () => pressTag(t));
     tagDisplayEl.appendChild(s);
