@@ -15,6 +15,14 @@ const PATTERNS = [
 const FIELD_W = 2400, FIELD_H = 1600;   // the field is bigger than the viewport — arrow keys pan it
 const STEP = 95;
 
+// how close to the field edge a plant can be dragged (see the mousedown
+// handler in renderPlantSlots) — keeps its 140px drawing (70px each way
+// from center) and, on the right, its name label too from running off
+// the edge of the field.
+const PLANT_MARGIN_LEFT = 70;
+const PLANT_MARGIN_RIGHT = 280;
+const PLANT_MARGIN_Y = 70;
+
 const garden = {
   id: null,
   meta: {
@@ -270,7 +278,11 @@ function renderPlantSlots(){
         const dx = ev.clientX - startX, dy = ev.clientY - startY;
         if(!moved && Math.hypot(dx, dy) < 4) return;
         moved = true;
-        p.x = origX + dx; p.y = origY + dy;
+        // keeps the drawing itself (70px half of its own 140px box) and its
+        // name label (which only ever extends to the right) from being
+        // draggable close enough to the field edge to run off it
+        p.x = Math.max(PLANT_MARGIN_LEFT, Math.min(FIELD_W - PLANT_MARGIN_RIGHT, origX + dx));
+        p.y = Math.max(PLANT_MARGIN_Y, Math.min(FIELD_H - PLANT_MARGIN_Y, origY + dy));
         el.style.left = p.x + "px"; el.style.top = p.y + "px";
         // pitch/volume both update on their own every frame in
         // updateAmbientAudio() — no need to touch audio here while dragging.
