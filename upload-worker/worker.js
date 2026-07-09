@@ -1,9 +1,16 @@
 /* sound-garden seed uploads
    ---------------------------------------------------------------------
-   One route: POST /upload — receives a seed's audio file (raw bytes,
-   streamed straight into R2 via the bucket binding, never buffered fully
-   in memory) and returns the public URL to store in that slot's synced
-   playhtml state instead of a session-only blob: URL.
+   Two routes:
+   - POST /upload — receives a seed's audio file (raw bytes, streamed
+     straight into R2 via the bucket binding, never buffered fully in
+     memory) and returns the public URL to store in that slot's synced
+     playhtml state instead of a session-only blob: URL.
+   - GET /download/<key> — streams that same object back with a
+     Content-Disposition: attachment header. The public R2 URL returned
+     above is cross-origin from the page, so a plain <a download> link
+     to it is silently ignored by the browser (it just opens/plays the
+     file instead of saving it) — routing the download through here is
+     what actually forces the browser's save dialog.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
    with an R2 bucket bound as SEEDS and PUBLIC_BUCKET_URL/ALLOWED_ORIGIN
@@ -15,8 +22,12 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders(env) });
     }
-    if (request.method === "POST" && new URL(request.url).pathname === "/upload") {
+    const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/upload") {
       return handleUpload(request, env);
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/download/")) {
+      return handleDownload(url, env);
     }
     return new Response("not found", { status: 404, headers: corsHeaders(env) });
   },
@@ -25,7 +36,7 @@ export default {
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Garden-Id, X-Slot-Index, X-File-Name",
   };
 }
@@ -53,6 +64,22 @@ async function handleUpload(request, env) {
   const url = `${env.PUBLIC_BUCKET_URL}/${key}`;
   return new Response(JSON.stringify({ url }), {
     headers: { ...corsHeaders(env), "Content-Type": "application/json" },
+  });
+}
+
+async function handleDownload(url, env) {
+  const key = decodeURIComponent(url.pathname.slice("/download/".length));
+  const object = await env.SEEDS.get(key);
+  if (!object) {
+    return new Response("not found", { status: 404, headers: corsHeaders(env) });
+  }
+  const fileName = key.split("/").pop();
+  return new Response(object.body, {
+    headers: {
+      ...corsHeaders(env),
+      "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+    },
   });
 }
 

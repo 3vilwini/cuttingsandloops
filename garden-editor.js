@@ -1242,7 +1242,15 @@ function renderSeedList(){
       seedListPlaying = { audioEl, btn: play, progress };
     });
     const dl = document.createElement("a");
-    dl.href = seed.audioRef; dl.download = `${seed.title} - ${seed.artist}`; dl.textContent = "⤓";
+    // seed.audioRef is R2's public .r2.dev URL, cross-origin from this page — a plain
+    // <a download> to it is silently ignored by the browser (it just opens the file
+    // instead of saving it), so route through the worker's /download proxy instead,
+    // which sets Content-Disposition: attachment and actually forces the save dialog
+    const seedKey = new URL(seed.audioRef).pathname.replace(/^\//, "");
+    dl.href = `${UPLOAD_ENDPOINT}/download/${seedKey}`;
+    dl.download = `${seed.title} - ${seed.artist}`;
+    dl.textContent = "⤓";
+    dl.title = "download this seed";
     const del = document.createElement("button");
     del.type = "button"; del.className = "seedlistdelete"; del.textContent = "✕";
     del.title = "delete this seed";
