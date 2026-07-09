@@ -370,7 +370,7 @@ function renderConnections(){
       path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${toX} ${toY}`);
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", `url(#${gradientId})`);
-      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-width", "1.5");
       // tight dotted line: a near-zero dash length with a round cap draws a
       // small dot at each point, spaced close together, instead of dashes
       path.setAttribute("stroke-linecap", "round");
