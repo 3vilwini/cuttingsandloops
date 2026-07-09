@@ -925,7 +925,7 @@ const TRAIL_MIN_DIST = 30;      // spawn a new footprint every ~this many px of 
 const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
 // decorative glyphs matching the site's own title treatment — one is picked
 // at random for each footprint instead of a plain dot
-const TRAIL_GLYPHS = ["୨ৎ","˖᯽","݁˖","જ","˚","༘♡","⋆｡˚","ੈ✩‧₊˚⋆˚❀","༉","‧₊˚"];
+const TRAIL_GLYPHS = ["୨ৎ ݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
 function spawnTrailDot(x, y){
   const dot = document.createElement("span");
   dot.className = "traildot";
