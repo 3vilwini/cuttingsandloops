@@ -31,11 +31,14 @@
 
 <div class="tagdisplay" id="tagDisplay"></div>
 
-<div class="arrowpad">
-  <button type="button" id="panUp" title="up">➵</button>
-  <button type="button" id="panLeft" title="left">➵</button>
-  <button type="button" id="panDown" title="down">➵</button>
-  <button type="button" id="panRight" title="right">➵</button>
+<!-- not a control — just reflects whether/how loud the ambient sound
+     currently is, panning is still arrow-keys-only (see panBy) -->
+<div class="volumemeter" id="volumeMeter" title="ambient sound level" aria-hidden="true">
+  <span class="bar"></span>
+  <span class="bar"></span>
+  <span class="bar"></span>
+  <span class="bar"></span>
+  <span class="bar"></span>
 </div>
 
 <div class="viewtoggles" id="viewToggles">

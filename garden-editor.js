@@ -193,15 +193,15 @@ function renderPlantSlots(){
   layer.innerHTML = "";
   Object.values(garden.plants || {}).forEach(p => {
     const el = document.createElement("div");
-    // pinned/loading are local-only state, never read from the synced
-    // plant object — see the notes by their declarations
-    el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "") + (loadingPlantIds.has(p.id) ? " loading" : "");
+    // pinned is local-only state, never read from the synced plant object —
+    // see the note by its declaration
+    el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
     el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
     el.title = p.name;
     // opposite of a filled seed's own hover glow color (see .seedslot:hover)
     el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
-    // same two custom properties a seed slot sets, so .plantmark.loading .txt
+    // same two custom properties a seed slot sets, so .plantmark.pinned .txt
     // can reuse its exact pulsing-gradient CSS
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
@@ -243,7 +243,10 @@ function renderPlantSlots(){
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = p.name;
-    label.style.color = garden.meta.colors.text;
+    // skip the inline color when pinned — .plantmark.pinned .txt sets its own
+    // (transparent, for the gradient-clip pulse), and an inline color here
+    // would always win over that CSS rule regardless of specificity
+    if(!pinnedPlantIds.has(p.id)) label.style.color = garden.meta.colors.text;
     el.appendChild(label);
 
     // no per-element hover audio anymore — updateAmbientAudio() plays/fades
@@ -604,18 +607,14 @@ fieldEl.style.height = FIELD_H + "px";
 randomizeDefaultColors();
 applyColors();
 
-/* ---- arrow-key / arrow-pad panning, same idea as the main garden view ---- */
+/* ---- arrow-key panning, same idea as the main garden view ---- */
 function panBy(dx, dy){
   viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
-  // ambient sound follows you even when you're navigating by keyboard/pad,
+  // ambient sound follows you even when you're navigating by keyboard,
   // not just when the mouse itself is moving over the field
   listener.x = Math.max(0, Math.min(FIELD_W, listener.x + dx));
   listener.y = Math.max(0, Math.min(FIELD_H, listener.y + dy));
 }
-document.getElementById("panUp").addEventListener("click", () => panBy(0,-STEP));
-document.getElementById("panDown").addEventListener("click", () => panBy(0,STEP));
-document.getElementById("panLeft").addEventListener("click", () => panBy(-STEP,0));
-document.getElementById("panRight").addEventListener("click", () => panBy(STEP,0));
 
 document.addEventListener("keydown", e => {
   const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
@@ -838,12 +837,6 @@ const lastPlantClickTimes = {};
    every position sync from other visitors. */
 const pinnedPlantIds = new Set();
 
-/* plants whose Audio element exists but hasn't fired "canplay" yet — local
-   UI state only, same reasoning as pinnedPlantIds. Drives the "loading"
-   class in renderPlantSlots(), which reuses a seed's own empty-slot
-   pulsing-gradient CSS. */
-const loadingPlantIds = new Set();
-
 /* ambient wandering sound: every plant's volume is a function of how far
    the "listener" (wherever the cursor is, or wherever arrow-key panning has
    taken you) currently is from it — recomputed continuously in
@@ -863,14 +856,22 @@ const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each f
    trail) — checked once per frame in updateAmbientAudio(), same as
    everything else audio-related, even though this part is purely visual. */
 let lastTrailX = listener.x, lastTrailY = listener.y;
-const TRAIL_MIN_DIST = 40;      // spawn a new footprint every ~this many px of movement
+const TRAIL_MIN_DIST = 18;      // spawn a new footprint every ~this many px of movement
 const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
+// decorative glyphs matching the site's own title treatment — one is picked
+// at random for each footprint instead of a plain dot
+const TRAIL_GLYPHS = ["୨ৎ","˖᯽","݁˖","જ⁀➴","˚","༘♡","⋆｡˚","ੈ✩‧₊˚⋆˚❀༉‧₊˚"];
 function spawnTrailDot(x, y){
   const dot = document.createElement("span");
   dot.className = "traildot";
+  dot.textContent = TRAIL_GLYPHS[Math.floor(Math.random() * TRAIL_GLYPHS.length)];
   dot.style.left = x + "px";
   dot.style.top = y + "px";
-  dot.style.background = garden.meta.colors.text;
+  // seed color -> sky color, same gradient-text technique as the seed/pinned pulse.
+  // background-image (not the "background" shorthand) — the shorthand resets
+  // background-clip to its initial value even when unmentioned, which would
+  // silently override the class's own background-clip:text rule below.
+  dot.style.backgroundImage = `linear-gradient(135deg, ${garden.meta.colors.seed}, ${garden.meta.colors.background[0]})`;
   fieldEl.appendChild(dot);
   setTimeout(() => dot.remove(), TRAIL_LIFETIME_MS);
 }
@@ -893,6 +894,19 @@ function pitchForY(y){
   return Math.pow(2, (FIELD_H/2 - y) / (FIELD_H/2));
 }
 
+/* bottom-right sound level meter — not a control, just a readout of the
+   loudest currently-playing voice (0-1), updated every frame alongside
+   everything else in updateAmbientAudio(). Bars light up past their own
+   threshold, same idea as a classic VU meter. */
+const volumeMeterEl = document.getElementById("volumeMeter");
+const volumeMeterBars = Array.from(volumeMeterEl.children);
+const VOLUME_METER_THRESHOLDS = [0.2, 0.4, 0.6, 0.8, 1.0];
+function updateVolumeMeter(level){
+  volumeMeterBars.forEach((bar, i) => {
+    bar.dataset.active = level >= VOLUME_METER_THRESHOLDS[i] ? "true" : "false";
+  });
+}
+
 // creates a plant's Audio element once, starting silent — updateAmbientAudio
 // fades it in by raising targetVolume, so play() only ever happens here,
 // never repeatedly on every little hover in and out
@@ -904,11 +918,6 @@ function ensurePlantAudio(p){
   audioEl.loop = true;
   audioEl.volume = 0;
   audioEl.playbackRate = pitchForY(p.y);
-  loadingPlantIds.add(p.id);
-  renderPlantSlots();
-  const stopLoading = () => { if(loadingPlantIds.delete(p.id)) renderPlantSlots(); };
-  audioEl.addEventListener("canplay", stopLoading, { once: true });
-  audioEl.addEventListener("error", stopLoading, { once: true });
   audioEl.play().catch(() => {});
   activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, leftRangeAt: null };
 }
@@ -917,7 +926,6 @@ function stopPlantAudio(id){
   if(!entry) return;
   entry.audioEl.pause();
   delete activePlantAudio[id];
-  loadingPlantIds.delete(id);
 }
 
 /* the one continuous audio update — recomputes every plant's distance from
@@ -953,16 +961,19 @@ function updateAmbientAudio(){
     if(now - entry.leftRangeAt >= STICK_MS) entry.targetVolume = 0;   // stuck long enough — now decay
     // else: still within the stick window — leave targetVolume alone, holding at its last value
   }
+  let loudest = 0;
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
     entry.currentVolume += (entry.targetVolume - entry.currentVolume) * VOLUME_LERP;
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
+    loudest = Math.max(loudest, entry.currentVolume);
     const p = garden.plants[id];
     if(p) entry.audioEl.playbackRate = pitchForY(p.y);
     if(!desired.has(id) && entry.targetVolume === 0 && entry.currentVolume < 0.01){
       stopPlantAudio(id);
     }
   }
+  updateVolumeMeter(loudest);
 
   // a footprint every so often you actually move, not on every frame
   if(Math.hypot(listener.x - lastTrailX, listener.y - lastTrailY) >= TRAIL_MIN_DIST){

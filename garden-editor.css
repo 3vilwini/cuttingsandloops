@@ -137,60 +137,41 @@ body{
 
 
 
-/* arrow key pad grid */
+/* ambient sound level meter — not interactive, just reflects how loud the
+   ambient wandering sound currently is (see updateVolumeMeter). Bars light
+   up left-to-right as the level rises past each one's threshold. */
 
-.arrowpad{
-  position:fixed; 
-  bottom:2.5rem; 
-  right:2.5rem; 
+.volumemeter{
+  position:fixed;
+  bottom:2.5rem;
+  right:2.5rem;
   z-index:3;
-  display:grid; 
-  grid-template-columns:repeat(3, 2.3rem); 
-  grid-template-rows:repeat(2, 2.3rem);
+  display:flex;
+  align-items:flex-end;
   gap:.3rem;
+  width:7.2rem;
+  height:4.9rem;
+  padding:.4rem;
+  border:1px solid #000;
+  background:var(--paper);
+  box-sizing:border-box;
 }
 
-.arrowpad button{
-  grid-column: 2; 
-  width: 2.3rem; 
-  height: 2.3rem; 
-  border: 1px solid #000; 
-  background: var(--paper); 
-  color: var(--ink);
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  padding: 0;
-  cursor: pointer; 
-  font-family: calibri; 
-  font-size: 1.6rem;
+.volumemeter .bar{
+  flex:1;
+  background:#000;
+  opacity:.15;
+  transition: opacity .12s ease-out;
 }
 
-.arrowpad button:active{ 
-  background:#000; 
-  color:var(--paper); 
-}
+.volumemeter .bar:nth-child(1){ height:20%; }
+.volumemeter .bar:nth-child(2){ height:40%; }
+.volumemeter .bar:nth-child(3){ height:60%; }
+.volumemeter .bar:nth-child(4){ height:80%; }
+.volumemeter .bar:nth-child(5){ height:100%; }
 
-/* ➵ points right by default — rotated to face each button's own direction */
-.arrowpad #panUp{
-  grid-row: 1;
-  transform: rotate(-90deg);
-}
-
-.arrowpad #panLeft{
-  grid-row: 2;
-  grid-column: 1;
-  transform: rotate(180deg);
-}
-
-.arrowpad #panDown{
-  grid-row: 2;
-  grid-column: 2;
-  transform: rotate(90deg);
-}
-
-.arrowpad #panRight{
-  grid-row:2; grid-column:3;
+.volumemeter .bar[data-active="true"]{
+  opacity:1;
 }
 
 
@@ -262,10 +243,10 @@ body{
 @keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
 
 
-/* same pulsing/gradient invitation, reused for a plant whose sound is
-   still buffering — see loadingPlantIds */
+/* same pulsing/gradient invitation, reused for a pinned plant's name —
+   the dot doesn't pulse when pinned, only the label (see .labeldot below) */
 .seedslot.empty .txt,
-.plantmark.loading .txt{
+.plantmark.pinned .txt{
   background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
   background-size:200% 100%;
   -webkit-background-clip:text;
@@ -330,8 +311,6 @@ body{
      so the two would otherwise visibly differ even at "the same" 10px */
   box-sizing:border-box;
 }
-@keyframes plantPinPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.6); } }
-.plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
 /* the plant's name, shown/hidden together with the seed labels via the
    same "labels" toggle — stroked so it stays readable over any field
    background or drawing color underneath it */
@@ -358,15 +337,19 @@ body{
 
 /* a footprint left behind as you wander — one of these spawns every so
    often you move (see spawnTrailDot), each fading out and removing itself
-   independently a couple seconds later */
+   independently a couple seconds later. background is a seed->sky gradient
+   set inline per-footprint (see spawnTrailDot), clipped to the glyph's own
+   text shape rather than filling a plain dot. */
 .traildot{
-  position:absolute; top:0; left:0; width:6px; height:6px;
-  margin:-3px 0 0 -3px; border-radius:50%; pointer-events:none;
+  position:absolute; top:0; left:0;
+  font-size:.75rem; line-height:1; white-space:nowrap;
+  pointer-events:none;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
   animation: trailFade 1.8s ease-out forwards;
 }
 @keyframes trailFade{
-  0%{ opacity:.5; transform:scale(1); }
-  100%{ opacity:0; transform:scale(.3); }
+  0%{ opacity:.7; transform:translate(-50%,-50%) scale(1); }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(.5); }
 }
 
 /* bottom toggle bar */
