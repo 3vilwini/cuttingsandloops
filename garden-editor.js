@@ -929,6 +929,17 @@ const pinnedPlantIds = new Set();
    one's volume glides toward its target every frame instead of snapping
    (the "decay" as you wander away). */
 const listener = { x: CX, y: CY };
+
+/* the listener position only ever moves on a real mousemove/pan — if the
+   user clicks away to another tab or app, those events just stop firing
+   and everything would otherwise keep playing forever at whatever volume
+   it happened to be at. windowFocused gates the final volume in
+   updateAmbientAudio() so leaving actually fades everything to silence,
+   instead of freezing in place. */
+let windowFocused = true;
+window.addEventListener("blur", () => { windowFocused = false; });
+window.addEventListener("focus", () => { windowFocused = true; });
+
 const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
 const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
@@ -1083,7 +1094,12 @@ function updateAmbientAudio(){
   let loudest = 0;
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
-    entry.currentVolume += (entry.targetVolume - entry.currentVolume) * VOLUME_LERP;
+    // tabbed/clicked away — fade toward silence regardless of each plant's
+    // own real target, without touching that target itself, so proximity
+    // and the stick/decay curve just pick back up where they left off the
+    // instant focus returns
+    const effectiveTarget = windowFocused ? entry.targetVolume : 0;
+    entry.currentVolume += (effectiveTarget - entry.currentVolume) * VOLUME_LERP;
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
     loudest = Math.max(loudest, entry.currentVolume);
     const p = garden.plants[id];
