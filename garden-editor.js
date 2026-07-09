@@ -221,11 +221,12 @@ function renderPlantSlots(){
       el.appendChild(fallback);
     }
 
-    // same label color as a seed's own dot, not the plant's drawing color —
-    // pulses while the plant is pinned instead of the old drop-shadow
+    // inverse of the current seed color (not the fixed p.color used for the
+    // drawing/roots) — recomputed live so it stays in sync if seed color
+    // changes later, same reasoning as renderField() calling renderPlantSlots()
     const labelDot = document.createElement("span");
     labelDot.className = "labeldot";
-    labelDot.style.background = garden.meta.colors.text;
+    labelDot.style.background = invertHex(garden.meta.colors.seed);
     el.appendChild(labelDot);
 
     // the planter's name — same "txt" class the seed labels use, so the
