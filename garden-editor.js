@@ -1196,11 +1196,12 @@ seedListToggleBtn.addEventListener("click", () => {
 // whichever seed-list preview is currently playing, if any — clicking a
 // different seed's play button stops this one first, so at most one
 // preview plays at a time, same jukebox assumption as everywhere else
-let seedListPlaying = null;   // { audioEl, btn } | null
+let seedListPlaying = null;   // { audioEl, btn, progress } | null
 function stopSeedListPreview(){
   if(!seedListPlaying) return;
   seedListPlaying.audioEl.pause();
   seedListPlaying.btn.textContent = "▶";
+  seedListPlaying.progress.style.width = "0%";
   seedListPlaying = null;
 }
 
@@ -1220,6 +1221,8 @@ function renderSeedList(){
   for(const [i, seed] of Object.entries(garden.seeds || {})){
     const row = document.createElement("div");
     row.className = "seedlistitem";
+    const progress = document.createElement("div");
+    progress.className = "seedlistprogress";
     const label = document.createElement("span");
     label.textContent = `${seed.title} - ${seed.artist}`;
     const play = document.createElement("button");
@@ -1230,10 +1233,13 @@ function renderSeedList(){
       stopSeedListPreview();
       if(wasThisOne) return;   // clicking the currently-playing one again just stops it
       const audioEl = new Audio(seed.audioRef);
+      audioEl.addEventListener("timeupdate", () => {
+        if(audioEl.duration) progress.style.width = (audioEl.currentTime / audioEl.duration * 100) + "%";
+      });
       audioEl.addEventListener("ended", () => { if(seedListPlaying?.audioEl === audioEl) stopSeedListPreview(); });
       audioEl.play().catch(() => {});
       play.textContent = "⏸";
-      seedListPlaying = { audioEl, btn: play };
+      seedListPlaying = { audioEl, btn: play, progress };
     });
     const dl = document.createElement("a");
     dl.href = seed.audioRef; dl.download = `${seed.title} - ${seed.artist}`; dl.textContent = "⤓";
@@ -1247,7 +1253,7 @@ function renderSeedList(){
       seedsChannel?.setData(draft => { delete draft[i]; });
       onSeedsChanged();
     });
-    row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
+    row.appendChild(progress); row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
     list.appendChild(row);
   }
 }

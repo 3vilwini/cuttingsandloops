@@ -454,12 +454,21 @@ body{
 }
 
 .seedlistitem{
-  display:flex; 
-  align-items:center; 
-  justify-content: space-between; 
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
   gap:.5rem;
-  border:1px solid #000; 
+  border:1px solid #000;
   padding:.4rem .5rem;
+}
+
+.seedlistprogress{
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:0%;
+  background:rgba(0,0,0,.08);
+  pointer-events:none;
 }
 
 .seedlistitem span{ 
