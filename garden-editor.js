@@ -362,7 +362,7 @@ function renderConnections(){
       const stop1 = document.createElementNS(SVG_NS, "stop");
       stop1.setAttribute("offset", "0%"); stop1.setAttribute("stop-color", garden.meta.colors.seed);
       const stop2 = document.createElementNS(SVG_NS, "stop");
-      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", p.color);
+      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", invertHex(garden.meta.colors.seed));
       gradient.appendChild(stop1); gradient.appendChild(stop2);
       defs.appendChild(gradient);
 
