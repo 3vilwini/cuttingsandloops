@@ -900,18 +900,23 @@ const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
 const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
 const STICK_MS = 4000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
-const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame, once fading (0-1, higher = snappier)
+const DECAY_MS = 3500;        // once fading, how long the eased trail-off takes to reach silence
+const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame (0-1, higher = snappier)
+// ease-in cubic: barely drops at first, then falls away faster — a plant
+// that had already built up volume holds onto most of it a while longer
+// before curving down, instead of decaying at a constant rate the whole way
+const decayEase = t => t*t*t;
 
 /* a faint footprint dropped every so often you actually move (mouse or
    keyboard/arrow-pad panning both update listener.x/y, so both leave a
    trail) — checked once per frame in updateAmbientAudio(), same as
    everything else audio-related, even though this part is purely visual. */
 let lastTrailX = listener.x, lastTrailY = listener.y;
-const TRAIL_MIN_DIST = 18;      // spawn a new footprint every ~this many px of movement
+const TRAIL_MIN_DIST = 30;      // spawn a new footprint every ~this many px of movement
 const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
 // decorative glyphs matching the site's own title treatment — one is picked
 // at random for each footprint instead of a plain dot
-const TRAIL_GLYPHS = ["୨ৎ","˖᯽","݁˖","જ⁀➴","˚","༘♡","⋆｡˚","ੈ✩‧₊˚⋆˚❀༉‧₊˚"];
+const TRAIL_GLYPHS = ["୨ৎ","˖᯽","݁˖","જ","˚","༘♡","⋆｡˚","ੈ✩‧₊˚⋆˚❀","༉","‧₊˚"];
 function spawnTrailDot(x, y){
   const dot = document.createElement("span");
   dot.className = "traildot";
@@ -1003,9 +1008,11 @@ function stopPlantAudio(id){
    the listener, decides who's audible (the closest MAX_VOICES within
    range, plus anything pinned), and glides each one's volume toward its
    target every frame instead of snapping. A plant you've wandered away
-   from doesn't start fading immediately — it sticks at its last volume
-   for STICK_MS, then decays, and only gets torn down once it's actually
-   silent, instead of tearing down and re-fetching on every back-and-forth. */
+   from doesn't start fading immediately — it sticks at its last volume for
+   STICK_MS, then eases down to silence over DECAY_MS (decayEase), holding
+   onto more of its volume for longer instead of decaying at a flat rate —
+   and only gets torn down once it's actually silent, instead of tearing
+   down and re-fetching on every back-and-forth. */
 function updateAmbientAudio(){
   const now = performance.now();
   const plants = Object.values(garden.plants || {});
@@ -1028,9 +1035,17 @@ function updateAmbientAudio(){
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
     if(desired.has(id)) continue;
-    if(entry.leftRangeAt == null) entry.leftRangeAt = now;   // just left range this frame
-    if(now - entry.leftRangeAt >= STICK_MS) entry.targetVolume = 0;   // stuck long enough — now decay
-    // else: still within the stick window — leave targetVolume alone, holding at its last value
+    if(entry.leftRangeAt == null){
+      entry.leftRangeAt = now;
+      entry.volumeAtLeave = entry.currentVolume;   // snapshot — the curve trails off from here, not from 1
+    }
+    const sinceLeft = now - entry.leftRangeAt;
+    if(sinceLeft < STICK_MS){
+      entry.targetVolume = entry.volumeAtLeave;   // still within the stick window — hold
+    } else {
+      const t = Math.min(1, (sinceLeft - STICK_MS) / DECAY_MS);
+      entry.targetVolume = entry.volumeAtLeave * (1 - decayEase(t));
+    }
   }
   let loudest = 0;
   for(const id in activePlantAudio){

@@ -344,7 +344,7 @@ body{
    text shape rather than filling a plain dot. */
 .traildot{
   position:absolute; top:0; left:0;
-  font-size:.75rem; line-height:1; white-space:nowrap;
+  font-size:1.2rem; line-height:1; white-space:nowrap;
   pointer-events:none;
   -webkit-background-clip:text; background-clip:text; color:transparent;
   animation: trailFade 1.8s ease-out forwards;
