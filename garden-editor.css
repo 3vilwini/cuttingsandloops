@@ -79,7 +79,9 @@ body{
 
 
 
-/* feels like */
+/* feels like — the tags are clickable, see pressTag/checkTagPresses: two
+   different people clicking the same one within a couple seconds opens a
+   SoundCloud tag search in a new tab for everyone in the room. */
 
 .tagdisplay{
   position: fixed; 
@@ -97,9 +99,10 @@ body{
   border-radius: 999px; 
   background: var(--paper); 
   color: var(--ink);
-  padding: .5rem .9rem; 
-  font-family: inherit; 
+  padding: .5rem .9rem;
+  font-family: inherit;
   font-size: inherit;
+  cursor: pointer;
 }
 
 .tagdisplay span:hover{ 

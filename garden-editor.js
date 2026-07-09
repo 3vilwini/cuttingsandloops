@@ -38,6 +38,7 @@ const garden = {
 // `let` declared later would be a temporal-dead-zone ReferenceError there.
 let plantSlotsChannel = null;
 let metaChannel = null;
+let tagPressChannel = null;
 let seedsChannel = null;
 
 /* garden.meta itself now lives in playhtml's synced Page Data (see
@@ -47,6 +48,10 @@ let seedsChannel = null;
 function newId(len=8){
   return crypto.randomUUID ? crypto.randomUUID().slice(0,len) : Math.random().toString(36).slice(2,2+len);
 }
+
+// one random id per browser tab/session — just enough to tell "two distinct
+// people" apart for the tag-press easter egg below, not a real user identity
+const clientId = newId();
 
 /* hex "#rrggbb" -> "r,g,b" so the seed color can be used at low opacity for the field pattern */
 function hexToRgb(hex){
@@ -461,15 +466,49 @@ function renderTagBank(){
 }
 
 /* top-center readout of the chosen tags — mirrors the bank, glows the
-   garden's seed color on hover. */
+   garden's seed color on hover, and doubles as the tag-press easter egg
+   trigger (see checkTagPresses). */
 const tagDisplayEl = document.getElementById("tagDisplay");
 function renderTagDisplay(){
   tagDisplayEl.innerHTML = "";
   for(const t of garden.meta.tags){
     const s = document.createElement("span");
     s.textContent = t;
+    s.title = "click here with a friend";   // hints at the two-person press below
     s.style.setProperty("--glow", garden.meta.colors.seed);
+    s.addEventListener("click", () => pressTag(t));
     tagDisplayEl.appendChild(s);
+  }
+}
+
+/* two DISTINCT people (browser tabs) pressing the same tag within a couple
+   seconds of each other opens a SoundCloud tag search in a new tab for
+   everyone currently on the page — a little synced "press together to
+   unlock" moment. Each click records {clientId, ts} into that tag's shared
+   list; checkTagPresses (run on every update, by everyone) looks for 2+
+   distinct clientIds still inside the time window.
+   window.open (not a direct navigation) is used so nobody loses their place
+   in the garden — but browsers only allow window.open without a popup
+   block when it's called synchronously from a real user gesture, so this
+   reliably opens for whichever tab's click completes the pair, and may be
+   silently blocked in tabs that are just idling on an earlier press. */
+const TAG_PRESS_WINDOW_MS = 2000;
+function pressTag(t){
+  const now = Date.now();
+  tagPressChannel?.setData(draft => {
+    const recent = (draft[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
+    recent.push({ clientId, ts: now });
+    draft[t] = recent;
+  });
+}
+function checkTagPresses(data){
+  const now = Date.now();
+  for(const t in data){
+    const recent = (data[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
+    if(new Set(recent.map(e => e.clientId)).size >= 2){
+      window.open(`https://soundcloud.com/tags/${encodeURIComponent(t)}`, "_blank", "noopener");
+      return;
+    }
   }
 }
 
@@ -695,6 +734,10 @@ function connectChannels(){
   garden.meta = metaChannel.getData();
   applyMetaToUI();
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
+
+  // tag-press easter egg — see checkTagPresses above
+  tagPressChannel = playhtml.createPageData("tag-presses", {});
+  tagPressChannel.onUpdate(checkTagPresses);
 
   seedsChannel = playhtml.createPageData("garden-seeds", garden.seeds);
   garden.seeds = seedsChannel.getData();
