@@ -694,6 +694,15 @@ navToggleBtn.addEventListener("click", () => {
 // usable until it resolves, so this has to chain off .then().
 playhtml.init({ cursors: { enabled: true } }).then(connectChannels);
 
+// #loadingScreen covers the field until connectChannels() has pulled the
+// real synced state (see the end of that function) — this timeout is just
+// a fallback so a slow/broken connection doesn't block the page forever,
+// falling back to showing the local defaults rather than a permanent cover.
+function hideLoadingScreen(){
+  document.getElementById("loadingScreen")?.remove();
+}
+setTimeout(hideLoadingScreen, 6000);
+
 /* live visitor count — window.cursors.allColors is playhtml's own list of
    currently-connected players in this room; .length is "here right now".
    It isn't available the instant init() returns (the cursor room connects
@@ -743,6 +752,8 @@ function connectChannels(){
   garden.seeds = seedsChannel.getData();
   onSeedsChanged();
   seedsChannel.onUpdate(data => { garden.seeds = data; onSeedsChanged(); });
+
+  hideLoadingScreen();
 }
 
 /* re-renders everywhere seed title/artist text shows up: the field markers

@@ -695,6 +695,16 @@ button.ghost:disabled{
    it's meant to fully gate the page until dismissed */
 #entryScrim{ z-index:10; }
 
+/* opaque cover over the field — sits below the entry gate (z-index 10) so
+   it's never the thing on top, but above everything else, blocking the
+   local/randomized defaults from flashing before the real synced garden
+   loads in. Removed outright once that data arrives (see hideLoadingScreen). */
+#loadingScreen{
+  position:fixed; inset:0; z-index:9;
+  background:var(--paper);
+  display:flex; align-items:center; justify-content:center;
+}
+
 .modal{
   width:100%; 
   max-width:480px; 
