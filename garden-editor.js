@@ -265,7 +265,10 @@ function renderPlantSlots(){
         p.x = origX + dx; p.y = origY + dy;
         el.style.left = p.x + "px"; el.style.top = p.y + "px";
         // pitch/volume both update on their own every frame in
-        // updateAmbientAudio() — no need to touch audio here while dragging
+        // updateAmbientAudio() — no need to touch audio here while dragging.
+        // roots aren't on any per-frame loop, though — without this, a
+        // connection line stays frozen at the old spot until the drag ends
+        renderConnections();
       }
       function onUp(){
         document.removeEventListener("mousemove", onMove);
@@ -766,6 +769,7 @@ const pSaveBtn = document.getElementById("pSaveBtn");
 const pDeleteBtn = document.getElementById("pDeleteBtn");
 const pCancelBtn = document.getElementById("pCancelBtn");
 const hoverSquare = document.getElementById("hoverSquare");
+const cursorPulse = document.getElementById("cursorPulse");
 
 const localPlantAudioRefs = {};
 const localSeedAudioRefs = {};
@@ -879,16 +883,26 @@ function updateAmbientAudio(){
     if(now - entry.leftRangeAt >= STICK_MS) entry.targetVolume = 0;   // stuck long enough — now decay
     // else: still within the stick window — leave targetVolume alone, holding at its last value
   }
+  let totalVolume = 0;
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
     entry.currentVolume += (entry.targetVolume - entry.currentVolume) * VOLUME_LERP;
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
+    totalVolume += entry.currentVolume;
     const p = garden.plants[id];
     if(p) entry.audioEl.playbackRate = pitchForY(p.y);
     if(!desired.has(id) && entry.targetVolume === 0 && entry.currentVolume < 0.01){
       stopPlantAudio(id);
     }
   }
+
+  // rings at the listener's own position, more visible/intense the more is
+  // currently audible nearby — a felt sense of "getting louder here"
+  cursorPulse.style.left = listener.x + "px";
+  cursorPulse.style.top = listener.y + "px";
+  cursorPulse.style.setProperty("--pulse-intensity", Math.min(1.5, totalVolume).toFixed(3));
+  cursorPulse.style.setProperty("--pulse-color", garden.meta.colors.text);
+
   requestAnimationFrame(updateAmbientAudio);
 }
 requestAnimationFrame(updateAmbientAudio);
