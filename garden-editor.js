@@ -153,7 +153,7 @@ function renderSeedSlots(){
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     const dot = document.createElement("span");
-    dot.className = "dot"; dot.style.background = garden.meta.colors.text;
+    dot.className = "dot"; dot.style.background = garden.meta.colors.seed;
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = seed ? `${seed.title} - ${seed.artist}` : "+ add seed";
