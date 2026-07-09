@@ -1236,9 +1236,9 @@ function renderSeedList(){
       seedListPlaying = { audioEl, btn: play };
     });
     const dl = document.createElement("a");
-    dl.href = seed.audioRef; dl.download = `${seed.title} - ${seed.artist}`; dl.textContent = "⇩";
+    dl.href = seed.audioRef; dl.download = `${seed.title} - ${seed.artist}`; dl.textContent = "⤓";
     const del = document.createElement("button");
-    del.type = "button"; del.className = "seedlistdelete"; del.textContent = "🗑";
+    del.type = "button"; del.className = "seedlistdelete"; del.textContent = "✕";
     del.title = "delete this seed";
     del.addEventListener("click", async () => {
       const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
@@ -1247,7 +1247,7 @@ function renderSeedList(){
       seedsChannel?.setData(draft => { delete draft[i]; });
       onSeedsChanged();
     });
-    row.appendChild(label); row.appendChild(play); row.appendChild(dl); row.appendChild(del);
+    row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
     list.appendChild(row);
   }
 }
