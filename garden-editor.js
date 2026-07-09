@@ -769,7 +769,6 @@ const pSaveBtn = document.getElementById("pSaveBtn");
 const pDeleteBtn = document.getElementById("pDeleteBtn");
 const pCancelBtn = document.getElementById("pCancelBtn");
 const hoverSquare = document.getElementById("hoverSquare");
-const cursorPulse = document.getElementById("cursorPulse");
 
 const localPlantAudioRefs = {};
 const localSeedAudioRefs = {};
@@ -804,6 +803,23 @@ const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually p
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
 const STICK_MS = 4000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
 const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame, once fading (0-1, higher = snappier)
+
+/* a faint footprint dropped every so often you actually move (mouse or
+   keyboard/arrow-pad panning both update listener.x/y, so both leave a
+   trail) — checked once per frame in updateAmbientAudio(), same as
+   everything else audio-related, even though this part is purely visual. */
+let lastTrailX = listener.x, lastTrailY = listener.y;
+const TRAIL_MIN_DIST = 40;      // spawn a new footprint every ~this many px of movement
+const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
+function spawnTrailDot(x, y){
+  const dot = document.createElement("span");
+  dot.className = "traildot";
+  dot.style.left = x + "px";
+  dot.style.top = y + "px";
+  dot.style.background = garden.meta.colors.text;
+  fieldEl.appendChild(dot);
+  setTimeout(() => dot.remove(), TRAIL_LIFETIME_MS);
+}
 
 // currently-playing plant audio, keyed by plant id — survives re-renders
 // for the same reason pinnedPlantIds does, which is what lets a sound keep
@@ -883,12 +899,10 @@ function updateAmbientAudio(){
     if(now - entry.leftRangeAt >= STICK_MS) entry.targetVolume = 0;   // stuck long enough — now decay
     // else: still within the stick window — leave targetVolume alone, holding at its last value
   }
-  let totalVolume = 0;
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
     entry.currentVolume += (entry.targetVolume - entry.currentVolume) * VOLUME_LERP;
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
-    totalVolume += entry.currentVolume;
     const p = garden.plants[id];
     if(p) entry.audioEl.playbackRate = pitchForY(p.y);
     if(!desired.has(id) && entry.targetVolume === 0 && entry.currentVolume < 0.01){
@@ -896,12 +910,11 @@ function updateAmbientAudio(){
     }
   }
 
-  // rings at the listener's own position, more visible/intense the more is
-  // currently audible nearby — a felt sense of "getting louder here"
-  cursorPulse.style.left = listener.x + "px";
-  cursorPulse.style.top = listener.y + "px";
-  cursorPulse.style.setProperty("--pulse-intensity", Math.min(1.5, totalVolume).toFixed(3));
-  cursorPulse.style.setProperty("--pulse-color", garden.meta.colors.text);
+  // a footprint every so often you actually move, not on every frame
+  if(Math.hypot(listener.x - lastTrailX, listener.y - lastTrailY) >= TRAIL_MIN_DIST){
+    spawnTrailDot(listener.x, listener.y);
+    lastTrailX = listener.x; lastTrailY = listener.y;
+  }
 
   requestAnimationFrame(updateAmbientAudio);
 }

@@ -353,22 +353,17 @@ body{
   display:none;
 }
 
-/* rings emanating from wherever you're standing — intensity/visibility
-   driven every frame by updateAmbientAudio() via --pulse-intensity, so it
-   reads as "louder near here" rather than a constant decoration */
-.cursorpulse{
-  position:absolute; top:0; left:0; width:0; height:0; pointer-events:none;
+/* a footprint left behind as you wander — one of these spawns every so
+   often you move (see spawnTrailDot), each fading out and removing itself
+   independently a couple seconds later */
+.traildot{
+  position:absolute; top:0; left:0; width:6px; height:6px;
+  margin:-3px 0 0 -3px; border-radius:50%; pointer-events:none;
+  animation: trailFade 1.8s ease-out forwards;
 }
-.cursorpulse .ring{
-  position:absolute; top:0; left:0; width:20px; height:20px;
-  margin:-10px 0 0 -10px; border-radius:50%;
-  border:1px solid var(--pulse-color, #fff);
-  opacity:0; animation:cursorRingPulse 2.2s ease-out infinite;
-}
-.cursorpulse .ring:nth-child(2){ animation-delay:1.1s; }
-@keyframes cursorRingPulse{
-  0%{ transform:scale(0.4); opacity:calc(var(--pulse-intensity, 0) * 0.6); }
-  100%{ transform:scale(2.4); opacity:0; }
+@keyframes trailFade{
+  0%{ opacity:.5; transform:scale(1); }
+  100%{ opacity:0; transform:scale(.3); }
 }
 
 /* bottom toggle bar */
