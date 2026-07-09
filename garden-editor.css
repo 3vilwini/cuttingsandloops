@@ -507,6 +507,9 @@ body{
 
 .sub{ color:var(--muted); margin:0 0 1.6rem; line-height:1.4; }
 label{ display:block; color:var(--muted); margin-bottom:.3rem; }
+/* a panel's own heading (seed list, settings) rather than a form field's
+   label — ink instead of the muted color plain labels get */
+.cardtitle{ color:var(--ink); margin-bottom:.5rem; }
 .row{ margin-bottom:.8rem; }
 input[type="text"], select{
   width:100%; padding:.4rem .5rem; border-radius:0; border:1px solid #000;
