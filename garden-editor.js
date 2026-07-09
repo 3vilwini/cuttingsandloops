@@ -198,7 +198,6 @@ function renderPlantSlots(){
     el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
     el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
-    el.title = p.name;
     // opposite of a filled seed's own hover glow color (see .seedslot:hover)
     el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
     // same two custom properties a seed slot sets, so .plantmark.pinned .txt
@@ -1292,7 +1291,6 @@ function renderSeedList(){
     label.textContent = `${seed.title} - ${seed.artist}`;
     const play = document.createElement("button");
     play.type = "button"; play.className = "seedlistplay"; play.textContent = "▶";
-    play.title = "play this seed";
     play.addEventListener("click", () => {
       const wasThisOne = seedListPlaying?.btn === play;
       stopSeedListPreview();
@@ -1315,10 +1313,8 @@ function renderSeedList(){
     dl.href = `${UPLOAD_ENDPOINT}/download/${seedKey}`;
     dl.download = `${seed.title} - ${seed.artist}`;
     dl.textContent = "⤓";
-    dl.title = "download this seed";
     const del = document.createElement("button");
     del.type = "button"; del.className = "seedlistdelete"; del.textContent = "✕";
-    del.title = "delete this seed";
     del.addEventListener("click", async () => {
       const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
       if(!ok) return;
