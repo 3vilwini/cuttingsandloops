@@ -206,8 +206,13 @@ function renderPlantSlots(){
     el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
     el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
-    // opposite of a filled seed's own hover glow color (see .seedslot:hover)
-    el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
+    // opposite of a filled seed's own hover glow color (see .seedslot:hover),
+    // and also this plant's own dot color — same value, reused below for the
+    // pinned dot's pulse (see .plantmark.pinned .labeldot)
+    const dotColor = invertHex(garden.meta.colors.seed);
+    el.style.setProperty("--glow", dotColor);
+    el.style.setProperty("--dot-color", dotColor);
+    el.style.setProperty("--seed-color", garden.meta.colors.seed);
     // same two custom properties a seed slot sets, so .plantmark.playing .txt
     // can reuse its exact pulsing-gradient CSS
     el.style.setProperty("--text-color", garden.meta.colors.text);

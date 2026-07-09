@@ -313,6 +313,18 @@ body{
      so the two would otherwise visibly differ even at "the same" 10px */
   box-sizing:border-box;
 }
+
+/* pinned dot pulses in size while cycling between the seed color and this
+   plant's own dot color — --seed-color/--dot-color are set alongside the
+   other custom properties in renderPlantSlots(). A CSS animation on
+   background-color wins over the dot's own inline background (unlike a
+   plain rule, which an inline style would always beat), so no need to
+   touch that inline style for this to take effect while pinned. */
+@keyframes plantPinPulse{
+  0%,100%{ transform:translateY(-50%) scale(1); background:var(--seed-color,currentColor); }
+  50%{ transform:translateY(-50%) scale(1.6); background:var(--dot-color,currentColor); }
+}
+.plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
 /* the plant's name, shown/hidden together with the seed labels via the
    same "labels" toggle — stroked so it stays readable over any field
    background or drawing color underneath it */
