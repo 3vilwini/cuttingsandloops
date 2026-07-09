@@ -700,7 +700,57 @@ playhtml.init({ cursors: { enabled: true } }).then(connectChannels);
 function hideLoadingScreen(){
   document.getElementById("loadingScreen")?.remove();
 }
-setTimeout(hideLoadingScreen, 6000);
+setTimeout(() => {
+  hideLoadingScreen();
+  // if connectChannels() never even ran, preloadGardenAudio() never got a
+  // chance to enable this either — nothing left to preload in that case
+  document.getElementById("enterBtn").disabled = false;
+}, 6000);
+
+/* preloads every seed/plant sound into the browser's HTTP cache while the
+   entry gate is up (see connectChannels), so wandering in right after
+   clicking through doesn't make the first pass near any plant wait on it —
+   ensurePlantAudio()/the seed list's play button fetch the exact same URL
+   again later, which the browser then just serves from cache instantly.
+   enterBtn stays disabled until everything's loaded (or ENTRY_PRELOAD_TIMEOUT_MS
+   gives up waiting on a slow/broken file, rather than blocking forever). */
+const ENTRY_PRELOAD_TIMEOUT_MS = 8000;
+function preloadGardenAudio(){
+  const refs = [
+    ...Object.values(garden.plants || {}).map(p => p.audioRef).filter(Boolean),
+    ...Object.values(garden.seeds || {}).map(s => s.audioRef).filter(Boolean),
+  ];
+  const bar = document.getElementById("entryProgressBar");
+  const label = document.getElementById("entryProgressLabel");
+  const enterBtn = document.getElementById("enterBtn");
+
+  let done = false;
+  const finish = () => {
+    if(done) return;
+    done = true;
+    bar.style.width = "100%";
+    label.textContent = "";
+    enterBtn.disabled = false;
+  };
+
+  if(refs.length === 0){ finish(); return; }
+
+  let loaded = 0;
+  const bump = () => {
+    loaded++;
+    bar.style.width = Math.round((loaded / refs.length) * 100) + "%";
+    label.textContent = `loading sounds... ${loaded}/${refs.length}`;
+    if(loaded >= refs.length) finish();
+  };
+  for(const ref of refs){
+    const a = new Audio();
+    a.preload = "auto";
+    a.addEventListener("canplaythrough", bump, { once:true });
+    a.addEventListener("error", bump, { once:true });   // don't let one bad file block everything else
+    a.src = ref;
+  }
+  setTimeout(finish, ENTRY_PRELOAD_TIMEOUT_MS);
+}
 
 /* live visitor count — window.cursors.allColors is playhtml's own list of
    currently-connected players in this room; .length is "here right now".
@@ -753,6 +803,7 @@ function connectChannels(){
   seedsChannel.onUpdate(data => { garden.seeds = data; onSeedsChanged(); });
 
   hideLoadingScreen();
+  preloadGardenAudio();
 }
 
 /* re-renders everywhere seed title/artist text shows up: the field markers

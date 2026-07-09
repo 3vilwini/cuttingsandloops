@@ -690,6 +690,21 @@ button.ghost:disabled{
   display:flex; align-items:center; justify-content:center;
 }
 
+/* fills while every seed/plant sound preloads behind the entry gate (see
+   preloadGardenAudio) — enterBtn stays disabled until it's full or the
+   preload gives up waiting, so wandering in doesn't hit any first-listen lag */
+.entryprogress{
+  border:1px solid #000;
+  height:.6rem;
+  overflow:hidden;
+}
+.entryprogressbar{
+  height:100%;
+  width:0%;
+  background:#000;
+  transition:width .15s ease-out;
+}
+
 .modal{
   width:100%; 
   max-width:480px; 
