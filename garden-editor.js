@@ -200,7 +200,7 @@ function renderPlantSlots(){
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
     // opposite of a filled seed's own hover glow color (see .seedslot:hover)
     el.style.setProperty("--glow", invertHex(garden.meta.colors.seed));
-    // same two custom properties a seed slot sets, so .plantmark.pinned .txt
+    // same two custom properties a seed slot sets, so .plantmark.playing .txt
     // can reuse its exact pulsing-gradient CSS
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
@@ -242,10 +242,11 @@ function renderPlantSlots(){
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = p.name;
-    // skip the inline color when pinned — .plantmark.pinned .txt sets its own
-    // (transparent, for the gradient-clip pulse), and an inline color here
-    // would always win over that CSS rule regardless of specificity
-    if(!pinnedPlantIds.has(p.id)) label.style.color = garden.meta.colors.text;
+    label.style.color = garden.meta.colors.text;
+    // updatePlayingClasses() clears this inline color back to "" whenever the
+    // plant is actually playing, so .plantmark.playing .txt's own transparent
+    // (for the gradient-clip pulse) can win — an inline color always beats a
+    // stylesheet rule regardless of specificity, so it can't be left set here
     el.appendChild(label);
 
     // no per-element hover audio anymore — updateAmbientAudio() plays/fades
@@ -880,6 +881,26 @@ function spawnTrailDot(x, y){
 // fading/playing uninterrupted while someone else drags that plant around.
 const activePlantAudio = {};
 
+// which plants currently get the .playing pulse class — hovered/in-range,
+// still decaying (STICK_MS), or pinned, all read the same currentVolume
+// off activePlantAudio, so there's nothing pin-specific to check separately.
+// Walks every rendered plantmark (not just activePlantAudio's keys) so a
+// class survives renderPlantSlots() rebuilding the DOM out from under it.
+// Also clears/restores the label's inline color to match — renderPlantSlots()
+// always sets that color inline, and an inline style always beats a
+// stylesheet rule, so .plantmark.playing .txt's transparent (for the
+// gradient-clip pulse) needs this to actually take effect.
+const PLAYING_THRESHOLD = 0.02;
+function updatePlayingClasses(){
+  for(const mark of document.querySelectorAll("#plantSlots .plantmark")){
+    const entry = activePlantAudio[mark.dataset.plantId];
+    const playing = !!entry && entry.currentVolume >= PLAYING_THRESHOLD;
+    mark.classList.toggle("playing", playing);
+    const txt = mark.querySelector(".txt");
+    if(txt) txt.style.color = playing ? "" : garden.meta.colors.text;
+  }
+}
+
 const smoothstep = t => t*t*(3-2*t);
 function volumeForDistance(dist){
   return dist >= AUDIBLE_RADIUS ? 0 : smoothstep(1 - dist/AUDIBLE_RADIUS);
@@ -973,6 +994,7 @@ function updateAmbientAudio(){
     }
   }
   updateVolumeMeter(loudest);
+  updatePlayingClasses();
 
   // a footprint every so often you actually move, not on every frame
   if(Math.hypot(listener.x - lastTrailX, listener.y - lastTrailY) >= TRAIL_MIN_DIST){
