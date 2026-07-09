@@ -394,8 +394,8 @@ function renderField(){
   const rgb = hexToRgb(seed);
 
   const scale = garden.meta.scale || 1;
-  const LATTICE_BASE = 52;              // grid cell size (2x the original default)
-  const FURROW_BASE = LATTICE_BASE / 2; // furrow lines are half as spread out as lattice
+  const LATTICE_BASE = 104;   // grid cell size (doubled again from 52)
+  const FURROW_BASE = 26;     // independent of LATTICE_BASE now, so furrow's spacing doesn't change too
 
   if(garden.meta.pattern === "array"){
     // dots arranged in an outward spiral from center, spaced evenly along
