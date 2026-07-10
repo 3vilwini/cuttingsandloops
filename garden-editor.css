@@ -138,8 +138,9 @@ body{
 
 
 /* ambient sound level meter — not interactive, just reflects how loud the
-   ambient wandering sound currently is (see updateVolumeMeter). Bars light
-   up left-to-right as the level rises past each one's threshold. */
+   ambient wandering sound currently is (see updateVolumeMeter). Vertical
+   stack of horizontal bars, bottom to top, lighting up as the level rises
+   past each one's threshold. */
 
 .volumemeter{
   position:fixed;
@@ -147,11 +148,12 @@ body{
   right:2.5rem;
   z-index:3;
   display:flex;
-  align-items:flex-end;
+  flex-direction:column-reverse;
+  align-items:flex-start;
   justify-content:space-between;
   gap:.15rem;
-  width:3.6rem;
-  height:2.45rem;
+  width:2.45rem;
+  height:3.6rem;
   padding:.2rem;
   border:1px solid #000;
   background:var(--paper);
@@ -165,11 +167,11 @@ body{
   transition: opacity .12s ease-out;
 }
 
-.volumemeter .bar:nth-child(1){ height:20%; }
-.volumemeter .bar:nth-child(2){ height:40%; }
-.volumemeter .bar:nth-child(3){ height:60%; }
-.volumemeter .bar:nth-child(4){ height:80%; }
-.volumemeter .bar:nth-child(5){ height:100%; }
+.volumemeter .bar:nth-child(1){ width:20%; }
+.volumemeter .bar:nth-child(2){ width:40%; }
+.volumemeter .bar:nth-child(3){ width:60%; }
+.volumemeter .bar:nth-child(4){ width:80%; }
+.volumemeter .bar:nth-child(5){ width:100%; }
 
 .volumemeter .bar[data-active="true"]{
   opacity:1;
