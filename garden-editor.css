@@ -256,7 +256,7 @@ body{
   animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
 }
 .plantmark.playing .txt{
-  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--sky-color,#fff) 50%, var(--text-color,#fff) 100%);
+  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--seed-color,#fff) 50%, var(--text-color,#fff) 100%);
   background-size:200% 100%;
   -webkit-background-clip:text;
   background-clip:text;
