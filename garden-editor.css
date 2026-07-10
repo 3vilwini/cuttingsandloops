@@ -148,10 +148,10 @@ body{
   z-index:3;
   display:flex;
   align-items:flex-end;
-  gap:.3rem;
-  width:7.2rem;
-  height:4.9rem;
-  padding:.4rem;
+  gap:.15rem;
+  width:3.6rem;
+  height:2.45rem;
+  padding:.2rem;
   border:1px solid #000;
   background:var(--paper);
   box-sizing:border-box;
@@ -711,23 +711,16 @@ button.ghost:disabled{
 
 /* fills while every seed/plant sound preloads behind the entry gate (see
    preloadGardenAudio) — enterBtn stays disabled until it's full or the
-   preload gives up waiting, so wandering in doesn't hit any first-listen lag.
-   The fill is decorative glyph text (set once in JS, long enough to always
-   overflow) rather than a solid bar — .entryprogressbar's own width is what
-   grows, clipping/revealing more of that same static text as it does. */
+   preload gives up waiting, so wandering in doesn't hit any first-listen lag */
 .entryprogress{
   border:1px solid #000;
-  height:1.1rem;
+  height:.6rem;
   overflow:hidden;
-  white-space:nowrap;
-  line-height:1.1rem;
-  font-size:.85rem;
 }
 .entryprogressbar{
   height:100%;
   width:0%;
-  overflow:hidden;
-  white-space:nowrap;
+  background:#000;
   transition:width .15s ease-out;
 }
 

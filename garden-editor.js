@@ -744,11 +744,6 @@ function preloadGardenAudio(){
   const enterBtn = document.getElementById("enterBtn");
   const failed = [];
 
-  // decorative fill instead of a solid bar — set once, long enough to
-  // always overflow the widest this bar could ever be; the bar's own
-  // width (animated below) is what clips/reveals more of it as it grows
-  bar.textContent = "୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚ ".repeat(15);
-
   let done = false;
   const finish = () => {
     if(done) return;
