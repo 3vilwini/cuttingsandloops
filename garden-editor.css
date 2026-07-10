@@ -139,8 +139,9 @@ body{
 
 /* ambient sound level meter — not interactive, just reflects how loud the
    ambient wandering sound currently is (see updateVolumeMeter). Vertical
-   stack of ten identical horizontal bars, packed close together, lighting
-   up bottom to top as the level rises past each one's threshold. */
+   stack of ten identical horizontal bars, spread via space-between so
+   they always span the full height of the box, lighting up bottom to
+   top as the level rises past each one's threshold. */
 
 .volumemeter{
   position:fixed;
@@ -150,7 +151,7 @@ body{
   display:flex;
   flex-direction:column-reverse;
   align-items:flex-start;
-  gap:.06rem;
+  justify-content:space-between;
   width:2.45rem;
   height:3.6rem;
   padding:.2rem;
