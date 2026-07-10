@@ -1025,7 +1025,7 @@ function pitchForY(y){
    threshold, same idea as a classic VU meter. */
 const volumeMeterEl = document.getElementById("volumeMeter");
 const volumeMeterBars = Array.from(volumeMeterEl.children);
-const VOLUME_METER_THRESHOLDS = [0.2, 0.4, 0.6, 0.8, 1.0];
+const VOLUME_METER_THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 function updateVolumeMeter(level){
   volumeMeterBars.forEach((bar, i) => {
     bar.dataset.active = level >= VOLUME_METER_THRESHOLDS[i] ? "true" : "false";
