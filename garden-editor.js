@@ -211,10 +211,12 @@ function renderPlantSlots(){
     el.style.setProperty("--glow", garden.meta.colors.seed);
     el.style.setProperty("--dot-color", dotColor);
     el.style.setProperty("--seed-color", garden.meta.colors.seed);
-    // same two custom properties a seed slot sets, so .plantmark.playing .txt
-    // can reuse its exact pulsing-gradient CSS
+    // --text-color/--soil-color match what a seed slot sets, for the shared
+    // seedTextPulse/seedGradientPulse animations; --sky-color is this plant's
+    // own (label -> sky, not label -> soil — see .plantmark.playing .txt)
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
+    el.style.setProperty("--sky-color", garden.meta.colors.background[0]);
 
     if(p.paths && p.paths.length){
       const svg = document.createElementNS(SVG_NS, "svg");
@@ -963,7 +965,7 @@ const TRAIL_MIN_DIST = 30;      // spawn a new footprint every ~this many px of 
 const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
 // decorative glyphs matching the site's own title treatment — one is picked
 // at random for each footprint instead of a plain dot
-const TRAIL_GLYPHS = ["୨ৎ ݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
+const TRAIL_GLYPHS = ["݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
 function spawnTrailDot(x, y){
   const dot = document.createElement("span");
   dot.className = "traildot";

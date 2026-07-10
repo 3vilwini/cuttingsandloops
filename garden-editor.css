@@ -246,10 +246,19 @@ body{
 /* same pulsing/gradient invitation, reused for any plant currently making
    sound — hovered/in-range, still decaying (STICK_MS), or pinned, all read
    the same "playing" class off updatePlayingClasses(). Never the dot,
-   only the label (see .labeldot below). */
-.seedslot.empty .txt,
-.plantmark.playing .txt{
+   only the label (see .labeldot below). label -> sky here, vs. label ->
+   soil for an empty seed slot, so an actively-playing plant reads as its
+   own distinct gradient rather than reusing the seed-invitation one. */
+.seedslot.empty .txt{
   background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
+}
+.plantmark.playing .txt{
+  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--sky-color,#fff) 50%, var(--text-color,#fff) 100%);
   background-size:200% 100%;
   -webkit-background-clip:text;
   background-clip:text;
