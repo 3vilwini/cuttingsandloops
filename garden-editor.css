@@ -51,6 +51,7 @@ body{
 
 
 /* hot soil spots */
+
 .hoversquare{
   position:absolute;
   width:140px;
@@ -159,7 +160,6 @@ body{
   padding: .5rem .9rem;
   font-family: inherit;
   font-size: inherit;
-  cursor: pointer;
 }
 
 .tagdisplay span:hover{ 
