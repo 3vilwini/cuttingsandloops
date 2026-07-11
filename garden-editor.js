@@ -1127,6 +1127,13 @@ function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
   document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
+  // plants from before plantedAt existed just don't count toward this —
+  // there's no way to recover when they were actually planted
+  const timestamps = Object.values(garden.plants || {}).map(p => p.plantedAt).filter(Boolean);
+  const lastPlanted = timestamps.length ? new Date(Math.max(...timestamps)) : null;
+  document.getElementById("lastPlantedDate").textContent = lastPlanted
+    ? lastPlanted.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" })
+    : "not yet";
   gardenUrlInput.value = location.href;
   gardenInfoCardEl.style.display = "";
 }
@@ -1696,6 +1703,10 @@ pSaveBtn.addEventListener("click", async () => {
     sampledFrom: selectedSampledFrom.slice(),
     paths: plantDraftPaths, color: plantDraftColor,
     x: pendingPlantPos.x, y: pendingPlantPos.y,
+    // preserved across edits — this is when the plant was first planted,
+    // not last touched, so editing an existing plant doesn't bump the
+    // garden info panel's "last planted" date
+    plantedAt: existing?.plantedAt || Date.now(),
   };
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
