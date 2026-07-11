@@ -6,16 +6,16 @@ compatibility_date = "2026-01-01"
 binding = "SEEDS"
 bucket_name = "cuttings-loops"
 
-# atomic counter for "new garden" ids — see GardenCounter in worker.js.
-# Durable Objects need both a binding (below) and a migration (further
-# down) the first time a class is introduced.
-[[durable_objects.bindings]]
-name = "GARDEN_COUNTER"
-class_name = "GardenCounter"
-
-[[migrations]]
-tag = "v1"
-new_classes = ["GardenCounter"]
+# atomic counter for "new garden" ids — see ensureCounterTable/
+# handleNextGardenId in worker.js. Durable Objects would also work but
+# require Workers Paid; D1 gives the same single-writer atomicity for
+# free. database_id comes from the D1 database's own dashboard page
+# after creating it under Storage & Databases → D1 — no manual schema
+# setup needed, the worker creates its own table on first use.
+[[d1_databases]]
+binding = "GARDEN_DB"
+database_name = "sound-garden-counter"
+database_id = "REPLACE-ME"
 
 [vars]
 # after creating the bucket, enable "Public Access" (r2.dev subdomain, or a

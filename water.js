@@ -1452,6 +1452,43 @@ function updateVolumeMeter(level){
   });
 }
 
+/* double-click the meter to teleport to a random OTHER garden — see
+   .volumemeterhint in mood.css for the "double-click to teleport" text
+   that hints at this. Picks from [1, count] (the Worker's /garden-count
+   peek at the same D1 counter "new garden" allocates from — see
+   upload-worker/worker.js), excluding whichever garden this already is,
+   so it's never a no-op. Not every number in that range is guaranteed to
+   still have anything planted in it — the counter only tracks how many
+   have ever been created, not which ones stuck around. */
+const volumeMeterHintEl = document.querySelector("#volumeMeter .volumemeterhint");
+const volumeMeterHintLabel = volumeMeterHintEl?.textContent;
+function flashVolumeMeterHint(message){
+  if(!volumeMeterHintEl) return;
+  volumeMeterHintEl.textContent = message;
+  setTimeout(() => { volumeMeterHintEl.textContent = volumeMeterHintLabel; }, 2500);
+}
+volumeMeterEl.addEventListener("dblclick", async () => {
+  const currentGarden = Number(new URLSearchParams(location.search).get("g"));
+  let count;
+  try {
+    const res = await fetch(`${UPLOAD_ENDPOINT}/garden-count`);
+    if(!res.ok) throw new Error(`garden-count failed: ${res.status}`);
+    ({ count } = await res.json());
+  } catch(err) {
+    console.warn("couldn't check for other gardens:", err);
+    flashVolumeMeterHint("couldn't reach the other gardens ~");
+    return;
+  }
+  const candidates = Array.from({ length: count }, (_, i) => i + 1)
+    .filter(id => id !== currentGarden);
+  if(!candidates.length){
+    flashVolumeMeterHint("no other gardens yet ~");
+    return;
+  }
+  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+  location.href = `${location.pathname}?g=${chosen}`;
+});
+
 // creates a plant's Audio element once, starting silent — updateAmbientAudio
 // snaps it straight to its target volume on the first frame (see justArrived
 // below), so play() only ever happens here, never repeatedly on every little
