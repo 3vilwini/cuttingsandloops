@@ -864,10 +864,6 @@ button.ghost:disabled{
   top:5.4rem;
 }
 
-.card.wide{
-  max-width:320px;
-}
-
 #gardenInfoCard .cardbody{
   max-height:70vh;
   overflow-y:auto;
