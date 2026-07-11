@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SETUP / GLOBAL — mirrors garden-editor.css "global style"
+   SETUP / GLOBAL — mirrors mood.css "global style"
    ========================================================================== */
 
 import { playhtml } from "https://unpkg.com/playhtml";
@@ -124,7 +124,7 @@ function svgEl(tag, attrs){
 garden.id = (location.pathname + location.search).replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
 
 /* ==========================================================================
-   GARDEN / FIELD — mirrors garden-editor.css "garden"
+   GARDEN / FIELD — mirrors mood.css "garden"
    ========================================================================== */
 
 
@@ -260,7 +260,7 @@ requestAnimationFrame(() => {
 });
 
 /* ==========================================================================
-   HOT SOIL SPOTS — mirrors garden-editor.css "hot soil spots"
+   HOT SOIL SPOTS — mirrors mood.css "hot soil spots"
    ========================================================================== */
 
 /* planting is only allowed on a hot spot — a fixed grid spread evenly across
@@ -375,7 +375,7 @@ fieldEl.addEventListener("click", e => {
 });
 
 /* ==========================================================================
-   TOP LEFT — NAV BUTTONS — mirrors garden-editor.css "top left - nav buttons"
+   TOP LEFT — NAV BUTTONS — mirrors mood.css "top left - nav buttons"
    ========================================================================== */
 
 const builderCardEl = document.getElementById("builderCard");
@@ -412,7 +412,7 @@ seedListToggleBtn.addEventListener("click", () => {
 });
 
 /* ==========================================================================
-   TOP CENTER — CLICKABLE TAGS — mirrors garden-editor.css "top center - clickable tags"
+   TOP CENTER — CLICKABLE TAGS — mirrors mood.css "top center - clickable tags"
    ========================================================================== */
 
 /* top-center readout of the chosen tags — mirrors the bank, glows the
@@ -474,7 +474,7 @@ function checkTagPresses(data){
 }
 
 /* ==========================================================================
-   BOTTOM LEFT — TOGGLE BAR — mirrors garden-editor.css "bottom left - toggle bar"
+   BOTTOM LEFT — TOGGLE BAR — mirrors mood.css "bottom left - toggle bar"
    ========================================================================== */
 
 /* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
@@ -501,7 +501,7 @@ document.querySelectorAll("#viewToggles button").forEach(b => {
 });
 
 /* ==========================================================================
-   SEED SLOTS — mirrors garden-editor.css "seed slots"
+   SEED SLOTS — mirrors mood.css "seed slots"
    ========================================================================== */
 
 /* an empty slot invites a click (opens the add-seed modal); a filled one
@@ -552,7 +552,7 @@ function renderSeedSlots(){
 }
 
 /* ==========================================================================
-   ROOTS — mirrors garden-editor.css "roots"
+   ROOTS — mirrors mood.css "roots"
    ========================================================================== */
 
 /* dashed curved lines from every filled seed to each plant whose
@@ -629,7 +629,7 @@ function renderConnections(){
 }
 
 /* ==========================================================================
-   PLANT SLOTS — mirrors garden-editor.css "plant slots"
+   PLANT SLOTS — mirrors mood.css "plant slots"
    ========================================================================== */
 
 function renderPlantSlots(){
@@ -762,7 +762,7 @@ function renderPlantSlots(){
 }
 
 /* ==========================================================================
-   MODAL / LOADING SCRIM — mirrors garden-editor.css "loading scrim" + "modal styling"
+   MODAL / LOADING SCRIM — mirrors mood.css "loading scrim" + "modal styling"
    ========================================================================== */
 
 // Escape closes whatever's open — works even while typing in one of these
@@ -949,7 +949,7 @@ function applyMetaToUI(){
 }
 
 /* ==========================================================================
-   SEASON SETTINGS + SEED LIST — mirrors garden-editor.css "season settings + seed list" + "tags" + "colors" + "field pattern picker" + "scale slider"
+   SEASON SETTINGS + SEED LIST — mirrors mood.css "season settings + seed list" + "tags" + "colors" + "field pattern picker" + "scale slider"
    ========================================================================== */
 
 /* ---- tag bank ---- */
@@ -1117,7 +1117,7 @@ function renderSeedList(){
 }
 
 /* ==========================================================================
-   VISITOR INFO — mirrors garden-editor.css "visitor info"
+   VISITOR INFO — mirrors mood.css "visitor info"
    ========================================================================== */
 
 /* the "about this garden" panel, opened from the visitor counter — mostly
@@ -1188,7 +1188,7 @@ newGardenBtn?.addEventListener("click", async () => {
 });
 
 /* ==========================================================================
-   FILE LABEL / PLANT DRAWING SPACE — mirrors garden-editor.css "file label" + "plant drawing space"
+   FILE LABEL / PLANT DRAWING SPACE — mirrors mood.css "file label" + "plant drawing space"
    ambient audio, cursor trail, and the volume meter's threshold logic live
    inside this block too (not under their own matching CSS sections) — they
    share the `listener` object with the planting/drag code below and
