@@ -113,11 +113,15 @@ function svgEl(tag, attrs){
 /* ---- create garden ---- */
 // a namespace for this garden's uploaded files (see uploadSeedFile's
 // X-Garden-Id header) — does not decide which synced room a visitor joins,
-// see connectChannels below. Derived from the page's own path rather than a
-// random id per load, so every visitor to the same garden page uploads into
-// the same stable folder (and re-uploading to a slot correctly overwrites
-// the old file there, instead of leaving it orphaned under a new random id).
-garden.id = location.pathname.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
+// see connectChannels below. Derived from the page's own path AND query
+// string (not just pathname) rather than a random id per load, so every
+// visitor to the same garden page uploads into the same stable folder
+// (and re-uploading to a slot correctly overwrites the old file there,
+// instead of leaving it orphaned under a new random id) — the query
+// string has to be included now that ?g=<id> is what actually
+// distinguishes one garden from another; pathname alone would put every
+// garden's uploads in the same folder and overwrite across gardens.
+garden.id = (location.pathname + location.search).replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
 
 /* ==========================================================================
    GARDEN / FIELD — mirrors garden-editor.css "garden"
@@ -1123,6 +1127,7 @@ const gardenInfoCardEl = document.getElementById("gardenInfoCard");
 const visitorCountBtn = document.getElementById("visitorCountBtn");
 const gardenUrlInput = document.getElementById("gardenUrl");
 const copyUrlBtn = document.getElementById("copyUrlBtn");
+const newGardenBtn = document.getElementById("newGardenBtn");
 function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
@@ -1156,6 +1161,30 @@ copyUrlBtn.addEventListener("click", async () => {
   }
   copyUrlBtn.textContent = copied ? "copied!" : "press ⌘C";
   setTimeout(() => { copyUrlBtn.textContent = label; }, 1500);
+});
+
+/* a "garden" is just location.pathname + location.search — playhtml's own
+   default room scoping, unchanged here — so starting a new one is just
+   navigating to a URL nobody's used yet. The id itself comes from the
+   Worker's atomic counter (GardenCounter, see upload-worker/worker.js) —
+   not generated locally, since two people clicking this at once could
+   otherwise land on the exact same "new" number and collide into one
+   shared room instead of two separate ones. */
+const newGardenLabel = newGardenBtn?.textContent;
+newGardenBtn?.addEventListener("click", async () => {
+  newGardenBtn.disabled = true;
+  newGardenBtn.textContent = "planting a new one…";
+  try {
+    const res = await fetch(`${UPLOAD_ENDPOINT}/next-garden-id`, { method: "POST" });
+    if(!res.ok) throw new Error(`next-garden-id failed: ${res.status}`);
+    const { id } = await res.json();
+    location.href = `${location.pathname}?g=${id}`;
+  } catch(err) {
+    console.warn("couldn't allocate a new garden id:", err);
+    newGardenBtn.disabled = false;
+    newGardenBtn.textContent = "couldn't start one — try again";
+    setTimeout(() => { newGardenBtn.textContent = newGardenLabel; }, 2500);
+  }
 });
 
 /* ==========================================================================

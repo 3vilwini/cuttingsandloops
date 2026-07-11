@@ -1,6 +1,6 @@
-/* sound-garden seed uploads
+/* sound-garden seed uploads + garden id counter
    ---------------------------------------------------------------------
-   Three routes:
+   Four routes:
    - POST /upload — receives a seed's audio file (raw bytes, streamed
      straight into R2 via the bucket binding, never buffered fully in
      memory) and returns the public URL to store in that slot's synced
@@ -16,10 +16,19 @@
      state before; the underlying file stayed in the bucket forever,
      orphaned. This is what the app now calls alongside that so the
      file itself actually goes away too.
+   - POST /next-garden-id — hands out the next sequential garden number.
+     Backed by the GardenCounter Durable Object (below), not KV — KV has
+     no real atomic increment, so two people clicking "new garden" at
+     the same moment could both land the same number. A Durable Object
+     is single-threaded per instance, so its increment is genuinely
+     atomic; there's only ever one instance (a fixed id, see
+     GARDEN_COUNTER.idFromName("singleton")) so it's a true global
+     counter, not one-per-garden.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
-   with an R2 bucket bound as SEEDS and PUBLIC_BUCKET_URL/ALLOWED_ORIGIN
-   set under the worker's Settings → Variables.
+   with an R2 bucket bound as SEEDS, a GARDEN_COUNTER Durable Object
+   binding (see wrangler.toml), and PUBLIC_BUCKET_URL/ALLOWED_ORIGIN set
+   under the worker's Settings → Variables.
    --------------------------------------------------------------------- */
 
 export default {
@@ -37,9 +46,39 @@ export default {
     if (request.method === "DELETE" && url.pathname.startsWith("/delete/")) {
       return handleDelete(url, env);
     }
+    if (request.method === "POST" && url.pathname === "/next-garden-id") {
+      return handleNextGardenId(env);
+    }
     return new Response("not found", { status: 404, headers: corsHeaders(env) });
   },
 };
+
+// one Durable Object instance for the whole worker — a fixed name always
+// resolves to the same instance, which is what makes this a single global
+// counter instead of accidentally sharding into several
+async function handleNextGardenId(env) {
+  const id = env.GARDEN_COUNTER.idFromName("singleton");
+  const stub = env.GARDEN_COUNTER.get(id);
+  const res = await stub.fetch("https://do/next", { method: "POST" });
+  return new Response(await res.text(), {
+    headers: { ...corsHeaders(env), "Content-Type": "application/json" },
+  });
+}
+
+// Durable Objects are single-threaded per instance — every request to this
+// exact instance runs to completion before the next one starts, so
+// read-increment-write here can never race the way it would in KV
+export class GardenCounter {
+  constructor(state) {
+    this.state = state;
+  }
+  async fetch() {
+    const current = (await this.state.storage.get("count")) || 0;
+    const next = current + 1;
+    await this.state.storage.put("count", next);
+    return new Response(JSON.stringify({ id: next }));
+  }
+}
 
 function corsHeaders(env) {
   return {

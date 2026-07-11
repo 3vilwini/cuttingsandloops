@@ -6,6 +6,17 @@ compatibility_date = "2026-01-01"
 binding = "SEEDS"
 bucket_name = "cuttings-loops"
 
+# atomic counter for "new garden" ids — see GardenCounter in worker.js.
+# Durable Objects need both a binding (below) and a migration (further
+# down) the first time a class is introduced.
+[[durable_objects.bindings]]
+name = "GARDEN_COUNTER"
+class_name = "GardenCounter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GardenCounter"]
+
 [vars]
 # after creating the bucket, enable "Public Access" (r2.dev subdomain, or a
 # custom domain) in the Cloudflare dashboard and paste that base URL here —
