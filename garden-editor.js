@@ -736,7 +736,9 @@ setTimeout(() => {
   hideLoadingScreen();
   // if connectChannels() never even ran, preloadGardenAudio() never got a
   // chance to enable this either — nothing left to preload in that case
-  document.getElementById("enterBtn").disabled = false;
+  const enterBtn = document.getElementById("enterBtn");
+  enterBtn.disabled = false;
+  enterBtn.textContent = "feel the grass";
 }, 6000);
 
 /* preloads every seed/plant sound into the browser's HTTP cache while the
@@ -757,7 +759,6 @@ function preloadGardenAudio(){
   ].filter(item => item.ref);
 
   const bar = document.getElementById("entryProgressBar");
-  const label = document.getElementById("entryProgressLabel");
   const enterBtn = document.getElementById("enterBtn");
   const failed = [];
 
@@ -766,8 +767,8 @@ function preloadGardenAudio(){
     if(done) return;
     done = true;
     bar.style.width = "100%";
-    label.textContent = "";
     enterBtn.disabled = false;
+    enterBtn.textContent = "feel the grass";
     if(failed.length){
       console.warn(`sound garden: ${failed.length} dead sound(s) — audio that never loaded:`,
         failed.map(item => `${item.label}: ${item.ref}`));
@@ -780,7 +781,6 @@ function preloadGardenAudio(){
   const bump = () => {
     loaded++;
     bar.style.width = Math.round((loaded / items.length) * 100) + "%";
-    label.textContent = `waking up the garden... ${loaded}/${items.length}`;
     if(loaded >= items.length) finish();
   };
   for(const item of items){
