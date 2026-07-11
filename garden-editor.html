@@ -32,8 +32,8 @@
 <div class="tagdisplay" id="tagDisplay"></div>
 
 
-<!-- top right - counter -->  
-<div class="visitorcount">
+<!-- top right - counter -->
+<div class="visitorcount" id="visitorCountBtn" title="about this garden">
   <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
@@ -140,7 +140,20 @@
   </div>
 </div>
 
-  
+
+<!-- modal: garden info, opened from the visitor counter -->
+<div class="card wide right" id="gardenInfoCard">
+  <div class="titlebar"><span class="closebox"></span></div>
+  <div class="cardbody">
+    <p class="sub">you're here in 1 of many sound gardens<br>planted by <span id="plantedByNames"></span></p>
+    <p class="sub">approach the plants to listen to their songs ~<br>click to keep them going<br>move their position to change their pitch</p>
+    <p class="sub">secret tip ~<br>look for portals to enter other gardens, or<br>if it feels like a new season, you can create a new one</p>
+    <p class="sub">want to plant your own sounds?<br>start with the seed list<br>cut and loop as you like<br>plant in an empty spot on the field</p>
+    <p class="sub" style="margin-bottom:0;">made with playhtml<br>font: deer diary</p>
+  </div>
+</div>
+
+
 <!-- modal: add seed -->
 <div class="scrim" id="seedScrim">
   <div class="modal">

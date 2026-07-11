@@ -657,7 +657,7 @@ document.addEventListener("keydown", e => {
   if(e.key !== "Escape") return;
   if(document.getElementById("confirmScrim").classList.contains("open")){ hideConfirmDialog(false); return; }
   document.getElementById("entryScrim").classList.remove("open");
-  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
+  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo();
 });
 
 // the click (or Escape) that dismisses this is also what satisfies the
@@ -692,7 +692,7 @@ const navToggleBtn = document.getElementById("navToggleBtn");
 /* ---- modal exclusivity: opening either one always closes the other ----
    the swirl button itself shows pressed (inverted) while the panel is open —
    it's the only way to open or close it now, so that state has to be obvious. */
-function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
+function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
 function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAttribute("data-open", "false"); }
 
 // closed by default for every visitor — opened only via the nav swirl icon
@@ -1258,7 +1258,7 @@ function openPlantModal(pos){
   selectedSampledFrom = [];
   renderSampledFromBank();
   validatePlant();
-  hideBuilder(); hideSeedModal(); hideSeedList();
+  hideBuilder(); hideSeedModal(); hideSeedList(); hideGardenInfo();
   plantScrim.classList.add("open");
 }
 
@@ -1281,7 +1281,7 @@ function openPlantEditModal(p){
   renderSampledFromBank();
   pDeleteBtn.style.display = "";
   validatePlant();
-  hideBuilder(); hideSeedModal(); hideSeedList();
+  hideBuilder(); hideSeedModal(); hideSeedList(); hideGardenInfo();
   plantScrim.classList.add("open");
 }
 function hidePlantModal(){ plantScrim?.classList.remove("open"); editingPlantId = null; }
@@ -1361,7 +1361,7 @@ function openSeedModal(slotIndex){
   sTitle.value = ""; sArtist.value = "";
   sFile.value = ""; sFileLabelText.textContent = "choose audio file…"; sFileLabel.classList.remove("has-file");
   validateSeed();
-  hideBuilder(); hidePlantModal(); hideSeedList();
+  hideBuilder(); hidePlantModal(); hideSeedList(); hideGardenInfo();
   seedScrim.classList.add("open");
 }
 function hideSeedModal(){ seedScrim?.classList.remove("open"); }
@@ -1406,12 +1406,30 @@ sSaveBtn.addEventListener("click", async () => {
 /* the seed-list panel — every seed added so far, each with a download link */
 const seedListCardEl = document.getElementById("seedListCard");
 const seedListToggleBtn = document.getElementById("seedListToggleBtn");
-function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
+function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); hideGardenInfo(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
 function hideSeedList(){ seedListCardEl.style.display = "none"; seedListToggleBtn.setAttribute("data-open", "false"); }
 hideSeedList();
 seedListToggleBtn.addEventListener("click", () => {
   const hidden = seedListCardEl.style.display === "none";
   if(hidden) showSeedList(); else hideSeedList();
+});
+
+/* the "about this garden" panel, opened from the visitor counter — mostly
+   static copy, except the "planted by" line, which is only worth
+   recomputing at the moment someone actually opens it, not kept live */
+const gardenInfoCardEl = document.getElementById("gardenInfoCard");
+const visitorCountBtn = document.getElementById("visitorCountBtn");
+function showGardenInfo(){
+  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
+  const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
+  document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
+  gardenInfoCardEl.style.display = "";
+}
+function hideGardenInfo(){ gardenInfoCardEl.style.display = "none"; }
+hideGardenInfo();
+visitorCountBtn.addEventListener("click", () => {
+  const hidden = gardenInfoCardEl.style.display === "none";
+  if(hidden) showGardenInfo(); else hideGardenInfo();
 });
 
 // whichever seed-list preview is currently playing, if any — clicking a
