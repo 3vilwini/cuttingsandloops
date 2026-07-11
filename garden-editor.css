@@ -672,11 +672,25 @@ input[type="text"], select{
   text-align:right; 
 }
 
-.actions{ 
-  display:flex; 
-  justify-content:flex-end; 
-  gap:.5rem; 
-  margin-top:1rem; 
+.actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:.5rem;
+  margin-top:1rem;
+}
+
+.copyrow{
+  display:flex;
+  gap:.4rem;
+  align-items:stretch;
+  margin-bottom:1.6rem;
+}
+.copyrow input{
+  flex:1;
+  min-width:0;
+}
+.copyrow button{
+  white-space:nowrap;
 }
 
 

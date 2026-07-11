@@ -1421,11 +1421,13 @@ seedListToggleBtn.addEventListener("click", () => {
    recomputing at the moment someone actually opens it, not kept live */
 const gardenInfoCardEl = document.getElementById("gardenInfoCard");
 const visitorCountBtn = document.getElementById("visitorCountBtn");
+const gardenUrlInput = document.getElementById("gardenUrl");
+const copyUrlBtn = document.getElementById("copyUrlBtn");
 function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
   document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
-  document.getElementById("gardenUrl").textContent = location.href;
+  gardenUrlInput.value = location.href;
   gardenInfoCardEl.style.display = "";
 }
 function hideGardenInfo(){ gardenInfoCardEl.style.display = "none"; }
@@ -1433,6 +1435,20 @@ hideGardenInfo();
 visitorCountBtn.addEventListener("click", () => {
   const hidden = gardenInfoCardEl.style.display === "none";
   if(hidden) showGardenInfo(); else hideGardenInfo();
+});
+copyUrlBtn.addEventListener("click", async () => {
+  const label = copyUrlBtn.textContent;
+  let copied = true;
+  try {
+    await navigator.clipboard.writeText(gardenUrlInput.value);
+  } catch {
+    // clipboard permission denied (Safari is strict about this) — fall back
+    // to selecting the text so the user can still copy it with cmd/ctrl+C
+    copied = false;
+    gardenUrlInput.select();
+  }
+  copyUrlBtn.textContent = copied ? "copied!" : "press ⌘C";
+  setTimeout(() => { copyUrlBtn.textContent = label; }, 1500);
 });
 
 // whichever seed-list preview is currently playing, if any — clicking a
