@@ -1423,6 +1423,7 @@ function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
   document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
+  document.getElementById("gardenUrl").textContent = location.href;
   gardenInfoCardEl.style.display = "";
 }
 function hideGardenInfo(){ gardenInfoCardEl.style.display = "none"; }
