@@ -8,6 +8,8 @@
 </head>
 <body>
 
+
+<!-- field and grid -->
 <div id="viewport">
   <div id="field">
     <svg id="patternLayer"></svg>
@@ -18,22 +20,26 @@
   </div>
 </div>
 
-<!-- covers the field until the real synced garden has loaded, so visitors
-     never see the hardcoded/randomized local defaults flash by first -->
-<div id="loadingScreen">
-  <p class="sub" style="margin:0;">loading your garden...</p>
-</div>
-
+  
+<!-- top left - nav -->
 <div class="navstack">
     <button type="button" class="navbtn" id="navToggleBtn" title="ੈ✩‧₊˚ szn settings ‧₊˚❀༉‧₊">𖦹</button>
     <button type="button" class="navbtn" id="seedListToggleBtn" title="˖᯽ ݁˖ seed list ˚ ༘♡⋆｡">❦</button>
 </div>
 
+
+<!-- top center - tags -->  
 <div class="tagdisplay" id="tagDisplay"></div>
 
-<!-- not a control — just reflects whether/how loud the ambient sound
-     currently is, panning is still arrow-keys-only (see panBy) -->
-<div class="volumemeter" id="volumeMeter" title="ambient sound level" aria-hidden="true">
+
+<!-- top right - counter -->  
+<div class="visitorcount">
+  <span class="dot"></span><span id="visitorCountText">1 here now</span>
+</div>
+
+  
+<!-- bottom right - audio meter -->
+<div class="volumemeter" id="volumeMeter">
   <span class="bar"></span>
   <span class="bar"></span>
   <span class="bar"></span>
@@ -46,6 +52,8 @@
   <span class="bar"></span>
 </div>
 
+
+<!-- bottom left - show/hide toggles -->
 <div class="viewtoggles" id="viewToggles">
   <button type="button" class="toggle" data-key="seeds"><span>seeds</span><span class="switch"><span class="knob"></span></span></button>
   <button type="button" class="toggle" data-key="plants"><span>plants</span><span class="switch"><span class="knob"></span></span></button>
@@ -53,19 +61,17 @@
   <button type="button" class="toggle" data-key="roots"><span>roots</span><span class="switch"><span class="knob"></span></span></button>
 </div>
 
-<div class="visitorcount" aria-hidden="true">
-  <span class="dot"></span><span id="visitorCountText">1 here now</span>
+  
+<!-- modal: loading sounds ("click to enter" allows audio autoplay) -->
+<div id="loadingScreen">
 </div>
-
-<!-- entry gate — shown on every load; the click also satisfies the browser's
-     autoplay-gesture requirement so the ambient sound can actually play -->
-<div class="scrim open" id="entryScrim">
+  
+  <div class="scrim open" id="entryScrim">
   <div class="modal" style="max-width:360px;">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub" style="margin-bottom:.3rem;">୨ৎ cuttings જ⁀➴ loops ༄<br>a sound garden multiverse</p>
-      <p class="sub" style="margin-bottom:.3rem;">cut a sound ~ plant a loop ~ propogate n grow</p>
-      <p class="sub" style="margin-bottom:1.2rem;">approach the plants to listen to their songs<br>click to keep them going<br>move their position to change their pitch</p>
+      <label class="cardtitle">୨ৎ cuttings જ⁀➴ loops ༄</label>
+      <p class="sub" style="margin-bottom:.3rem;">cut a sound ~ plant a loop ~ propagate n grow</p>
       <div class="entryprogress" id="entryProgress"><div class="entryprogressbar" id="entryProgressBar"></div></div>
       <p class="sub" id="entryProgressLabel" style="margin:.5rem 0 1.2rem;">waking up the garden...</p>
       <div class="actions">
@@ -75,7 +81,8 @@
   </div>
 </div>
 
-<!-- feels like -->
+  
+<!-- modal: szn settings -->
 <div class="card" id="builderCard">
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
@@ -122,7 +129,8 @@
   </div>
 </div>
 
-<!-- seed list -->
+  
+<!-- modal: seed list -->
 <div class="card" id="seedListCard">
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
@@ -132,12 +140,13 @@
   </div>
 </div>
 
-<!-- add a seed sound to an empty slot -->
+  
+<!-- modal: add seed -->
 <div class="scrim" id="seedScrim">
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub">seeds are the source of this garden. others will be able to download and propogate them with other seed sounds.</p>
+      <p class="sub">seeds are the source of this garden. others will be able to download and propagate them with other seed sounds.</p>
 
       <label>audio file</label>
       <label class="filelabel" id="sFileLabel" tabindex="0">
@@ -159,16 +168,17 @@
   </div>
 </div>
 
-<!-- plant a sound -->
+  
+<!-- modal: plant/edit sound -->
 <div class="scrim" id="plantScrim">
   <div class="modal">
     <div class="titlebar"><span class="closebox"></span></div>
     <div class="cardbody">
-      <p class="sub" id="pSub">plant your own sound mixed from the seedlist, and watch it grow next to others.</p>
+      <p class="sub" id="pSub">plant your own sound mixed from the seed list, and watch it grow next to others.</p>
 
-      <label>the sound</label>
+      <label>audio file</label>
       <label class="filelabel" id="pFileLabel" tabindex="0">
-        <span id="pFileLabelText">choose audio file…</span>
+        <span id="pFileLabelText">select file (.mp3, .wav, .flac)</span>
         <input type="file" id="pFile" accept="audio/*" hidden>
       </label>
 
@@ -193,7 +203,8 @@
   </div>
 </div>
 
-<!-- delete seed confirmation -->
+  
+<!-- modal: delete seed confirmation -->
 <div class="scrim" id="confirmScrim">
   <div class="modal" style="max-width:360px;">
     <div class="titlebar"><span class="closebox"></span></div>
@@ -207,6 +218,9 @@
   </div>
 </div>
 
+
+
+  
 <script type="module" src="garden-editor.js"></script>
 
 </body>
