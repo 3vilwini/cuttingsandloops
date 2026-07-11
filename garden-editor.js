@@ -406,8 +406,10 @@ function renderField(){
   const fieldEl = document.getElementById("field");
   fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
   fieldEl.style.color = text;
-  // the volume meter's hover hint glows the seed color too (see .volumemeterhint)
-  document.getElementById("volumeMeter").style.setProperty("--glow", seed);
+  // the volume meter's hover hint is soil-colored with a seed-color glow (see .volumemeterhint)
+  const volumeMeterEl = document.getElementById("volumeMeter");
+  volumeMeterEl.style.setProperty("--glow", seed);
+  volumeMeterEl.style.setProperty("--soil-color", background[1]);
   renderSeedSlots();
   // plant labeldots are colored from garden.meta.colors.text too — without
   // this they'd keep whatever color was current when each plant last

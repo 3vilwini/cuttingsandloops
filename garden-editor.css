@@ -161,31 +161,30 @@ body{
   box-sizing:border-box;
 }
 
-/* hidden until hovered — transparent fill, only the seed-color glow reads,
-   so the hint reveals itself rather than looking like plain UI copy */
+/* hidden until hovered — soil-colored fill with a seed-color glow behind it */
 .volumemeterhint{
   position:absolute;
-  top:50%;
+  bottom:.2rem;
   right:100%;
-  transform:translateY(-50%);
   margin-right:.6rem;
   white-space:nowrap;
-  color:transparent;
-  /* text-shadow layers apply in parallel against the glyph shape, unlike
-     chained filter:drop-shadow() calls which each re-blur the PREVIOUS
-     shadow's output — stacking those just diluted into nothing instead of
-     building up a stronger glow */
+  color:var(--soil-color, transparent);
   text-shadow:
     0 0 4px var(--glow, transparent),
     0 0 8px var(--glow, transparent),
     0 0 14px var(--glow, transparent),
     0 0 22px var(--glow, transparent);
   opacity:0;
+  /* visibility as a second, independent gate alongside opacity — belt and
+     suspenders against any engine-specific quirk where opacity:0 alone
+     doesn't fully suppress a text-shadow from compositing/painting */
+  visibility:hidden;
   pointer-events:none;
-  transition:opacity .15s ease-out;
+  transition:opacity .15s ease-out, visibility .15s;
 }
 .volumemeter:hover .volumemeterhint{
   opacity:1;
+  visibility:visible;
 }
 
 .volumemeter .bar{
