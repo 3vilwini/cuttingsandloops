@@ -1,4 +1,4 @@
-/* global style — no direct JS counterpart, pure layout/typography */
+/* global style */
 
 @font-face{
   font-family: "Deer Diary";
@@ -27,7 +27,7 @@ body{
 
 
 
-/* garden — see renderField(), panBy() in garden-editor.js */
+/* garden — js renderField(), panBy() */
 
 #viewport{ 
   position:fixed; 
@@ -50,7 +50,7 @@ body{
 
 
 
-/* hot soil spots — see hotSpotPositions(), occupiedBoxes(), seedOccupiedBoxes(), nearestHotSpot() in garden-editor.js */
+/* hot soil spots — js hotSpotPositions(), occupiedBoxes(), seedOccupiedBoxes(), nearestHotSpot() */
 
 .hoversquare{
   position:absolute;
@@ -64,7 +64,7 @@ body{
 
 
 
-/* cursor trail — see spawnTrailDot() in garden-editor.js */
+/* cursor trail — js spawnTrailDot() */
 
 .traildot{
   position:absolute; 
@@ -87,7 +87,7 @@ body{
 
 
 
-/* top left - nav buttons — see showBuilder()/hideBuilder(), showSeedList()/hideSeedList() in garden-editor.js */
+/* top left - nav buttons — js showBuilder()/hideBuilder(), showSeedList()/hideSeedList() */
 
 .navstack{ 
   position: fixed; 
@@ -139,7 +139,7 @@ body{
 
 
 
-/* top center - clickable tags — see renderTagDisplay(), pressTag()/checkTagPresses() in garden-editor.js */
+/* top center - clickable tags — js renderTagDisplay(), pressTag()/checkTagPresses() */
 
 .tagdisplay{
   position: fixed; 
@@ -168,7 +168,7 @@ body{
 
 
 
-/* top right - visitor counter — see renderVisitorCount() in garden-editor.js */
+/* top right - visitor counter — js renderVisitorCount() */
 
 .visitorcount{
   position: fixed;
@@ -195,7 +195,7 @@ body{
 
 
 
-/* bottom left - toggle bar — see applyViewToggles(), toggleView() in garden-editor.js */
+/* bottom left - toggle bar — js applyViewToggles(), toggleView() */
 
 .viewtoggles{
   position:fixed; 
@@ -259,7 +259,7 @@ body{
 
 
 
-/* bottom right - volume meter + teleporation hint — see updateVolumeMeter() in garden-editor.js */
+/* bottom right - volume meter + teleporation hint — js updateVolumeMeter() */
 
 .volumemeter{
   position:fixed;
@@ -291,9 +291,6 @@ body{
     0 0 14px var(--glow, transparent),
     0 0 22px var(--glow, transparent);
   opacity:0;
-  /* visibility as a second, independent gate alongside opacity — belt and
-     suspenders against any engine-specific quirk where opacity:0 alone
-     doesn't fully suppress a text-shadow from compositing/painting */
   visibility:hidden;
   pointer-events:none;
   transition:opacity .15s ease-out, visibility .15s;
@@ -318,7 +315,7 @@ body{
 
 
 
-/* seed slots — see renderSeedSlots() in garden-editor.js */
+/* seed slots — js renderSeedSlots() */
 
 #seedSlots{ 
   position:absolute; 
@@ -349,7 +346,6 @@ body{
 
 .seedslot .txt{
   position:absolute;
-  /* dot (10px = .625rem at the default 16px root) + .35rem gap */
   left:.975rem;
   top:50%;
   transform:translateY(-50%);
@@ -370,7 +366,7 @@ body{
 
 
 
-/* roots — see renderConnections() in garden-editor.js */
+/* roots — js renderConnections() */
 
 #connectionsLayer{ 
   position:absolute; 
@@ -382,7 +378,7 @@ body{
 
 
 
-/* plant slots — see renderPlantSlots(), canvasPos()/redrawPaths() in garden-editor.js */
+/* plant slots — js renderPlantSlots(), canvasPos()/redrawPaths() */
 
 #plantSlots{ 
   position:absolute; 
@@ -414,12 +410,15 @@ body{
 }
 
 .plantmark .labeldot{
-  position:absolute; top:50%; left:100%; transform:translateY(-50%);
-  margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
-  /* without this the 1px border adds outside the 10px box (no global
-     box-sizing:border-box reset in this file), rendering 12x12 — a seed's
-     own dot is sized via inset:0 instead, which doesn't have this problem,
-     so the two would otherwise visibly differ even at "the same" 10px */
+  position:absolute; 
+  top:50%; 
+  left:100%; 
+  transform:translateY(-50%);
+  margin-left:.4rem; 
+  width:10px; 
+  height:10px; 
+  border-radius:50%; 
+  border:1px solid #000;
   box-sizing:border-box;
 }
 
@@ -428,8 +427,6 @@ body{
   top:50%;
   left:100%;
   transform:translateY(-50%);
-  /* labeldot's own .4rem offset + dot (10px = .625rem at the default 16px
-     root) + .35rem gap, same dot-to-label spacing as .seedslot .txt */
   margin-left:1.375rem;
   white-space:nowrap; pointer-events:none;
 }
@@ -460,7 +457,7 @@ body{
 
 
 
-/* modal styling — shared by every modal's show/hide pair (hideBuilder, hideSeedList, hidePlantModal, hideSeedModal, hideGardenInfo, hideConfirmDialog) in garden-editor.js */
+/* modal styling — js (hideBuilder, hideSeedList, hidePlantModal, hideSeedModal, hideGardenInfo, hideConfirmDialog) */
 
 .modal{
   width:100%; 
@@ -548,7 +545,7 @@ input[type="text"], select{
 
 
 
-/* save and cancel buttons — generic, wired per-modal (pSaveBtn/pCancelBtn, sSaveBtn/sCancelBtn, confirmOkBtn/confirmCancelBtn) in garden-editor.js */
+/* save and cancel buttons — js (pSaveBtn/pCancelBtn, sSaveBtn/sCancelBtn, confirmOkBtn/confirmCancelBtn) */
 
 button.primary{
   padding:.45rem 1rem; 
@@ -589,7 +586,7 @@ button.ghost:disabled{
 
 
 
-/* loading scrim — see hideLoadingScreen(), preloadGardenAudio() in garden-editor.js */
+/* loading scrim — js hideLoadingScreen(), preloadGardenAudio() */
 
 .scrim{
   display:none; 
@@ -632,13 +629,11 @@ button.ghost:disabled{
 
 
 
-/* season settings + seed list — see renderTagBank(), applyColors(), renderPatternBank(), renderSeedList() in garden-editor.js */
+/* season settings + seed list — js renderTagBank(), applyColors(), renderPatternBank(), renderSeedList() */
 
 .card{
   position:fixed;
   top:2.5rem;
-  /* nav stack's 2.5rem offset + a navbtn's 2.3rem size + its .6rem gap —
-     starts the panel right past the nav stack instead of overlapping it */
   left:5.4rem;
   z-index:2;
   width:100%;
@@ -708,7 +703,7 @@ button.ghost:disabled{
 
 
 
-/* tags — chip styling shared by renderTagBank() (settings) and renderSampledFromBank() (plant modal) in garden-editor.js */
+/* tags — js renderTagBank() (settings), renderSampledFromBank() (plant modal) */
 
 .tagbank{ 
   display:flex; 
@@ -761,7 +756,7 @@ button.ghost:disabled{
 
 
 
-/* colors — see applyColors() in garden-editor.js */
+/* colors — js applyColors() */
 
 .colorgrid{ 
   display:grid; 
@@ -792,7 +787,7 @@ button.ghost:disabled{
 
 
 
-/* field pattern picker — see renderPatternBank() in garden-editor.js */
+/* field pattern picker — js renderPatternBank() */
 
 .patternbank{ 
   display:flex; 
@@ -820,7 +815,7 @@ button.ghost:disabled{
 
 
 
-/* scale slider — wired inline via fieldScale's own "input" listener in garden-editor.js (no named handler function) */
+/* scale slider — js fieldScale */
 
 .scalerow{ 
   display:flex; 
@@ -861,13 +856,11 @@ button.ghost:disabled{
 
 
 
-/* visitor info — see showGardenInfo()/hideGardenInfo() in garden-editor.js */
+/* visitor info — js showGardenInfo()/hideGardenInfo() */
 
 .card.right{
   left:auto;
   right:2.5rem;
-  /* same 5.4rem derivation as .card's left offset, applied to top instead —
-     starts below the visitor counter instead of overlapping it */
   top:5.4rem;
 }
 
@@ -882,7 +875,7 @@ button.ghost:disabled{
 
 
 
-/* file label — see validateSeed(), validatePlant() in garden-editor.js */
+/* file label — js validateSeed(), validatePlant() */
 
 .filelabel{
   display:flex; 
@@ -906,7 +899,7 @@ button.ghost:disabled{
 
 
 
-/* plant drawing space — see openPlantModal()/openPlantEditModal() in garden-editor.js */
+/* plant drawing space — js openPlantModal()/openPlantEditModal() */
 
 #pCanvas{ 
   border:2px solid #000; 
