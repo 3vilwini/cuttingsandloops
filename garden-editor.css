@@ -441,18 +441,12 @@ body{
 }
 
 @keyframes plantPinPulse{
-  0%,100%{
-    transform:translateY(-50%) scale(1);
-    background:var(--seed-color,currentColor);
-  }
-  50%{
-    transform:translateY(-50%) scale(1.25);
-    background:var(--dot-color,currentColor);
-  }
+  0%,100%{ background:var(--seed-color,currentColor); }
+  50%{ background:var(--dot-color,currentColor); }
 }
 
 .plantmark.pinned .labeldot{
-  animation:plantPinPulse 2.4s ease-in-out infinite;
+  animation:plantPinPulse 2s ease-in-out infinite;
 }
 
 
