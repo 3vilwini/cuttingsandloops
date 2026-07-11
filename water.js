@@ -93,8 +93,11 @@ function hsl2hex(h, s, l){
 }
 
 /* random but constrained: a saturated seed color, a sky->soil pair with real
-   lightness contrast, and labels picked for contrast against the sky. */
-function randomizeDefaultColors(){
+   lightness contrast, labels picked for contrast against the sky, plus a
+   random field pattern and scale. Only fieldScale's own min/max/step (not
+   hardcoded here) decide the range, so this stays correct if that slider's
+   HTML attributes ever change. */
+function randomizeDefaults(){
   const bgHue = randInt(0,359);
   const seedHue = (bgHue + 180 + randInt(-40,40) + 360) % 360; // roughly complementary -> pops against the field
   const skyLightness = randInt(35,45);
@@ -102,6 +105,14 @@ function randomizeDefaultColors(){
   cBg2.value = hsl2hex((bgHue + randInt(-15,15) + 360) % 360, randInt(30,50), randInt(85,92));
   cSeed.value = hsl2hex(seedHue, randInt(65,85), randInt(55,70));
   cText.value = skyLightness < 50 ? "#FFFFFF" : "#000000";
+
+  garden.meta.pattern = PATTERNS[randInt(0, PATTERNS.length - 1)].id;
+
+  const scaleMin = parseFloat(fieldScale.min), scaleMax = parseFloat(fieldScale.max), scaleStep = parseFloat(fieldScale.step);
+  const scale = Math.round((scaleMin + randInt(0, Math.round((scaleMax - scaleMin) / scaleStep)) * scaleStep) * 10) / 10;
+  garden.meta.scale = scale;
+  fieldScale.value = scale;
+  fieldScaleLabel.textContent = scale.toFixed(1) + "×";
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -1050,7 +1061,10 @@ renderPatternBank();
 // these local defaults only matter for whoever connects to this garden's
 // shared channel first ever — connectChannels() below immediately overwrites
 // garden.meta with whatever's already synced for everyone else on this URL.
-randomizeDefaultColors();
+randomizeDefaults();
+renderPatternBank();   // re-render — the pattern picker's buttons were drawn
+                        // just above using the old default, before this
+                        // randomized garden.meta.pattern existed
 applyColors();
 
 // whichever seed-list preview is currently playing, if any — clicking a
