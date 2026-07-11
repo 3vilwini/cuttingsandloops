@@ -349,7 +349,8 @@ body{
 
 .seedslot .txt{
   position:absolute;
-  left:calc(10px + .35rem);   
+  /* dot (10px = .625rem at the default 16px root) + .35rem gap */
+  left:.975rem;
   top:50%;
   transform:translateY(-50%);
   white-space:nowrap;
@@ -423,11 +424,13 @@ body{
 }
 
 .plantmark .txt{
-  position:absolute; 
-  top:50%; 
-  left:100%; 
+  position:absolute;
+  top:50%;
+  left:100%;
   transform:translateY(-50%);
-  margin-left:calc(.4rem + 10px + .35rem); 
+  /* labeldot's own .4rem offset + dot (10px = .625rem at the default 16px
+     root) + .35rem gap, same dot-to-label spacing as .seedslot .txt */
+  margin-left:1.375rem;
   white-space:nowrap; pointer-events:none;
 }
 
@@ -632,20 +635,22 @@ button.ghost:disabled{
 /* season settings + seed list */
 
 .card{
-  position:fixed; 
-  top:2.5rem; 
-  left:calc(2.5rem + 2.3rem + .6rem); 
+  position:fixed;
+  top:2.5rem;
+  /* nav stack's 2.5rem offset + a navbtn's 2.3rem size + its .6rem gap —
+     starts the panel right past the nav stack instead of overlapping it */
+  left:5.4rem;
   z-index:2;
-  width:100%; 
-  max-width:250px; 
-  background:var(--paper); 
+  width:100%;
+  max-width:250px;
+  background:var(--paper);
   color:var(--ink);
-  border:2px solid #000; 
+  border:2px solid #000;
   border-radius:0;
 }
 
 #seedListCard{
-  top:calc(2.5rem + 2.3rem + .6rem);
+  top:5.4rem;
 }
 
 #seedListItems{
@@ -861,7 +866,9 @@ button.ghost:disabled{
 .card.right{
   left:auto;
   right:2.5rem;
-  top:calc(2.5rem + 2.3rem + .6rem);
+  /* same 5.4rem derivation as .card's left offset, applied to top instead —
+     starts below the visitor counter instead of overlapping it */
+  top:5.4rem;
 }
 
 .card.wide{
