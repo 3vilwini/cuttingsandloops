@@ -1293,7 +1293,7 @@ confirmCancelBtn.addEventListener("click", () => hideConfirmDialog(false));
 sSaveBtn.addEventListener("click", async () => {
   sSaveBtn.disabled = true; sSaveBtn.textContent = "adding…";
   const slot = pendingSeedSlot;
-  const audioRef = await uploadSeedFile(seedDraftFile, `seed-${slot}`).catch(err => {
+  const audioRef = await uploadSeedFile(seedDraftFile, `seeds/${slot}`).catch(err => {
     console.warn("seed upload failed, falling back to a local-only blob URL:", err);
     return URL.createObjectURL(seedDraftFile);
   });
@@ -1757,7 +1757,7 @@ pSaveBtn.addEventListener("click", async () => {
 
   let audioRef = existing?.audioRef;
   if(plantDraftFile){
-    audioRef = await uploadSeedFile(plantDraftFile, `plant-${plantId}`).catch(err => {
+    audioRef = await uploadSeedFile(plantDraftFile, `plants/${plantId}`).catch(err => {
       console.warn("plant upload failed, falling back to a local-only blob URL:", err);
       return URL.createObjectURL(plantDraftFile);
     });
