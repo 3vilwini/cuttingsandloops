@@ -1037,12 +1037,14 @@ function pitchForY(y){
    everything else in updateAmbientAudio(). Bars light up past their own
    threshold, same idea as a classic VU meter. */
 const volumeMeterEl = document.getElementById("volumeMeter");
-const volumeMeterBars = Array.from(volumeMeterEl.children);
+// .bar only — volumeMeterEl also has a .volumemeterhint span as a sibling,
+// which .children would include and throw off the index-to-threshold mapping
+const volumeMeterBars = Array.from(volumeMeterEl.querySelectorAll(".bar"));
 // the last one is 0.99, not 1.0 — currentVolume glides toward its target via
 // a lerp (see updateAmbientAudio), which asymptotically approaches but can
 // never exactly equal 1.0 in floating point, so a literal 1.0 threshold here
 // would leave the top bar permanently unreachable
-const VOLUME_METER_THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99];
+const VOLUME_METER_THRESHOLDS = [0.083, 0.167, 0.25, 0.333, 0.417, 0.5, 0.583, 0.667, 0.75, 0.833, 0.917, 0.99];
 function updateVolumeMeter(level){
   volumeMeterBars.forEach((bar, i) => {
     bar.dataset.active = level >= VOLUME_METER_THRESHOLDS[i] ? "true" : "false";
