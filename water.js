@@ -796,7 +796,15 @@ document.getElementById("enterBtn").addEventListener("click", () => {
    ========================================================================== */
 // init() returns a promise; createPageData() (inside connectChannels) isn't
 // usable until it resolves, so this has to chain off .then().
-playhtml.init({ cursors: { enabled: true } }).then(connectChannels);
+//
+// room is explicit here — playhtml's own default (confirmed by inspecting
+// window.playhtml.roomId at runtime) is origin + pathname ONLY, with the
+// .html extension stripped and the query string dropped entirely. That
+// means /feelthegrass.html?g=1 and /feelthegrass.html?g=2 land in the
+// SAME room by default — silently defeating the whole ?g=<id> multi-garden
+// scheme. garden.id (pathname + search, sanitized) is reused here so every
+// distinct ?g= value actually gets its own room.
+playhtml.init({ room: garden.id, cursors: { enabled: true } }).then(connectChannels);
 
 // #loadingScreen covers the field until connectChannels() has pulled the
 // real synced state (see the end of that function) — this timeout is just
