@@ -287,9 +287,7 @@ body{
   color:var(--soil-color, transparent);
   text-shadow:
     0 0 4px var(--glow, transparent),
-    0 0 8px var(--glow, transparent),
-/*    0 0 14px var(--glow, transparent),
-    0 0 22px var(--glow, transparent); */
+    0 0 8px var(--glow, transparent);
   opacity:0;
   visibility:hidden;
   pointer-events:none;
