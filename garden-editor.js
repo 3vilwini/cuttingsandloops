@@ -1256,7 +1256,6 @@ function openPlantModal(pos){
    it blank keeps what was already there (see pSaveBtn below). */
 function openPlantEditModal(p){
   editingPlantId = p.id;
-  pSub.textContent = "edit this planting.";
   pSaveBtn.textContent = "save";
   pendingPlantPos = { x: p.x, y: p.y };
   plantDraftFile = null;
