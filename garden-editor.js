@@ -1326,7 +1326,7 @@ window.addEventListener("focus", () => { windowFocused = true; });
 const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
 const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
-const STICK_MS = 4000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
+const STICK_MS = 3000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
 const DECAY_MS = 3500;        // once fading, how long the eased trail-off takes to reach silence
 const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame (0-1, higher = snappier)
 // ease-in cubic: barely drops at first, then falls away faster — a plant
@@ -1417,8 +1417,9 @@ function updateVolumeMeter(level){
 }
 
 // creates a plant's Audio element once, starting silent — updateAmbientAudio
-// fades it in by raising targetVolume, so play() only ever happens here,
-// never repeatedly on every little hover in and out
+// snaps it straight to its target volume on the first frame (see justArrived
+// below), so play() only ever happens here, never repeatedly on every little
+// hover in and out
 function ensurePlantAudio(p){
   if(activePlantAudio[p.id]) return;
   const ref = p.audioRef || localPlantAudioRefs[p.id];
@@ -1428,7 +1429,7 @@ function ensurePlantAudio(p){
   audioEl.volume = 0;
   audioEl.playbackRate = pitchForY(p.y);
   audioEl.play().catch(() => {});
-  activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, leftRangeAt: null };
+  activePlantAudio[p.id] = { audioEl, currentVolume: 0, targetVolume: 0, leftRangeAt: null, justArrived: true };
 }
 function stopPlantAudio(id){
   const entry = activePlantAudio[id];
@@ -1488,7 +1489,16 @@ function updateAmbientAudio(){
     // and the stick/decay curve just pick back up where they left off the
     // instant focus returns
     const effectiveTarget = windowFocused ? entry.targetVolume : 0;
-    entry.currentVolume += (effectiveTarget - entry.currentVolume) * VOLUME_LERP;
+    if(entry.justArrived){
+      // no fade-in — a plant that just came into range (or got pinned)
+      // snaps straight to its computed volume on this first frame instead
+      // of creeping up via the lerp below, which still governs every
+      // frame after this one (moving around in range, leaving, decaying)
+      entry.currentVolume = effectiveTarget;
+      entry.justArrived = false;
+    } else {
+      entry.currentVolume += (effectiveTarget - entry.currentVolume) * VOLUME_LERP;
+    }
     entry.audioEl.volume = Math.max(0, Math.min(1, entry.currentVolume));
     loudest = Math.max(loudest, entry.currentVolume);
     const p = garden.plants[id];
