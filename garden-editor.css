@@ -171,7 +171,15 @@ body{
   margin-right:.6rem;
   white-space:nowrap;
   color:transparent;
-  filter:drop-shadow(0 0 6px var(--glow, transparent));
+  /* text-shadow layers apply in parallel against the glyph shape, unlike
+     chained filter:drop-shadow() calls which each re-blur the PREVIOUS
+     shadow's output — stacking those just diluted into nothing instead of
+     building up a stronger glow */
+  text-shadow:
+    0 0 4px var(--glow, transparent),
+    0 0 8px var(--glow, transparent),
+    0 0 14px var(--glow, transparent),
+    0 0 22px var(--glow, transparent);
   opacity:0;
   pointer-events:none;
   transition:opacity .15s ease-out;
