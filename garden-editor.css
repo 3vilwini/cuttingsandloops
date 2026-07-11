@@ -153,12 +153,31 @@ body{
   flex-direction:column-reverse;
   align-items:flex-start;
   justify-content:space-between;
-  width:2.45rem;
-  height:3.6rem;
+  width:1.225rem;
+  height:7.2rem;
   padding:.2rem;
   border:1px solid #000;
   background:var(--paper);
   box-sizing:border-box;
+}
+
+/* hidden until hovered — transparent fill, only the seed-color glow reads,
+   so the hint reveals itself rather than looking like plain UI copy */
+.volumemeterhint{
+  position:absolute;
+  top:50%;
+  right:100%;
+  transform:translateY(-50%);
+  margin-right:.6rem;
+  white-space:nowrap;
+  color:transparent;
+  filter:drop-shadow(0 0 6px var(--glow, transparent));
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease-out;
+}
+.volumemeter:hover .volumemeterhint{
+  opacity:1;
 }
 
 .volumemeter .bar{
