@@ -808,14 +808,22 @@ document.getElementById("enterBtn").addEventListener("click", () => {
 // init() returns a promise; createPageData() (inside connectChannels) isn't
 // usable until it resolves, so this has to chain off .then().
 //
-// room is explicit here — playhtml's own default (confirmed by inspecting
-// window.playhtml.roomId at runtime) is origin + pathname ONLY, with the
-// .html extension stripped and the query string dropped entirely. That
-// means /feelthegrass.html?g=1 and /feelthegrass.html?g=2 land in the
-// SAME room by default — silently defeating the whole ?g=<id> multi-garden
-// scheme. garden.id (pathname + search, sanitized) is reused here so every
-// distinct ?g= value actually gets its own room.
-playhtml.init({ room: garden.id, cursors: { enabled: true } }).then(connectChannels);
+// room is only passed explicitly when ?g=<id> is actually present. playhtml's
+// own default (confirmed by inspecting window.playhtml.roomId at runtime) is
+// origin + pathname ONLY, with the .html extension stripped and the query
+// string dropped entirely — that's what silently let every ?g= value share
+// one room before. But that native default is also where THE ORIGINAL
+// garden (no ?g= at all) has always actually lived — passing an explicit
+// room unconditionally would point the bare URL at a brand-new empty room
+// instead of that real one, orphaning it exactly the way the file rename
+// once did. So: no ?g= -> no room override, keep using playhtml's real
+// default; ?g=<id> present -> use garden.id (pathname + search, sanitized)
+// so each numbered garden actually gets its own separate room.
+const gardenParam = new URLSearchParams(location.search).get("g");
+playhtml.init({
+  ...(gardenParam ? { room: garden.id } : {}),
+  cursors: { enabled: true },
+}).then(connectChannels);
 
 // #loadingScreen covers the field until connectChannels() has pulled the
 // real synced state (see the end of that function) — this timeout is just
