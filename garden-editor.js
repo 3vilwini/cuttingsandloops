@@ -1,3 +1,7 @@
+/* ==========================================================================
+   SETUP / GLOBAL — mirrors garden-editor.css "global style"
+   ========================================================================== */
+
 import { playhtml } from "https://unpkg.com/playhtml";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
@@ -106,6 +110,19 @@ function svgEl(tag, attrs){
   for(const k in attrs) el.setAttribute(k, attrs[k]);
   return el;
 }
+/* ---- create garden ---- */
+// a namespace for this garden's uploaded files (see uploadSeedFile's
+// X-Garden-Id header) — does not decide which synced room a visitor joins,
+// see connectChannels below. Derived from the page's own path rather than a
+// random id per load, so every visitor to the same garden page uploads into
+// the same stable folder (and re-uploading to a slot correctly overwrites
+// the old file there, instead of leaving it orphaned under a new random id).
+garden.id = location.pathname.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
+
+/* ==========================================================================
+   GARDEN / FIELD — mirrors garden-editor.css "garden"
+   ========================================================================== */
+
 
 /* seed slots — one fixed layout per pattern (not random), so a given pattern
    always shows its seeds in the same arrangement, matching how that pattern
@@ -148,6 +165,340 @@ function seedFieldOffsets(){
     ? arraySlotOffsets(scale)
     : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
 }
+
+/* draws the current garden.meta.colors/pattern onto the field (gradient)
+   and the SVG layer (pattern lines/dots), sized to the whole (bigger-than-
+   viewport) field rather than just what's on screen. */
+function renderField(){
+  const { background, text, seed } = garden.meta.colors;
+  const fieldEl = document.getElementById("field");
+  fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
+  fieldEl.style.color = text;
+  // the volume meter's hover hint is soil-colored with a seed-color glow (see .volumemeterhint)
+  const volumeMeterEl = document.getElementById("volumeMeter");
+  volumeMeterEl.style.setProperty("--glow", seed);
+  volumeMeterEl.style.setProperty("--soil-color", background[1]);
+  renderSeedSlots();
+  // plant labeldots are colored from garden.meta.colors.text too — without
+  // this they'd keep whatever color was current when each plant last
+  // rendered, drifting out of sync with the seed dots the moment "labels" changes
+  renderPlantSlots();
+
+  const svg = document.getElementById("patternLayer");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  const rgb = hexToRgb(seed);
+
+  const scale = garden.meta.scale || 1;
+  const LATTICE_BASE = 104;   // grid cell size (doubled again from 52)
+  const FURROW_BASE = 26;     // independent of LATTICE_BASE now, so furrow's spacing doesn't change too
+
+  if(garden.meta.pattern === "array"){
+    // dots arranged in an outward spiral from center, spaced evenly along
+    // the curve (not by fixed angle step, or it thins into spokes at radius) —
+    // wider pitch + smaller dots so it reads as a spiral, not concentric rings.
+    const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
+    const a = 16 * scale;      // spiral pitch — distance between successive arms
+    const dotGap = 10 * scale; // arc-length distance between dots — doubled density vs before
+    const dotR = Math.max(0.6, 0.9 * scale);
+    const group = svgEl("g", { fill:`rgba(${rgb},.55)` });
+    let t = 1;
+    for(let r = a*t; r <= maxR; r = a*t){
+      const x = CX + r*Math.cos(t), y = CY + r*Math.sin(t);
+      group.appendChild(svgEl("circle", { cx:x.toFixed(1), cy:y.toFixed(1), r:dotR }));
+      t += dotGap / r;       // shrink angular step as radius grows -> even spacing
+    }
+    svg.appendChild(group);
+  } else {
+    // lattice (grid) or furrow (horizontal-only) — both are a tiled <pattern>
+    const spacing = (garden.meta.pattern === "lattice" ? LATTICE_BASE : FURROW_BASE) * scale;
+    const defs = svgEl("defs", {});
+    const pattern = svgEl("pattern", { id:"fieldPattern", width:spacing, height:spacing, patternUnits:"userSpaceOnUse" });
+    const stroke = `rgba(${rgb},.4)`;
+    pattern.appendChild(svgEl("line", { x1:0, y1:spacing/2, x2:spacing, y2:spacing/2, stroke, "stroke-width":0.6 }));
+    if(garden.meta.pattern === "lattice"){
+      pattern.appendChild(svgEl("line", { x1:spacing/2, y1:0, x2:spacing/2, y2:spacing, stroke, "stroke-width":0.6 }));
+    }
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+    svg.appendChild(svgEl("rect", { width:"100%", height:"100%", fill:"url(#fieldPattern)" }));
+  }
+
+  applyViewToggles(); // re-apply since renderSeedSlots() just rebuilt the label spans
+}
+
+const viewportEl = document.getElementById("viewport");
+const fieldEl = document.getElementById("field");
+fieldEl.style.width = FIELD_W + "px";
+fieldEl.style.height = FIELD_H + "px";
+
+/* ---- arrow-key panning, same idea as the main garden view ---- */
+function panBy(dx, dy){
+  viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
+  // ambient sound follows you even when you're navigating by keyboard,
+  // not just when the mouse itself is moving over the field
+  listener.x = Math.max(0, Math.min(FIELD_W, listener.x + dx));
+  listener.y = Math.max(0, Math.min(FIELD_H, listener.y + dy));
+}
+
+document.addEventListener("keydown", e => {
+  const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
+  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open") || document.getElementById("confirmScrim").classList.contains("open") || document.getElementById("entryScrim").classList.contains("open")) return;
+  const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
+  if(move){ e.preventDefault(); panBy(move[0], move[1]); }
+});
+
+// start centered on the field, like the main garden view does — deferred a
+// frame so the viewport has actually been laid out before we measure it
+requestAnimationFrame(() => {
+  viewportEl.scrollTo({ left: FIELD_W/2 - viewportEl.clientWidth/2, top: FIELD_H/2 - viewportEl.clientHeight/2 });
+});
+
+/* ==========================================================================
+   HOT SOIL SPOTS — mirrors garden-editor.css "hot soil spots"
+   ========================================================================== */
+
+/* planting is only allowed on a hot spot — a fixed grid spread evenly across
+   the field, unrelated to the decorative seed markers (those are clickable
+   some other way, not this). A spot with a plant in it already is excluded,
+   so hovering/clicking an existing plant never offers it as a target. */
+const HOTSPOT_COLS = 15, HOTSPOT_ROWS = 8, HOTSPOT_MARGIN = 150;
+function hotSpotPositions(){
+  const usableW = FIELD_W - HOTSPOT_MARGIN * 2, usableH = FIELD_H - HOTSPOT_MARGIN * 2;
+  const spots = [];
+  for(let row = 0; row < HOTSPOT_ROWS; row++){
+    for(let col = 0; col < HOTSPOT_COLS; col++){
+      spots.push({
+        x: HOTSPOT_MARGIN + (usableW * col) / (HOTSPOT_COLS - 1),
+        y: HOTSPOT_MARGIN + (usableH * row) / (HOTSPOT_ROWS - 1),
+      });
+    }
+  }
+  return spots;
+}
+
+// half of the hover square's 140x140 footprint (matches .hoversquare/
+// .plantmark/pCanvas) — a square hit test, not a circular radius, so the
+// square appears/disappears exactly at its own visible edge, not some
+// smaller invisible area inside it.
+const HOTSPOT_HALF = 70;
+/* a plant's *actual* rendered box (drawing + its name label, which sits to
+   the right and can extend well past the 140px drawing itself for a longer
+   name) — measured live rather than assumed, so a "plant here" square never
+   lands on top of a long label's overflow. */
+function occupiedBoxes(){
+  const fieldRect = fieldEl.getBoundingClientRect();
+  return Array.from(document.querySelectorAll("#plantSlots .plantmark")).map(m => {
+    // .plantmark's own rect stops at 140x140 even though its name label is
+    // an absolutely-positioned child sitting outside that box (to the
+    // right) — an overflowing absolutely-positioned child never enlarges
+    // its ancestor's own bounding rect, so the label has to be measured
+    // separately and unioned in, or a long name's overflow goes unprotected
+    const markRect = m.getBoundingClientRect();
+    const txtEl = m.querySelector(".txt");
+    const txtRect = txtEl ? txtEl.getBoundingClientRect() : markRect;
+    const left = Math.min(markRect.left, txtRect.left), right = Math.max(markRect.right, txtRect.right);
+    const top = Math.min(markRect.top, txtRect.top), bottom = Math.max(markRect.bottom, txtRect.bottom);
+    return {
+      left: left - fieldRect.left, right: right - fieldRect.left,
+      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
+    };
+  });
+}
+// same idea as occupiedBoxes above, but for seed slots — a hot spot whose
+// square would cover a seed's own clickable area (dot + label) is skipped,
+// so hovering near a seed always reads as "click the seed", never "plant
+// here". Unlike occupiedBoxes this is a box-vs-square overlap test rather
+// than a point-in-box test, since a seed's dot is much smaller than a hot
+// spot's 140x140 square and a point test would almost never catch it.
+function seedOccupiedBoxes(){
+  const fieldRect = fieldEl.getBoundingClientRect();
+  return Array.from(document.querySelectorAll("#seedSlots .seedslot")).map(m => {
+    const dotRect = m.getBoundingClientRect();
+    const txtEl = m.querySelector(".txt");
+    const txtRect = txtEl ? txtEl.getBoundingClientRect() : dotRect;
+    const left = Math.min(dotRect.left, txtRect.left), right = Math.max(dotRect.right, txtRect.right);
+    const top = Math.min(dotRect.top, txtRect.top), bottom = Math.max(dotRect.bottom, txtRect.bottom);
+    return {
+      left: left - fieldRect.left, right: right - fieldRect.left,
+      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
+    };
+  });
+}
+function nearestHotSpot(x, y){
+  const boxes = occupiedBoxes();
+  const seedBoxes = seedOccupiedBoxes();
+  let best = null, bestDist = Infinity;
+  for(const s of hotSpotPositions()){
+    // a hot spot inside an existing plant's real rendered box (drawing +
+    // label) is never offered — being near a plant means dragging it, not
+    // planting a new one on top of it
+    if(boxes.some(b => s.x >= b.left && s.x <= b.right && s.y >= b.top && s.y <= b.bottom)) continue;
+    const sqLeft = s.x - HOTSPOT_HALF, sqRight = s.x + HOTSPOT_HALF, sqTop = s.y - HOTSPOT_HALF, sqBottom = s.y + HOTSPOT_HALF;
+    if(seedBoxes.some(b => sqLeft < b.right && sqRight > b.left && sqTop < b.bottom && sqBottom > b.top)) continue;
+    if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
+    const d = Math.hypot(x - s.x, y - s.y);
+    if(d < bestDist){ bestDist = d; best = s; }
+  }
+  return best;
+}
+
+const NO_SEEDS_MSG = "you can’t plant just yet! add at least one seed as the source before other plants can grow";
+fieldEl.addEventListener("mousemove", e => {
+  const r = fieldEl.getBoundingClientRect();
+  // ambient sound's "listener" position — same field-space coordinates as
+  // a plant's own x/y, so distance comparisons in updateAmbientAudio() just work
+  listener.x = e.clientX - r.left;
+  listener.y = e.clientY - r.top;
+  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
+  if(!spot){ hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; return; }
+  const hasSeeds = Object.keys(garden.seeds || {}).length > 0;
+  hoverSquare.style.left = spot.x + "px";
+  hoverSquare.style.top = spot.y + "px";
+  hoverSquare.style.borderColor = garden.meta.colors.seed;
+  hoverSquare.style.display = "block";
+  fieldEl.style.cursor = hasSeeds ? "" : "not-allowed";
+  fieldEl.title = hasSeeds ? "" : NO_SEEDS_MSG;
+});
+fieldEl.addEventListener("mouseleave", () => { hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; });
+fieldEl.addEventListener("click", e => {
+  const r = fieldEl.getBoundingClientRect();
+  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
+  if(!spot) return;   // clicking away from a hot spot does nothing now
+  if(!Object.keys(garden.seeds || {}).length) return;   // can't plant until at least one seed exists
+  openPlantModal(spot);
+});
+
+/* ==========================================================================
+   TOP LEFT — NAV BUTTONS — mirrors garden-editor.css "top left - nav buttons"
+   ========================================================================== */
+
+const builderCardEl = document.getElementById("builderCard");
+// declared here (not down by the click listener below) because hideBuilder()
+// is called immediately, and showBuilder()/hideBuilder() both reference this
+// button to show whether the panel is open — same TDZ trap as before if this
+// were declared any later.
+const navToggleBtn = document.getElementById("navToggleBtn");
+
+/* ---- modal exclusivity: opening either one always closes the other ----
+   the swirl button itself shows pressed (inverted) while the panel is open —
+   it's the only way to open or close it now, so that state has to be obvious. */
+function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
+function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAttribute("data-open", "false"); }
+
+// closed by default for every visitor — opened only via the nav swirl icon
+hideBuilder();
+
+/* ---- nav stack (icon-only): toggle the builder window ---- */
+navToggleBtn.addEventListener("click", () => {
+  const hidden = builderCardEl.style.display === "none";
+  if(hidden) showBuilder(); else hideBuilder();
+});
+
+/* the seed-list panel — every seed added so far, each with a download link */
+const seedListCardEl = document.getElementById("seedListCard");
+const seedListToggleBtn = document.getElementById("seedListToggleBtn");
+function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); hideGardenInfo(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
+function hideSeedList(){ seedListCardEl.style.display = "none"; seedListToggleBtn.setAttribute("data-open", "false"); }
+hideSeedList();
+seedListToggleBtn.addEventListener("click", () => {
+  const hidden = seedListCardEl.style.display === "none";
+  if(hidden) showSeedList(); else hideSeedList();
+});
+
+/* ==========================================================================
+   TOP CENTER — CLICKABLE TAGS — mirrors garden-editor.css "top center - clickable tags"
+   ========================================================================== */
+
+/* top-center readout of the chosen tags — mirrors the bank, glows the
+   garden's seed color on hover, and doubles as the tag-press easter egg
+   trigger (see checkTagPresses). */
+const tagDisplayEl = document.getElementById("tagDisplay");
+function renderTagDisplay(){
+  tagDisplayEl.innerHTML = "";
+  for(const t of garden.meta.tags){
+    const s = document.createElement("span");
+    s.textContent = t;
+    s.title = "click here with a friend ˚Ი⑅𐑼˖";   // hints at the two-person press below
+    s.style.setProperty("--glow", garden.meta.colors.seed);
+    s.addEventListener("click", () => pressTag(t));
+    tagDisplayEl.appendChild(s);
+  }
+}
+
+/* two DISTINCT people (browser tabs) pressing the same tag within a couple
+   seconds of each other opens a SoundCloud tag search in a new tab for
+   everyone currently on the page — a little synced "press together to
+   unlock" moment. Each press writes to its own "tag:clientId" key rather
+   than appending to a shared per-tag array — two people pressing close
+   together would otherwise each read-modify-write that array from a stale
+   pre-merge view, and whichever write lands last silently overwrites the
+   other's entry (confirmed: two near-simultaneous presses settled on only
+   one surviving entry every time). Keying by clientId means concurrent
+   presses never touch the same key, so neither can clobber the other.
+   checkTagPresses (run on every update, by everyone) groups the flat
+   "tag:clientId" -> ts map back by tag and looks for 2+ distinct clientIds
+   still inside the time window; stale keys just linger harmlessly since
+   they're always re-filtered by ts on read.
+   window.open (not a direct navigation) is used so nobody loses their place
+   in the garden — but browsers only allow window.open without a popup
+   block when it's called synchronously from a real user gesture, so this
+   reliably opens for whichever tab's click completes the pair, and may be
+   silently blocked in tabs that are just idling on an earlier press. */
+const TAG_PRESS_WINDOW_MS = 2000;
+function pressTag(t){
+  tagPressChannel?.setData(draft => {
+    draft[`${t}:${clientId}`] = Date.now();
+  });
+}
+function checkTagPresses(data){
+  const now = Date.now();
+  const clientIdsByTag = {};
+  for(const key in data){
+    const sep = key.lastIndexOf(":");
+    const t = key.slice(0, sep), cid = key.slice(sep + 1);
+    if(now - data[key] >= TAG_PRESS_WINDOW_MS) continue;
+    (clientIdsByTag[t] ??= new Set()).add(cid);
+  }
+  for(const t in clientIdsByTag){
+    if(clientIdsByTag[t].size >= 2){
+      window.open(`https://soundcloud.com/tags/${encodeURIComponent(t)}`, "_blank", "noopener");
+      return;
+    }
+  }
+}
+
+/* ==========================================================================
+   BOTTOM LEFT — TOGGLE BAR — mirrors garden-editor.css "bottom left - toggle bar"
+   ========================================================================== */
+
+/* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
+const VIEW_STATE = { seeds:true, plants:true, labels:true, roots:true };
+function applyViewToggles(){
+  document.getElementById("seedSlots").style.display = VIEW_STATE.seeds ? "" : "none";
+  document.getElementById("plantSlots").style.display = VIEW_STATE.plants ? "" : "none";
+  document.getElementById("connectionsLayer").style.display = VIEW_STATE.roots ? "" : "none";
+  document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
+    .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
+}
+// shared by the bottom-bar buttons themselves and anything else that wants
+// to flip one of these (a filled seed's click uses this same function for
+// "roots" — same mechanism, not a separate parallel toggle)
+function toggleView(key){
+  VIEW_STATE[key] = !VIEW_STATE[key];
+  document.querySelectorAll(`#viewToggles button[data-key="${key}"]`)
+    .forEach(b => b.setAttribute("data-on", String(VIEW_STATE[key])));
+  applyViewToggles();
+}
+document.querySelectorAll("#viewToggles button").forEach(b => {
+  b.setAttribute("data-on", "true");
+  b.addEventListener("click", () => toggleView(b.dataset.key));
+});
+
+/* ==========================================================================
+   SEED SLOTS — mirrors garden-editor.css "seed slots"
+   ========================================================================== */
 
 /* an empty slot invites a click (opens the add-seed modal); a filled one
    shows "title - artist" and previews on hover, same as a plant does. */
@@ -195,6 +546,87 @@ function renderSeedSlots(){
     layer.appendChild(el);
   });
 }
+
+/* ==========================================================================
+   ROOTS — mirrors garden-editor.css "roots"
+   ========================================================================== */
+
+/* dashed curved lines from every filled seed to each plant whose
+   sampledFrom includes it. Always rendered (same as the seed/plant/label
+   layers) — visibility is purely VIEW_STATE.roots via applyViewToggles, the
+   same "roots" switch in the bottom bar. Clicking a filled seed doesn't
+   pick which one to show anymore — it just flips that same switch, via
+   toggleView, exactly like clicking the bottom-bar button does. */
+function renderConnections(){
+  const svg = document.getElementById("connectionsLayer");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
+  const defs = document.createElementNS(SVG_NS, "defs");
+  svg.appendChild(defs);
+  let gradientCount = 0;
+  const offsets = seedFieldOffsets();
+  const plants = Object.values(garden.plants || {});
+  const fieldRect = fieldEl.getBoundingClientRect();
+  for(const i in garden.seeds){
+    const seed = garden.seeds[i];
+    if(!seed) continue;
+    const label = `${seed.title} - ${seed.artist}`;
+    const o = offsets[i];
+    const from = { x: CX + o.dx, y: CY + o.dy };
+    const connected = plants.filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
+    for(const p of connected){
+      // ends on the plant's own labeldot, not its drawing's center — measured
+      // live (same idea as occupiedBoxes/seedOccupiedBoxes) rather than
+      // computed from margin/size constants, so it stays correct even if
+      // that dot's CSS changes. Falls back to the plant's raw x/y if the
+      // dot isn't actually rendered right now (e.g. the "plants" toggle is off).
+      const dotEl = document.querySelector(`#plantSlots .plantmark[data-plant-id="${p.id}"] .labeldot`);
+      const dotRect = dotEl?.getBoundingClientRect();
+      const toX = dotRect?.width ? dotRect.left + dotRect.width/2 - fieldRect.left : p.x;
+      const toY = dotRect?.width ? dotRect.top + dotRect.height/2 - fieldRect.top : p.y;
+      // bow the line out to the side, perpendicular to the straight path
+      // between them, so overlapping connections stay visually distinct
+      // instead of stacking as straight lines
+      const dx = toX - from.x, dy = toY - from.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bow = 40;
+      const midX = (from.x + toX) / 2 - (dy / len) * bow;
+      const midY = (from.y + toY) / 2 + (dx / len) * bow;
+
+      // gradient from the seed's own dot color to this plant's dot color,
+      // so the line itself reads as flowing from one to the other — each
+      // connection needs its own gradient since the endpoints differ
+      const gradientId = `rootGradient-${gradientCount++}`;
+      const gradient = document.createElementNS(SVG_NS, "linearGradient");
+      gradient.setAttribute("id", gradientId);
+      gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+      gradient.setAttribute("x1", from.x); gradient.setAttribute("y1", from.y);
+      gradient.setAttribute("x2", toX); gradient.setAttribute("y2", toY);
+      const stop1 = document.createElementNS(SVG_NS, "stop");
+      stop1.setAttribute("offset", "0%"); stop1.setAttribute("stop-color", garden.meta.colors.seed);
+      const stop2 = document.createElementNS(SVG_NS, "stop");
+      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", invertHex(garden.meta.colors.seed));
+      gradient.appendChild(stop1); gradient.appendChild(stop2);
+      defs.appendChild(gradient);
+
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${toX} ${toY}`);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", `url(#${gradientId})`);
+      path.setAttribute("stroke-width", "1.5");
+      // tight dotted line: a near-zero dash length with a round cap draws a
+      // small dot at each point, spaced close together, instead of dashes
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-dasharray", "0.1 3");
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(path);
+    }
+  }
+}
+
+/* ==========================================================================
+   PLANT SLOTS — mirrors garden-editor.css "plant slots"
+   ========================================================================== */
 
 function renderPlantSlots(){
   const layer = document.getElementById("plantSlots");
@@ -325,335 +757,9 @@ function renderPlantSlots(){
   renderConnections();   // plants (and their positions) may have changed
 }
 
-/* dashed curved lines from every filled seed to each plant whose
-   sampledFrom includes it. Always rendered (same as the seed/plant/label
-   layers) — visibility is purely VIEW_STATE.roots via applyViewToggles, the
-   same "roots" switch in the bottom bar. Clicking a filled seed doesn't
-   pick which one to show anymore — it just flips that same switch, via
-   toggleView, exactly like clicking the bottom-bar button does. */
-function renderConnections(){
-  const svg = document.getElementById("connectionsLayer");
-  svg.innerHTML = "";
-  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
-  const defs = document.createElementNS(SVG_NS, "defs");
-  svg.appendChild(defs);
-  let gradientCount = 0;
-  const offsets = seedFieldOffsets();
-  const plants = Object.values(garden.plants || {});
-  const fieldRect = fieldEl.getBoundingClientRect();
-  for(const i in garden.seeds){
-    const seed = garden.seeds[i];
-    if(!seed) continue;
-    const label = `${seed.title} - ${seed.artist}`;
-    const o = offsets[i];
-    const from = { x: CX + o.dx, y: CY + o.dy };
-    const connected = plants.filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
-    for(const p of connected){
-      // ends on the plant's own labeldot, not its drawing's center — measured
-      // live (same idea as occupiedBoxes/seedOccupiedBoxes) rather than
-      // computed from margin/size constants, so it stays correct even if
-      // that dot's CSS changes. Falls back to the plant's raw x/y if the
-      // dot isn't actually rendered right now (e.g. the "plants" toggle is off).
-      const dotEl = document.querySelector(`#plantSlots .plantmark[data-plant-id="${p.id}"] .labeldot`);
-      const dotRect = dotEl?.getBoundingClientRect();
-      const toX = dotRect?.width ? dotRect.left + dotRect.width/2 - fieldRect.left : p.x;
-      const toY = dotRect?.width ? dotRect.top + dotRect.height/2 - fieldRect.top : p.y;
-      // bow the line out to the side, perpendicular to the straight path
-      // between them, so overlapping connections stay visually distinct
-      // instead of stacking as straight lines
-      const dx = toX - from.x, dy = toY - from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const bow = 40;
-      const midX = (from.x + toX) / 2 - (dy / len) * bow;
-      const midY = (from.y + toY) / 2 + (dx / len) * bow;
-
-      // gradient from the seed's own dot color to this plant's dot color,
-      // so the line itself reads as flowing from one to the other — each
-      // connection needs its own gradient since the endpoints differ
-      const gradientId = `rootGradient-${gradientCount++}`;
-      const gradient = document.createElementNS(SVG_NS, "linearGradient");
-      gradient.setAttribute("id", gradientId);
-      gradient.setAttribute("gradientUnits", "userSpaceOnUse");
-      gradient.setAttribute("x1", from.x); gradient.setAttribute("y1", from.y);
-      gradient.setAttribute("x2", toX); gradient.setAttribute("y2", toY);
-      const stop1 = document.createElementNS(SVG_NS, "stop");
-      stop1.setAttribute("offset", "0%"); stop1.setAttribute("stop-color", garden.meta.colors.seed);
-      const stop2 = document.createElementNS(SVG_NS, "stop");
-      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", invertHex(garden.meta.colors.seed));
-      gradient.appendChild(stop1); gradient.appendChild(stop2);
-      defs.appendChild(gradient);
-
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", `M ${from.x} ${from.y} Q ${midX} ${midY} ${toX} ${toY}`);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", `url(#${gradientId})`);
-      path.setAttribute("stroke-width", "1.5");
-      // tight dotted line: a near-zero dash length with a round cap draws a
-      // small dot at each point, spaced close together, instead of dashes
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-dasharray", "0.1 3");
-      path.setAttribute("vector-effect", "non-scaling-stroke");
-      svg.appendChild(path);
-    }
-  }
-}
-
-/* draws the current garden.meta.colors/pattern onto the field (gradient)
-   and the SVG layer (pattern lines/dots), sized to the whole (bigger-than-
-   viewport) field rather than just what's on screen. */
-function renderField(){
-  const { background, text, seed } = garden.meta.colors;
-  const fieldEl = document.getElementById("field");
-  fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
-  fieldEl.style.color = text;
-  // the volume meter's hover hint is soil-colored with a seed-color glow (see .volumemeterhint)
-  const volumeMeterEl = document.getElementById("volumeMeter");
-  volumeMeterEl.style.setProperty("--glow", seed);
-  volumeMeterEl.style.setProperty("--soil-color", background[1]);
-  renderSeedSlots();
-  // plant labeldots are colored from garden.meta.colors.text too — without
-  // this they'd keep whatever color was current when each plant last
-  // rendered, drifting out of sync with the seed dots the moment "labels" changes
-  renderPlantSlots();
-
-  const svg = document.getElementById("patternLayer");
-  svg.innerHTML = "";
-  svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
-  svg.setAttribute("preserveAspectRatio", "none");
-  const rgb = hexToRgb(seed);
-
-  const scale = garden.meta.scale || 1;
-  const LATTICE_BASE = 104;   // grid cell size (doubled again from 52)
-  const FURROW_BASE = 26;     // independent of LATTICE_BASE now, so furrow's spacing doesn't change too
-
-  if(garden.meta.pattern === "array"){
-    // dots arranged in an outward spiral from center, spaced evenly along
-    // the curve (not by fixed angle step, or it thins into spokes at radius) —
-    // wider pitch + smaller dots so it reads as a spiral, not concentric rings.
-    const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
-    const a = 16 * scale;      // spiral pitch — distance between successive arms
-    const dotGap = 10 * scale; // arc-length distance between dots — doubled density vs before
-    const dotR = Math.max(0.6, 0.9 * scale);
-    const group = svgEl("g", { fill:`rgba(${rgb},.55)` });
-    let t = 1;
-    for(let r = a*t; r <= maxR; r = a*t){
-      const x = CX + r*Math.cos(t), y = CY + r*Math.sin(t);
-      group.appendChild(svgEl("circle", { cx:x.toFixed(1), cy:y.toFixed(1), r:dotR }));
-      t += dotGap / r;       // shrink angular step as radius grows -> even spacing
-    }
-    svg.appendChild(group);
-  } else {
-    // lattice (grid) or furrow (horizontal-only) — both are a tiled <pattern>
-    const spacing = (garden.meta.pattern === "lattice" ? LATTICE_BASE : FURROW_BASE) * scale;
-    const defs = svgEl("defs", {});
-    const pattern = svgEl("pattern", { id:"fieldPattern", width:spacing, height:spacing, patternUnits:"userSpaceOnUse" });
-    const stroke = `rgba(${rgb},.4)`;
-    pattern.appendChild(svgEl("line", { x1:0, y1:spacing/2, x2:spacing, y2:spacing/2, stroke, "stroke-width":0.6 }));
-    if(garden.meta.pattern === "lattice"){
-      pattern.appendChild(svgEl("line", { x1:spacing/2, y1:0, x2:spacing/2, y2:spacing, stroke, "stroke-width":0.6 }));
-    }
-    defs.appendChild(pattern);
-    svg.appendChild(defs);
-    svg.appendChild(svgEl("rect", { width:"100%", height:"100%", fill:"url(#fieldPattern)" }));
-  }
-
-  applyViewToggles(); // re-apply since renderSeedSlots() just rebuilt the label spans
-}
-
-/* ---- tag bank ---- */
-const tagBankEl = document.getElementById("tagBank");
-const tagCountLabel = document.getElementById("tagCountLabel");
-function renderTagBank(){
-  tagBankEl.innerHTML = "";
-  // bank tags first, in fixed order
-  for(const t of TAG_BANK){
-    const chosen = garden.meta.tags.includes(t);
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "tag"; b.textContent = t;
-    b.setAttribute("data-selected", chosen ? "true" : "false");
-    b.disabled = !chosen && garden.meta.tags.length >= MAX_TAGS;
-    b.addEventListener("click", () => toggleTag(t));
-    tagBankEl.appendChild(b);
-  }
-  // then any custom (typed-in) tags — these aren't in TAG_BANK, so they need
-  // their own chips or they'd be stored in state but never shown.
-  for(const t of garden.meta.tags){
-    if(TAG_BANK.includes(t)) continue;
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "tag"; b.textContent = t;
-    b.setAttribute("data-selected", "true");
-    b.addEventListener("click", () => toggleTag(t));
-    tagBankEl.appendChild(b);
-  }
-  tagCountLabel.textContent = `(${garden.meta.tags.length}/${MAX_TAGS})`;
-  renderTagDisplay();
-}
-
-/* top-center readout of the chosen tags — mirrors the bank, glows the
-   garden's seed color on hover, and doubles as the tag-press easter egg
-   trigger (see checkTagPresses). */
-const tagDisplayEl = document.getElementById("tagDisplay");
-function renderTagDisplay(){
-  tagDisplayEl.innerHTML = "";
-  for(const t of garden.meta.tags){
-    const s = document.createElement("span");
-    s.textContent = t;
-    s.title = "click here with a friend ˚Ი⑅𐑼˖";   // hints at the two-person press below
-    s.style.setProperty("--glow", garden.meta.colors.seed);
-    s.addEventListener("click", () => pressTag(t));
-    tagDisplayEl.appendChild(s);
-  }
-}
-
-/* two DISTINCT people (browser tabs) pressing the same tag within a couple
-   seconds of each other opens a SoundCloud tag search in a new tab for
-   everyone currently on the page — a little synced "press together to
-   unlock" moment. Each press writes to its own "tag:clientId" key rather
-   than appending to a shared per-tag array — two people pressing close
-   together would otherwise each read-modify-write that array from a stale
-   pre-merge view, and whichever write lands last silently overwrites the
-   other's entry (confirmed: two near-simultaneous presses settled on only
-   one surviving entry every time). Keying by clientId means concurrent
-   presses never touch the same key, so neither can clobber the other.
-   checkTagPresses (run on every update, by everyone) groups the flat
-   "tag:clientId" -> ts map back by tag and looks for 2+ distinct clientIds
-   still inside the time window; stale keys just linger harmlessly since
-   they're always re-filtered by ts on read.
-   window.open (not a direct navigation) is used so nobody loses their place
-   in the garden — but browsers only allow window.open without a popup
-   block when it's called synchronously from a real user gesture, so this
-   reliably opens for whichever tab's click completes the pair, and may be
-   silently blocked in tabs that are just idling on an earlier press. */
-const TAG_PRESS_WINDOW_MS = 2000;
-function pressTag(t){
-  tagPressChannel?.setData(draft => {
-    draft[`${t}:${clientId}`] = Date.now();
-  });
-}
-function checkTagPresses(data){
-  const now = Date.now();
-  const clientIdsByTag = {};
-  for(const key in data){
-    const sep = key.lastIndexOf(":");
-    const t = key.slice(0, sep), cid = key.slice(sep + 1);
-    if(now - data[key] >= TAG_PRESS_WINDOW_MS) continue;
-    (clientIdsByTag[t] ??= new Set()).add(cid);
-  }
-  for(const t in clientIdsByTag){
-    if(clientIdsByTag[t].size >= 2){
-      window.open(`https://soundcloud.com/tags/${encodeURIComponent(t)}`, "_blank", "noopener");
-      return;
-    }
-  }
-}
-
-function toggleTag(t){
-  const i = garden.meta.tags.indexOf(t);
-  if(i>=0) garden.meta.tags.splice(i,1);
-  else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
-  renderTagBank();
-  syncMeta();
-}
-document.getElementById("tagCustomBtn").addEventListener("click", () => {
-  const input = document.getElementById("tagCustomInput");
-  const v = input.value.trim().toLowerCase();
-  if(!v || garden.meta.tags.length >= MAX_TAGS || garden.meta.tags.includes(v)) return;
-  garden.meta.tags.push(v);
-  input.value = "";
-  renderTagBank();
-  syncMeta();
-});
-
-/* ---- colors ---- */
-const cBg1 = document.getElementById("cBg1"), cBg2 = document.getElementById("cBg2");
-const cText = document.getElementById("cText"), cSeed = document.getElementById("cSeed");
-function applyColors(){
-  garden.meta.colors = { background:[cBg1.value, cBg2.value], text:cText.value, seed:cSeed.value };
-  renderField();
-  syncMeta();
-}
-[cBg1,cBg2,cText,cSeed].forEach(el => el.addEventListener("input", applyColors));
-
-/* ---- scale slider ---- */
-const fieldScale = document.getElementById("fieldScale");
-const fieldScaleLabel = document.getElementById("fieldScaleLabel");
-fieldScale.addEventListener("input", () => {
-  garden.meta.scale = parseFloat(fieldScale.value);
-  fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
-  renderField();
-  syncMeta();
-});
-
-/* ---- pattern picker ---- */
-const patternBankEl = document.getElementById("patternBank");
-function renderPatternBank(){
-  patternBankEl.innerHTML = "";
-  for(const p of PATTERNS){
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "patternbtn"; b.textContent = p.label;
-    b.setAttribute("data-selected", garden.meta.pattern === p.id ? "true" : "false");
-    b.addEventListener("click", () => {
-      garden.meta.pattern = p.id;
-      renderPatternBank();
-      renderField();
-      syncMeta();
-    });
-    patternBankEl.appendChild(b);
-  }
-}
-
-renderTagBank();
-renderPatternBank();
-
-/* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
-const VIEW_STATE = { seeds:true, plants:true, labels:true, roots:true };
-function applyViewToggles(){
-  document.getElementById("seedSlots").style.display = VIEW_STATE.seeds ? "" : "none";
-  document.getElementById("plantSlots").style.display = VIEW_STATE.plants ? "" : "none";
-  document.getElementById("connectionsLayer").style.display = VIEW_STATE.roots ? "" : "none";
-  document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
-    .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
-}
-// shared by the bottom-bar buttons themselves and anything else that wants
-// to flip one of these (a filled seed's click uses this same function for
-// "roots" — same mechanism, not a separate parallel toggle)
-function toggleView(key){
-  VIEW_STATE[key] = !VIEW_STATE[key];
-  document.querySelectorAll(`#viewToggles button[data-key="${key}"]`)
-    .forEach(b => b.setAttribute("data-on", String(VIEW_STATE[key])));
-  applyViewToggles();
-}
-document.querySelectorAll("#viewToggles button").forEach(b => {
-  b.setAttribute("data-on", "true");
-  b.addEventListener("click", () => toggleView(b.dataset.key));
-});
-
-const viewportEl = document.getElementById("viewport");
-const fieldEl = document.getElementById("field");
-fieldEl.style.width = FIELD_W + "px";
-fieldEl.style.height = FIELD_H + "px";
-
-// these local defaults only matter for whoever connects to this garden's
-// shared channel first ever — connectChannels() below immediately overwrites
-// garden.meta with whatever's already synced for everyone else on this URL.
-randomizeDefaultColors();
-applyColors();
-
-/* ---- arrow-key panning, same idea as the main garden view ---- */
-function panBy(dx, dy){
-  viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
-  // ambient sound follows you even when you're navigating by keyboard,
-  // not just when the mouse itself is moving over the field
-  listener.x = Math.max(0, Math.min(FIELD_W, listener.x + dx));
-  listener.y = Math.max(0, Math.min(FIELD_H, listener.y + dy));
-}
-
-document.addEventListener("keydown", e => {
-  const typing = /input|textarea/i.test(e.target.tagName) || e.target.isContentEditable;
-  if(typing || plantScrim.classList.contains("open") || seedScrim.classList.contains("open") || document.getElementById("confirmScrim").classList.contains("open") || document.getElementById("entryScrim").classList.contains("open")) return;
-  const move = { ArrowLeft:[-STEP,0], ArrowRight:[STEP,0], ArrowUp:[0,-STEP], ArrowDown:[0,STEP] }[e.key];
-  if(move){ e.preventDefault(); panBy(move[0], move[1]); }
-});
+/* ==========================================================================
+   MODAL / LOADING SCRIM — mirrors garden-editor.css "loading scrim" + "modal styling"
+   ========================================================================== */
 
 // Escape closes whatever's open — works even while typing in one of these
 // panels' own fields, unlike the arrow-key panning guard above.
@@ -669,43 +775,6 @@ document.addEventListener("keydown", e => {
 // eventual audio.play() calls are actually allowed to produce sound
 document.getElementById("enterBtn").addEventListener("click", () => {
   document.getElementById("entryScrim").classList.remove("open");
-});
-
-// start centered on the field, like the main garden view does — deferred a
-// frame so the viewport has actually been laid out before we measure it
-requestAnimationFrame(() => {
-  viewportEl.scrollTo({ left: FIELD_W/2 - viewportEl.clientWidth/2, top: FIELD_H/2 - viewportEl.clientHeight/2 });
-});
-
-/* ---- create garden ---- */
-// a namespace for this garden's uploaded files (see uploadSeedFile's
-// X-Garden-Id header) — does not decide which synced room a visitor joins,
-// see connectChannels below. Derived from the page's own path rather than a
-// random id per load, so every visitor to the same garden page uploads into
-// the same stable folder (and re-uploading to a slot correctly overwrites
-// the old file there, instead of leaving it orphaned under a new random id).
-garden.id = location.pathname.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
-
-const builderCardEl = document.getElementById("builderCard");
-// declared here (not down by the click listener below) because hideBuilder()
-// is called immediately, and showBuilder()/hideBuilder() both reference this
-// button to show whether the panel is open — same TDZ trap as before if this
-// were declared any later.
-const navToggleBtn = document.getElementById("navToggleBtn");
-
-/* ---- modal exclusivity: opening either one always closes the other ----
-   the swirl button itself shows pressed (inverted) while the panel is open —
-   it's the only way to open or close it now, so that state has to be obvious. */
-function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
-function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAttribute("data-open", "false"); }
-
-// closed by default for every visitor — opened only via the nav swirl icon
-hideBuilder();
-
-/* ---- nav stack (icon-only): toggle the builder window ---- */
-navToggleBtn.addEventListener("click", () => {
-  const hidden = builderCardEl.style.display === "none";
-  if(hidden) showBuilder(); else hideBuilder();
 });
 
 /* ==========================================================================
@@ -875,6 +944,222 @@ function applyMetaToUI(){
   renderField();
 }
 
+/* ==========================================================================
+   SEASON SETTINGS + SEED LIST — mirrors garden-editor.css "season settings + seed list" + "tags" + "colors" + "field pattern picker" + "scale slider"
+   ========================================================================== */
+
+/* ---- tag bank ---- */
+const tagBankEl = document.getElementById("tagBank");
+const tagCountLabel = document.getElementById("tagCountLabel");
+function renderTagBank(){
+  tagBankEl.innerHTML = "";
+  // bank tags first, in fixed order
+  for(const t of TAG_BANK){
+    const chosen = garden.meta.tags.includes(t);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = t;
+    b.setAttribute("data-selected", chosen ? "true" : "false");
+    b.disabled = !chosen && garden.meta.tags.length >= MAX_TAGS;
+    b.addEventListener("click", () => toggleTag(t));
+    tagBankEl.appendChild(b);
+  }
+  // then any custom (typed-in) tags — these aren't in TAG_BANK, so they need
+  // their own chips or they'd be stored in state but never shown.
+  for(const t of garden.meta.tags){
+    if(TAG_BANK.includes(t)) continue;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = t;
+    b.setAttribute("data-selected", "true");
+    b.addEventListener("click", () => toggleTag(t));
+    tagBankEl.appendChild(b);
+  }
+  tagCountLabel.textContent = `(${garden.meta.tags.length}/${MAX_TAGS})`;
+  renderTagDisplay();
+}
+
+function toggleTag(t){
+  const i = garden.meta.tags.indexOf(t);
+  if(i>=0) garden.meta.tags.splice(i,1);
+  else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
+  renderTagBank();
+  syncMeta();
+}
+document.getElementById("tagCustomBtn").addEventListener("click", () => {
+  const input = document.getElementById("tagCustomInput");
+  const v = input.value.trim().toLowerCase();
+  if(!v || garden.meta.tags.length >= MAX_TAGS || garden.meta.tags.includes(v)) return;
+  garden.meta.tags.push(v);
+  input.value = "";
+  renderTagBank();
+  syncMeta();
+});
+
+/* ---- colors ---- */
+const cBg1 = document.getElementById("cBg1"), cBg2 = document.getElementById("cBg2");
+const cText = document.getElementById("cText"), cSeed = document.getElementById("cSeed");
+function applyColors(){
+  garden.meta.colors = { background:[cBg1.value, cBg2.value], text:cText.value, seed:cSeed.value };
+  renderField();
+  syncMeta();
+}
+[cBg1,cBg2,cText,cSeed].forEach(el => el.addEventListener("input", applyColors));
+
+/* ---- scale slider ---- */
+const fieldScale = document.getElementById("fieldScale");
+const fieldScaleLabel = document.getElementById("fieldScaleLabel");
+fieldScale.addEventListener("input", () => {
+  garden.meta.scale = parseFloat(fieldScale.value);
+  fieldScaleLabel.textContent = garden.meta.scale.toFixed(1) + "×";
+  renderField();
+  syncMeta();
+});
+
+/* ---- pattern picker ---- */
+const patternBankEl = document.getElementById("patternBank");
+function renderPatternBank(){
+  patternBankEl.innerHTML = "";
+  for(const p of PATTERNS){
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "patternbtn"; b.textContent = p.label;
+    b.setAttribute("data-selected", garden.meta.pattern === p.id ? "true" : "false");
+    b.addEventListener("click", () => {
+      garden.meta.pattern = p.id;
+      renderPatternBank();
+      renderField();
+      syncMeta();
+    });
+    patternBankEl.appendChild(b);
+  }
+}
+
+renderTagBank();
+renderPatternBank();
+
+// these local defaults only matter for whoever connects to this garden's
+// shared channel first ever — connectChannels() below immediately overwrites
+// garden.meta with whatever's already synced for everyone else on this URL.
+randomizeDefaultColors();
+applyColors();
+
+// whichever seed-list preview is currently playing, if any — clicking a
+// different seed's play button stops this one first, so at most one
+// preview plays at a time, same jukebox assumption as everywhere else
+let seedListPlaying = null;   // { audioEl, btn, progress } | null
+function stopSeedListPreview(){
+  if(!seedListPlaying) return;
+  seedListPlaying.audioEl.pause();
+  seedListPlaying.btn.textContent = "▶";
+  seedListPlaying.progress.style.width = "0%";
+  seedListPlaying = null;
+}
+
+function renderSeedList(){
+  stopSeedListPreview();   // this rebuilds every row's DOM node below, so any old button reference would go stale
+  const list = document.getElementById("seedListItems");
+  list.innerHTML = "";
+  const seeds = Object.values(garden.seeds || {});
+  if(!seeds.length){
+    const empty = document.createElement("p");
+    empty.className = "sub";
+    empty.style.margin = "0";
+    empty.textContent = "no seeds yet — click an empty seed on the field to add one.";
+    list.appendChild(empty);
+    return;
+  }
+  for(const [i, seed] of Object.entries(garden.seeds || {})){
+    const row = document.createElement("div");
+    row.className = "seedlistitem";
+    const progress = document.createElement("div");
+    progress.className = "seedlistprogress";
+    const label = document.createElement("span");
+    label.textContent = `${seed.title} - ${seed.artist}`;
+    const play = document.createElement("button");
+    play.type = "button"; play.className = "seedlistplay"; play.textContent = "▶";
+    play.addEventListener("click", () => {
+      const wasThisOne = seedListPlaying?.btn === play;
+      stopSeedListPreview();
+      if(wasThisOne) return;   // clicking the currently-playing one again just stops it
+      const audioEl = new Audio(seed.audioRef);
+      audioEl.addEventListener("timeupdate", () => {
+        if(audioEl.duration) progress.style.width = (audioEl.currentTime / audioEl.duration * 100) + "%";
+      });
+      audioEl.addEventListener("ended", () => { if(seedListPlaying?.audioEl === audioEl) stopSeedListPreview(); });
+      audioEl.play().catch(() => {});
+      play.textContent = "⏸";
+      seedListPlaying = { audioEl, btn: play, progress };
+    });
+    const dl = document.createElement("a");
+    // seed.audioRef is R2's public .r2.dev URL, cross-origin from this page — a plain
+    // <a download> to it is silently ignored by the browser (it just opens the file
+    // instead of saving it), so route through the worker's /download proxy instead,
+    // which sets Content-Disposition: attachment and actually forces the save dialog
+    const seedKey = new URL(seed.audioRef).pathname.replace(/^\//, "");
+    dl.href = `${UPLOAD_ENDPOINT}/download/${seedKey}`;
+    dl.download = `${seed.title} - ${seed.artist}`;
+    dl.textContent = "⤓";
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "seedlistdelete"; del.textContent = "✕";
+    del.addEventListener("click", async () => {
+      const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
+      if(!ok) return;
+      deleteR2File(seed.audioRef);
+      delete garden.seeds[i];
+      seedsChannel?.setData(draft => { delete draft[i]; });
+      onSeedsChanged();
+    });
+    row.appendChild(progress); row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
+    list.appendChild(row);
+  }
+}
+
+/* ==========================================================================
+   VISITOR INFO — mirrors garden-editor.css "visitor info"
+   ========================================================================== */
+
+/* the "about this garden" panel, opened from the visitor counter — mostly
+   static copy, except the "planted by" line, which is only worth
+   recomputing at the moment someone actually opens it, not kept live */
+const gardenInfoCardEl = document.getElementById("gardenInfoCard");
+const visitorCountBtn = document.getElementById("visitorCountBtn");
+const gardenUrlInput = document.getElementById("gardenUrl");
+const copyUrlBtn = document.getElementById("copyUrlBtn");
+function showGardenInfo(){
+  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
+  const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
+  document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
+  gardenUrlInput.value = location.href;
+  gardenInfoCardEl.style.display = "";
+}
+function hideGardenInfo(){ gardenInfoCardEl.style.display = "none"; }
+hideGardenInfo();
+visitorCountBtn.addEventListener("click", () => {
+  const hidden = gardenInfoCardEl.style.display === "none";
+  if(hidden) showGardenInfo(); else hideGardenInfo();
+});
+copyUrlBtn.addEventListener("click", async () => {
+  const label = copyUrlBtn.textContent;
+  let copied = true;
+  try {
+    await navigator.clipboard.writeText(gardenUrlInput.value);
+  } catch {
+    // clipboard permission denied (Safari is strict about this) — fall back
+    // to selecting the text so the user can still copy it with cmd/ctrl+C
+    copied = false;
+    gardenUrlInput.select();
+  }
+  copyUrlBtn.textContent = copied ? "copied!" : "press ⌘C";
+  setTimeout(() => { copyUrlBtn.textContent = label; }, 1500);
+});
+
+/* ==========================================================================
+   FILE LABEL / PLANT DRAWING SPACE — mirrors garden-editor.css "file label" + "plant drawing space"
+   ambient audio, cursor trail, and the volume meter's threshold logic live
+   inside this block too (not under their own matching CSS sections) — they
+   share the `listener` object with the planting/drag code below and
+   splitting them out would risk a temporal-dead-zone reference, so this
+   whole continuum stays as one unit rather than being sliced apart.
+   ========================================================================== */
+
 /* streams a file straight to the Worker, which writes it into R2 and hands
    back the public URL. Throws on any failure — the caller decides what to
    fall back to (see the plant save handler). */
@@ -906,6 +1191,84 @@ async function deleteR2File(audioRef){
   const key = new URL(audioRef).pathname.replace(/^\//, "");
   fetch(`${UPLOAD_ENDPOINT}/delete/${key}`, { method: "DELETE" }).catch(() => {});
 }
+
+/* ==========================================================================
+   SEEDS — clicking an empty seed slot lets you name/upload a sound for it.
+   A filled slot just shows "title - artist" and previews on hover; there's
+   no re-editing a seed once it's set, unlike plants.
+   ========================================================================== */
+const seedScrim = document.getElementById("seedScrim");
+const sTitle = document.getElementById("sTitle");
+const sArtist = document.getElementById("sArtist");
+const sFile = document.getElementById("sFile");
+const sFileLabel = document.getElementById("sFileLabel");
+const sFileLabelText = document.getElementById("sFileLabelText");
+const sSaveBtn = document.getElementById("sSaveBtn");
+const sCancelBtn = document.getElementById("sCancelBtn");
+
+let seedDraftFile = null;
+let pendingSeedSlot = null;
+
+function validateSeed(){
+  sSaveBtn.disabled = !seedDraftFile || !sTitle.value.trim() || !sArtist.value.trim();
+}
+sTitle.addEventListener("input", validateSeed);
+sArtist.addEventListener("input", validateSeed);
+sFile.addEventListener("change", () => {
+  seedDraftFile = sFile.files[0] || null;
+  sFileLabelText.textContent = seedDraftFile ? seedDraftFile.name : "choose audio file…";
+  sFileLabel.classList.toggle("has-file", !!seedDraftFile);
+  validateSeed();
+});
+sFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); sFile.click(); } });
+
+function openSeedModal(slotIndex){
+  pendingSeedSlot = slotIndex;
+  seedDraftFile = null;
+  sTitle.value = ""; sArtist.value = "";
+  sFile.value = ""; sFileLabelText.textContent = "choose audio file…"; sFileLabel.classList.remove("has-file");
+  validateSeed();
+  hideBuilder(); hidePlantModal(); hideSeedList(); hideGardenInfo();
+  seedScrim.classList.add("open");
+}
+function hideSeedModal(){ seedScrim?.classList.remove("open"); }
+sCancelBtn.addEventListener("click", hideSeedModal);
+
+/* generic yes/no confirmation — resolves true if the user confirms, false
+   if they cancel/Escape/click away. One shared modal, re-used for every
+   confirmation in the app rather than a bespoke dialog per action. */
+const confirmScrim = document.getElementById("confirmScrim");
+const confirmMsg = document.getElementById("confirmMsg");
+const confirmOkBtn = document.getElementById("confirmOkBtn");
+const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+let resolveConfirm = null;
+function confirmDialog(message){
+  confirmMsg.textContent = message;
+  confirmScrim.classList.add("open");
+  return new Promise(resolve => { resolveConfirm = resolve; });
+}
+function hideConfirmDialog(result){
+  confirmScrim.classList.remove("open");
+  if(resolveConfirm){ resolveConfirm(result); resolveConfirm = null; }
+}
+confirmOkBtn.addEventListener("click", () => hideConfirmDialog(true));
+confirmCancelBtn.addEventListener("click", () => hideConfirmDialog(false));
+
+sSaveBtn.addEventListener("click", async () => {
+  sSaveBtn.disabled = true; sSaveBtn.textContent = "adding…";
+  const slot = pendingSeedSlot;
+  const audioRef = await uploadSeedFile(seedDraftFile, `seed-${slot}`).catch(err => {
+    console.warn("seed upload failed, falling back to a local-only blob URL:", err);
+    return URL.createObjectURL(seedDraftFile);
+  });
+  localSeedAudioRefs[slot] = audioRef;
+  const seed = { title: sTitle.value.trim(), artist: sArtist.value.trim(), audioRef };
+  garden.seeds[slot] = seed;
+  seedsChannel?.setData(draft => { draft[slot] = seed; });
+  onSeedsChanged();
+  hideSeedModal();
+  sSaveBtn.disabled = false; sSaveBtn.textContent = "add seed";
+});
 
 /* ==========================================================================
    PLANTING — a plant carries a small freehand drawing and gets placed
@@ -1332,310 +1695,8 @@ pSaveBtn.addEventListener("click", async () => {
 });
 
 /* ==========================================================================
-   SEEDS — clicking an empty seed slot lets you name/upload a sound for it.
-   A filled slot just shows "title - artist" and previews on hover; there's
-   no re-editing a seed once it's set, unlike plants.
+   INITIAL RENDER — first paint, must stay last: needs every DOM-query const above it already initialized
    ========================================================================== */
-const seedScrim = document.getElementById("seedScrim");
-const sTitle = document.getElementById("sTitle");
-const sArtist = document.getElementById("sArtist");
-const sFile = document.getElementById("sFile");
-const sFileLabel = document.getElementById("sFileLabel");
-const sFileLabelText = document.getElementById("sFileLabelText");
-const sSaveBtn = document.getElementById("sSaveBtn");
-const sCancelBtn = document.getElementById("sCancelBtn");
-
-let seedDraftFile = null;
-let pendingSeedSlot = null;
-
-function validateSeed(){
-  sSaveBtn.disabled = !seedDraftFile || !sTitle.value.trim() || !sArtist.value.trim();
-}
-sTitle.addEventListener("input", validateSeed);
-sArtist.addEventListener("input", validateSeed);
-sFile.addEventListener("change", () => {
-  seedDraftFile = sFile.files[0] || null;
-  sFileLabelText.textContent = seedDraftFile ? seedDraftFile.name : "choose audio file…";
-  sFileLabel.classList.toggle("has-file", !!seedDraftFile);
-  validateSeed();
-});
-sFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); sFile.click(); } });
-
-function openSeedModal(slotIndex){
-  pendingSeedSlot = slotIndex;
-  seedDraftFile = null;
-  sTitle.value = ""; sArtist.value = "";
-  sFile.value = ""; sFileLabelText.textContent = "choose audio file…"; sFileLabel.classList.remove("has-file");
-  validateSeed();
-  hideBuilder(); hidePlantModal(); hideSeedList(); hideGardenInfo();
-  seedScrim.classList.add("open");
-}
-function hideSeedModal(){ seedScrim?.classList.remove("open"); }
-sCancelBtn.addEventListener("click", hideSeedModal);
-
-/* generic yes/no confirmation — resolves true if the user confirms, false
-   if they cancel/Escape/click away. One shared modal, re-used for every
-   confirmation in the app rather than a bespoke dialog per action. */
-const confirmScrim = document.getElementById("confirmScrim");
-const confirmMsg = document.getElementById("confirmMsg");
-const confirmOkBtn = document.getElementById("confirmOkBtn");
-const confirmCancelBtn = document.getElementById("confirmCancelBtn");
-let resolveConfirm = null;
-function confirmDialog(message){
-  confirmMsg.textContent = message;
-  confirmScrim.classList.add("open");
-  return new Promise(resolve => { resolveConfirm = resolve; });
-}
-function hideConfirmDialog(result){
-  confirmScrim.classList.remove("open");
-  if(resolveConfirm){ resolveConfirm(result); resolveConfirm = null; }
-}
-confirmOkBtn.addEventListener("click", () => hideConfirmDialog(true));
-confirmCancelBtn.addEventListener("click", () => hideConfirmDialog(false));
-
-sSaveBtn.addEventListener("click", async () => {
-  sSaveBtn.disabled = true; sSaveBtn.textContent = "adding…";
-  const slot = pendingSeedSlot;
-  const audioRef = await uploadSeedFile(seedDraftFile, `seed-${slot}`).catch(err => {
-    console.warn("seed upload failed, falling back to a local-only blob URL:", err);
-    return URL.createObjectURL(seedDraftFile);
-  });
-  localSeedAudioRefs[slot] = audioRef;
-  const seed = { title: sTitle.value.trim(), artist: sArtist.value.trim(), audioRef };
-  garden.seeds[slot] = seed;
-  seedsChannel?.setData(draft => { draft[slot] = seed; });
-  onSeedsChanged();
-  hideSeedModal();
-  sSaveBtn.disabled = false; sSaveBtn.textContent = "add seed";
-});
-
-/* the seed-list panel — every seed added so far, each with a download link */
-const seedListCardEl = document.getElementById("seedListCard");
-const seedListToggleBtn = document.getElementById("seedListToggleBtn");
-function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); hideGardenInfo(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
-function hideSeedList(){ seedListCardEl.style.display = "none"; seedListToggleBtn.setAttribute("data-open", "false"); }
-hideSeedList();
-seedListToggleBtn.addEventListener("click", () => {
-  const hidden = seedListCardEl.style.display === "none";
-  if(hidden) showSeedList(); else hideSeedList();
-});
-
-/* the "about this garden" panel, opened from the visitor counter — mostly
-   static copy, except the "planted by" line, which is only worth
-   recomputing at the moment someone actually opens it, not kept live */
-const gardenInfoCardEl = document.getElementById("gardenInfoCard");
-const visitorCountBtn = document.getElementById("visitorCountBtn");
-const gardenUrlInput = document.getElementById("gardenUrl");
-const copyUrlBtn = document.getElementById("copyUrlBtn");
-function showGardenInfo(){
-  hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
-  const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
-  document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
-  gardenUrlInput.value = location.href;
-  gardenInfoCardEl.style.display = "";
-}
-function hideGardenInfo(){ gardenInfoCardEl.style.display = "none"; }
-hideGardenInfo();
-visitorCountBtn.addEventListener("click", () => {
-  const hidden = gardenInfoCardEl.style.display === "none";
-  if(hidden) showGardenInfo(); else hideGardenInfo();
-});
-copyUrlBtn.addEventListener("click", async () => {
-  const label = copyUrlBtn.textContent;
-  let copied = true;
-  try {
-    await navigator.clipboard.writeText(gardenUrlInput.value);
-  } catch {
-    // clipboard permission denied (Safari is strict about this) — fall back
-    // to selecting the text so the user can still copy it with cmd/ctrl+C
-    copied = false;
-    gardenUrlInput.select();
-  }
-  copyUrlBtn.textContent = copied ? "copied!" : "press ⌘C";
-  setTimeout(() => { copyUrlBtn.textContent = label; }, 1500);
-});
-
-// whichever seed-list preview is currently playing, if any — clicking a
-// different seed's play button stops this one first, so at most one
-// preview plays at a time, same jukebox assumption as everywhere else
-let seedListPlaying = null;   // { audioEl, btn, progress } | null
-function stopSeedListPreview(){
-  if(!seedListPlaying) return;
-  seedListPlaying.audioEl.pause();
-  seedListPlaying.btn.textContent = "▶";
-  seedListPlaying.progress.style.width = "0%";
-  seedListPlaying = null;
-}
-
-function renderSeedList(){
-  stopSeedListPreview();   // this rebuilds every row's DOM node below, so any old button reference would go stale
-  const list = document.getElementById("seedListItems");
-  list.innerHTML = "";
-  const seeds = Object.values(garden.seeds || {});
-  if(!seeds.length){
-    const empty = document.createElement("p");
-    empty.className = "sub";
-    empty.style.margin = "0";
-    empty.textContent = "no seeds yet — click an empty seed on the field to add one.";
-    list.appendChild(empty);
-    return;
-  }
-  for(const [i, seed] of Object.entries(garden.seeds || {})){
-    const row = document.createElement("div");
-    row.className = "seedlistitem";
-    const progress = document.createElement("div");
-    progress.className = "seedlistprogress";
-    const label = document.createElement("span");
-    label.textContent = `${seed.title} - ${seed.artist}`;
-    const play = document.createElement("button");
-    play.type = "button"; play.className = "seedlistplay"; play.textContent = "▶";
-    play.addEventListener("click", () => {
-      const wasThisOne = seedListPlaying?.btn === play;
-      stopSeedListPreview();
-      if(wasThisOne) return;   // clicking the currently-playing one again just stops it
-      const audioEl = new Audio(seed.audioRef);
-      audioEl.addEventListener("timeupdate", () => {
-        if(audioEl.duration) progress.style.width = (audioEl.currentTime / audioEl.duration * 100) + "%";
-      });
-      audioEl.addEventListener("ended", () => { if(seedListPlaying?.audioEl === audioEl) stopSeedListPreview(); });
-      audioEl.play().catch(() => {});
-      play.textContent = "⏸";
-      seedListPlaying = { audioEl, btn: play, progress };
-    });
-    const dl = document.createElement("a");
-    // seed.audioRef is R2's public .r2.dev URL, cross-origin from this page — a plain
-    // <a download> to it is silently ignored by the browser (it just opens the file
-    // instead of saving it), so route through the worker's /download proxy instead,
-    // which sets Content-Disposition: attachment and actually forces the save dialog
-    const seedKey = new URL(seed.audioRef).pathname.replace(/^\//, "");
-    dl.href = `${UPLOAD_ENDPOINT}/download/${seedKey}`;
-    dl.download = `${seed.title} - ${seed.artist}`;
-    dl.textContent = "⤓";
-    const del = document.createElement("button");
-    del.type = "button"; del.className = "seedlistdelete"; del.textContent = "✕";
-    del.addEventListener("click", async () => {
-      const ok = await confirmDialog(`delete "${seed.title} - ${seed.artist}"? this can't be undone.`);
-      if(!ok) return;
-      deleteR2File(seed.audioRef);
-      delete garden.seeds[i];
-      seedsChannel?.setData(draft => { delete draft[i]; });
-      onSeedsChanged();
-    });
-    row.appendChild(progress); row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
-    list.appendChild(row);
-  }
-}
-
-/* planting is only allowed on a hot spot — a fixed grid spread evenly across
-   the field, unrelated to the decorative seed markers (those are clickable
-   some other way, not this). A spot with a plant in it already is excluded,
-   so hovering/clicking an existing plant never offers it as a target. */
-const HOTSPOT_COLS = 15, HOTSPOT_ROWS = 8, HOTSPOT_MARGIN = 150;
-function hotSpotPositions(){
-  const usableW = FIELD_W - HOTSPOT_MARGIN * 2, usableH = FIELD_H - HOTSPOT_MARGIN * 2;
-  const spots = [];
-  for(let row = 0; row < HOTSPOT_ROWS; row++){
-    for(let col = 0; col < HOTSPOT_COLS; col++){
-      spots.push({
-        x: HOTSPOT_MARGIN + (usableW * col) / (HOTSPOT_COLS - 1),
-        y: HOTSPOT_MARGIN + (usableH * row) / (HOTSPOT_ROWS - 1),
-      });
-    }
-  }
-  return spots;
-}
-
-// half of the hover square's 140x140 footprint (matches .hoversquare/
-// .plantmark/pCanvas) — a square hit test, not a circular radius, so the
-// square appears/disappears exactly at its own visible edge, not some
-// smaller invisible area inside it.
-const HOTSPOT_HALF = 70;
-/* a plant's *actual* rendered box (drawing + its name label, which sits to
-   the right and can extend well past the 140px drawing itself for a longer
-   name) — measured live rather than assumed, so a "plant here" square never
-   lands on top of a long label's overflow. */
-function occupiedBoxes(){
-  const fieldRect = fieldEl.getBoundingClientRect();
-  return Array.from(document.querySelectorAll("#plantSlots .plantmark")).map(m => {
-    // .plantmark's own rect stops at 140x140 even though its name label is
-    // an absolutely-positioned child sitting outside that box (to the
-    // right) — an overflowing absolutely-positioned child never enlarges
-    // its ancestor's own bounding rect, so the label has to be measured
-    // separately and unioned in, or a long name's overflow goes unprotected
-    const markRect = m.getBoundingClientRect();
-    const txtEl = m.querySelector(".txt");
-    const txtRect = txtEl ? txtEl.getBoundingClientRect() : markRect;
-    const left = Math.min(markRect.left, txtRect.left), right = Math.max(markRect.right, txtRect.right);
-    const top = Math.min(markRect.top, txtRect.top), bottom = Math.max(markRect.bottom, txtRect.bottom);
-    return {
-      left: left - fieldRect.left, right: right - fieldRect.left,
-      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
-    };
-  });
-}
-// same idea as occupiedBoxes above, but for seed slots — a hot spot whose
-// square would cover a seed's own clickable area (dot + label) is skipped,
-// so hovering near a seed always reads as "click the seed", never "plant
-// here". Unlike occupiedBoxes this is a box-vs-square overlap test rather
-// than a point-in-box test, since a seed's dot is much smaller than a hot
-// spot's 140x140 square and a point test would almost never catch it.
-function seedOccupiedBoxes(){
-  const fieldRect = fieldEl.getBoundingClientRect();
-  return Array.from(document.querySelectorAll("#seedSlots .seedslot")).map(m => {
-    const dotRect = m.getBoundingClientRect();
-    const txtEl = m.querySelector(".txt");
-    const txtRect = txtEl ? txtEl.getBoundingClientRect() : dotRect;
-    const left = Math.min(dotRect.left, txtRect.left), right = Math.max(dotRect.right, txtRect.right);
-    const top = Math.min(dotRect.top, txtRect.top), bottom = Math.max(dotRect.bottom, txtRect.bottom);
-    return {
-      left: left - fieldRect.left, right: right - fieldRect.left,
-      top: top - fieldRect.top, bottom: bottom - fieldRect.top,
-    };
-  });
-}
-function nearestHotSpot(x, y){
-  const boxes = occupiedBoxes();
-  const seedBoxes = seedOccupiedBoxes();
-  let best = null, bestDist = Infinity;
-  for(const s of hotSpotPositions()){
-    // a hot spot inside an existing plant's real rendered box (drawing +
-    // label) is never offered — being near a plant means dragging it, not
-    // planting a new one on top of it
-    if(boxes.some(b => s.x >= b.left && s.x <= b.right && s.y >= b.top && s.y <= b.bottom)) continue;
-    const sqLeft = s.x - HOTSPOT_HALF, sqRight = s.x + HOTSPOT_HALF, sqTop = s.y - HOTSPOT_HALF, sqBottom = s.y + HOTSPOT_HALF;
-    if(seedBoxes.some(b => sqLeft < b.right && sqRight > b.left && sqTop < b.bottom && sqBottom > b.top)) continue;
-    if(Math.abs(x - s.x) > HOTSPOT_HALF || Math.abs(y - s.y) > HOTSPOT_HALF) continue;
-    const d = Math.hypot(x - s.x, y - s.y);
-    if(d < bestDist){ bestDist = d; best = s; }
-  }
-  return best;
-}
-
-const NO_SEEDS_MSG = "you can’t plant just yet! add at least one seed as the source before other plants can grow";
-fieldEl.addEventListener("mousemove", e => {
-  const r = fieldEl.getBoundingClientRect();
-  // ambient sound's "listener" position — same field-space coordinates as
-  // a plant's own x/y, so distance comparisons in updateAmbientAudio() just work
-  listener.x = e.clientX - r.left;
-  listener.y = e.clientY - r.top;
-  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
-  if(!spot){ hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; return; }
-  const hasSeeds = Object.keys(garden.seeds || {}).length > 0;
-  hoverSquare.style.left = spot.x + "px";
-  hoverSquare.style.top = spot.y + "px";
-  hoverSquare.style.borderColor = garden.meta.colors.seed;
-  hoverSquare.style.display = "block";
-  fieldEl.style.cursor = hasSeeds ? "" : "not-allowed";
-  fieldEl.title = hasSeeds ? "" : NO_SEEDS_MSG;
-});
-fieldEl.addEventListener("mouseleave", () => { hoverSquare.style.display = "none"; fieldEl.style.cursor = ""; fieldEl.title = ""; });
-fieldEl.addEventListener("click", e => {
-  const r = fieldEl.getBoundingClientRect();
-  const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
-  if(!spot) return;   // clicking away from a hot spot does nothing now
-  if(!Object.keys(garden.seeds || {}).length) return;   // can't plant until at least one seed exists
-  openPlantModal(spot);
-});
 
 // connectChannels() runs async (after playhtml.init resolves) and re-renders
 // on its own once the real synced data arrives — these are just the
