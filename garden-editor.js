@@ -504,9 +504,17 @@ function renderTagDisplay(){
 /* two DISTINCT people (browser tabs) pressing the same tag within a couple
    seconds of each other opens a SoundCloud tag search in a new tab for
    everyone currently on the page — a little synced "press together to
-   unlock" moment. Each click records {clientId, ts} into that tag's shared
-   list; checkTagPresses (run on every update, by everyone) looks for 2+
-   distinct clientIds still inside the time window.
+   unlock" moment. Each press writes to its own "tag:clientId" key rather
+   than appending to a shared per-tag array — two people pressing close
+   together would otherwise each read-modify-write that array from a stale
+   pre-merge view, and whichever write lands last silently overwrites the
+   other's entry (confirmed: two near-simultaneous presses settled on only
+   one surviving entry every time). Keying by clientId means concurrent
+   presses never touch the same key, so neither can clobber the other.
+   checkTagPresses (run on every update, by everyone) groups the flat
+   "tag:clientId" -> ts map back by tag and looks for 2+ distinct clientIds
+   still inside the time window; stale keys just linger harmlessly since
+   they're always re-filtered by ts on read.
    window.open (not a direct navigation) is used so nobody loses their place
    in the garden — but browsers only allow window.open without a popup
    block when it's called synchronously from a real user gesture, so this
@@ -514,18 +522,21 @@ function renderTagDisplay(){
    silently blocked in tabs that are just idling on an earlier press. */
 const TAG_PRESS_WINDOW_MS = 2000;
 function pressTag(t){
-  const now = Date.now();
   tagPressChannel?.setData(draft => {
-    const recent = (draft[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
-    recent.push({ clientId, ts: now });
-    draft[t] = recent;
+    draft[`${t}:${clientId}`] = Date.now();
   });
 }
 function checkTagPresses(data){
   const now = Date.now();
-  for(const t in data){
-    const recent = (data[t] || []).filter(e => now - e.ts < TAG_PRESS_WINDOW_MS);
-    if(new Set(recent.map(e => e.clientId)).size >= 2){
+  const clientIdsByTag = {};
+  for(const key in data){
+    const sep = key.lastIndexOf(":");
+    const t = key.slice(0, sep), cid = key.slice(sep + 1);
+    if(now - data[key] >= TAG_PRESS_WINDOW_MS) continue;
+    (clientIdsByTag[t] ??= new Set()).add(cid);
+  }
+  for(const t in clientIdsByTag){
+    if(clientIdsByTag[t].size >= 2){
       window.open(`https://soundcloud.com/tags/${encodeURIComponent(t)}`, "_blank", "noopener");
       return;
     }
