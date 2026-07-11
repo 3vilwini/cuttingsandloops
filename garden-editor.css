@@ -305,7 +305,7 @@ body{
 }
 
 .volumemeter .bar{
-  flex:0 0 .4rem;
+  flex:0 0 .3rem;
   width:100%;
   background:#000;
   opacity:.15;

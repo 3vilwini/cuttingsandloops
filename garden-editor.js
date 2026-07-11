@@ -1046,7 +1046,7 @@ const volumeMeterBars = Array.from(volumeMeterEl.querySelectorAll(".bar"));
 // a lerp (see updateAmbientAudio), which asymptotically approaches but can
 // never exactly equal 1.0 in floating point, so a literal 1.0 threshold here
 // would leave the top bar permanently unreachable
-const VOLUME_METER_THRESHOLDS = [0.083, 0.167, 0.25, 0.333, 0.417, 0.5, 0.583, 0.667, 0.75, 0.833, 0.917, 0.99];
+const VOLUME_METER_THRESHOLDS = [0.063, 0.125, 0.188, 0.25, 0.313, 0.375, 0.438, 0.5, 0.563, 0.625, 0.688, 0.75, 0.813, 0.875, 0.938, 0.99];
 function updateVolumeMeter(level){
   volumeMeterBars.forEach((bar, i) => {
     bar.dataset.active = level >= VOLUME_METER_THRESHOLDS[i] ? "true" : "false";
