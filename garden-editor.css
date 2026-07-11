@@ -1,3 +1,5 @@
+/* global style */
+
 @font-face{
   font-family: "Deer Diary";
   src: url("fonts/deer-diary.ttf") format("truetype");
@@ -25,7 +27,67 @@ body{
 
 
 
-/* top left nav buttons */
+/* garden */
+
+#viewport{ 
+  position:fixed; 
+  inset:0; 
+  z-index:0; 
+  overflow:auto; 
+}
+
+#field{ 
+  position:relative; 
+}
+
+#patternLayer{ 
+  position:absolute; 
+  inset:0; 
+  width:100%; 
+  height:100%; 
+  pointer-events:none; 
+}
+
+
+
+/* hot soil spots */
+
+.hoversquare{
+  position:absolute;
+  width:140px;
+  height:140px;
+  border:1px solid #000;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  display:none;
+}
+
+
+
+/* cursor trail (js spawnTrailDot) */
+
+.traildot{
+  position:absolute; 
+  top:0; 
+  left:0;
+  font-size:1.2rem; 
+  line-height:1; 
+  white-space:nowrap;
+  pointer-events:none;
+  -webkit-background-clip:text; 
+  background-clip:text; 
+  color:transparent;
+  animation: trailFade 1.8s ease-out forwards;
+}
+
+@keyframes trailFade{
+  0%{ opacity:.7; transform:translate(-50%,-50%) scale(1); }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(.5); }
+}
+
+
+
+/* top left - nav buttons */
 
 .navstack{ 
   position: fixed; 
@@ -67,21 +129,17 @@ body{
   color:var(--paper); 
 }
 
-/* adjusts the size of this lil swirly ꩜ on the weather nav button */
 #navToggleBtn{ 
   font-size:1.6rem; 
 }
 
-/* adjusts the size of this lil seed ❦ on the seedlist nav button */
 #seedListToggleBtn{ 
   font-size:1.6rem; 
 }
 
 
 
-/* feels like — the tags are clickable, see pressTag/checkTagPresses: two
-   different people clicking the same one within a couple seconds opens a
-   SoundCloud tag search in a new tab for everyone in the room. */
+/* top center - clickable tags */
 
 .tagdisplay{
   position: fixed; 
@@ -102,7 +160,6 @@ body{
   padding: .5rem .9rem;
   font-family: inherit;
   font-size: inherit;
-  cursor: pointer;
 }
 
 .tagdisplay span:hover{ 
@@ -111,7 +168,7 @@ body{
 
 
 
-/* visitor counter - connects to playhtml */
+/* top right - visitor counter */
 
 .visitorcount{
   position: fixed;
@@ -138,269 +195,8 @@ body{
 
 
 
-/* ambient sound level meter — not interactive, just reflects how loud the
-   ambient wandering sound currently is (see updateVolumeMeter). Vertical
-   stack of ten identical horizontal bars, spread via space-between so
-   they always span the full height of the box, lighting up bottom to
-   top as the level rises past each one's threshold. */
+/* bottom left - toggle bar */
 
-.volumemeter{
-  position:fixed;
-  bottom:2.5rem;
-  right:2.5rem;
-  z-index:3;
-  display:flex;
-  flex-direction:column-reverse;
-  align-items:flex-start;
-  justify-content:space-between;
-  width:1.225rem;
-  height:7.2rem;
-  padding:.2rem;
-  border:1px solid #000;
-  background:var(--paper);
-  box-sizing:border-box;
-}
-
-/* hidden until hovered — soil-colored fill with a seed-color glow behind it */
-.volumemeterhint{
-  position:absolute;
-  bottom:.2rem;
-  right:100%;
-  margin-right:.6rem;
-  white-space:nowrap;
-  color:var(--soil-color, transparent);
-  text-shadow:
-    0 0 4px var(--glow, transparent),
-    0 0 8px var(--glow, transparent),
-    0 0 14px var(--glow, transparent),
-    0 0 22px var(--glow, transparent);
-  opacity:0;
-  /* visibility as a second, independent gate alongside opacity — belt and
-     suspenders against any engine-specific quirk where opacity:0 alone
-     doesn't fully suppress a text-shadow from compositing/painting */
-  visibility:hidden;
-  pointer-events:none;
-  transition:opacity .15s ease-out, visibility .15s;
-}
-.volumemeter:hover .volumemeterhint{
-  opacity:1;
-  visibility:visible;
-}
-
-.volumemeter .bar{
-  flex:0 0 .4rem;
-  width:100%;
-  background:#000;
-  opacity:.15;
-  transition: opacity .12s ease-out;
-}
-
-.volumemeter .bar[data-active="true"]{
-  opacity:1;
-}
-
-
-
-/* the field */
-#viewport{ 
-  position:fixed; 
-  inset:0; 
-  z-index:0; 
-  overflow:auto; 
-}
-
-#field{ 
-  position:relative; 
-}
-
-#patternLayer{ 
-  position:absolute; 
-  inset:0; 
-  width:100%; 
-  height:100%; 
-  pointer-events:none; 
-}
-
-/* seed slots — fixed positions on a pattern-specific grid (never move once
-   the pattern is set). An empty one is a "+ add seed" invitation; a
-   filled one shows its title/artist and previews on hover, like a plant.
-   Same pointer-events split as #plantSlots: the full-field container must
-   not capture clicks itself (it would win hit-tests over anything drawn
-   later, like a plant's overflowing label, everywhere it isn't actually
-   covering an actual seed) — each .seedslot re-enables it individually. */
-#seedSlots{ 
-  position:absolute; 
-  inset:0; 
-  pointer-events:none; 
-}
-/* the dot is the real anchor — sized+centered on its own, so toggling the
-   label's visibility never shifts a seed's actual planted position. */
-.seedslot{ position:absolute; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer; }
-/* glows the dot + label together as one shape, in the garden's seed
-   color — drop-shadow (not box-shadow) so it follows the label's actual
-   text/gradient silhouette instead of a rectangular box around it */
-
-.seedslot:hover{ 
-  filter: 
-    drop-shadow(0 0 6px var(--glow, transparent)); 
-}
-
-.seedslot .dot{ 
-  position:absolute; 
-  inset:0; 
-  border-radius:50%; 
-  border:1px 
-    solid #000; 
-}
-
-.seedslot .txt{
-  position:absolute;
-  left:calc(10px + .35rem);   /* same dot-to-label gap as .plantmark .txt (.35rem past the 10px dot) */
-  top:50%;
-  transform:translateY(-50%);
-  white-space:nowrap;
-}
-/* empty seeds invite a click: the "+ add seed" text pulses in size while
-   its own gradient fill (seed color <-> white) slides through it — both
-   stop the instant a seed is added, since only .empty gets these. */
-
-@keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1); } 50%{ transform:translateY(-50%) scale(1.1); } }
-@keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
-
-
-/* same pulsing/gradient invitation, reused for any plant currently making
-   sound — hovered/in-range, still decaying (STICK_MS), or pinned, all read
-   the same "playing" class off updatePlayingClasses(). Never the dot,
-   only the label (see .labeldot below). label -> sky here, vs. label ->
-   soil for an empty seed slot, so an actively-playing plant reads as its
-   own distinct gradient rather than reusing the seed-invitation one. */
-.seedslot.empty .txt{
-  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
-  background-size:200% 100%;
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent;
-  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
-}
-.plantmark.playing .txt{
-  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--seed-color,#fff) 50%, var(--text-color,#fff) 100%);
-  background-size:200% 100%;
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent;
-  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
-}
-
-/* the layer itself must not capture pointer events — it's the full size
-   of the field, and would otherwise sit on top of everything (including
-   the seed slots underneath) and swallow clicks even where there's no
-   actual plant. Each .plantmark re-enables pointer-events on itself. */
-#plantSlots{ 
-  position:absolute; 
-  inset:0; pointer-events:none; 
-}
-
-/* roots */
-#connectionsLayer{ 
-  position:absolute; 
-  inset:0; 
-  width:100%; 
-  height:100%; 
-  pointer-events:none; 
-}
-
-/* plant - positioned playhtml */
-
-.plantmark{
-  position:absolute; 
-  width:140px; 
-  height:140px; 
-  transform:translate(-50%,-50%);
-  cursor:grab; 
-  pointer-events:auto;
-}
-
-.plantmark:active{
-  cursor:grabbing;
-}
-
-/* opposite color from a filled seed's own hover glow, so hovering a plant
-   reads as a distinct action from hovering a seed — only the label dot and
-   name glow, not the drawing itself, unlike a seed's combined dot+label glow */
-.plantmark:hover .labeldot,
-.plantmark:hover .txt{
-  filter: drop-shadow(0 0 6px var(--glow, transparent));
-}
-
-.plantmark svg{ 
-  width:100%; 
-  height:100%; 
-  overflow:visible; 
-}
-
-.plantmark .labeldot{
-  position:absolute; top:50%; left:100%; transform:translateY(-50%);
-  margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
-  /* without this the 1px border adds outside the 10px box (no global
-     box-sizing:border-box reset in this file), rendering 12x12 — a seed's
-     own dot is sized via inset:0 instead, which doesn't have this problem,
-     so the two would otherwise visibly differ even at "the same" 10px */
-  box-sizing:border-box;
-}
-
-/* pinned dot pulses in size while cycling between the seed color and this
-   plant's own dot color — --seed-color/--dot-color are set alongside the
-   other custom properties in renderPlantSlots(). A CSS animation on
-   background-color wins over the dot's own inline background (unlike a
-   plain rule, which an inline style would always beat), so no need to
-   touch that inline style for this to take effect while pinned. */
-@keyframes plantPinPulse{
-  0%,100%{ transform:translateY(-50%) scale(1); background:var(--seed-color,currentColor); }
-  50%{ transform:translateY(-50%) scale(1.6); background:var(--dot-color,currentColor); }
-}
-.plantmark.pinned .labeldot{ animation:plantPinPulse 1s ease-in-out infinite; }
-/* the plant's name, shown/hidden together with the seed labels via the
-   same "labels" toggle — stroked so it stays readable over any field
-   background or drawing color underneath it */
-
-.plantmark .txt{
-  position:absolute; 
-  top:50%; 
-  left:100%; 
-  transform:translateY(-50%);
-  margin-left:calc(.4rem + 10px + .35rem); 
-  white-space:nowrap; pointer-events:none;
-}
-
-/* hot soil spots */
-.hoversquare{
-  position:absolute;
-  width:140px;
-  height:140px;
-  border:1px solid #000;
-  transform:translate(-50%,-50%);
-  pointer-events:none;
-  display:none;
-}
-
-/* a footprint left behind as you wander — one of these spawns every so
-   often you move (see spawnTrailDot), each fading out and removing itself
-   independently a couple seconds later. background is a seed->sky gradient
-   set inline per-footprint (see spawnTrailDot), clipped to the glyph's own
-   text shape rather than filling a plain dot. */
-.traildot{
-  position:absolute; top:0; left:0;
-  font-size:1.2rem; line-height:1; white-space:nowrap;
-  pointer-events:none;
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  animation: trailFade 1.8s ease-out forwards;
-}
-@keyframes trailFade{
-  0%{ opacity:.7; transform:translate(-50%,-50%) scale(1); }
-  100%{ opacity:0; transform:translate(-50%,-50%) scale(.5); }
-}
-
-/* bottom toggle bar */
 .viewtoggles{
   position:fixed; 
   bottom:2.5rem; 
@@ -461,7 +257,380 @@ body{
   background:#000; 
 }
 
-/* top left cards */
+
+
+/* bottom right - volume meter + teleporation hint */
+
+.volumemeter{
+  position:fixed;
+  bottom:2.5rem;
+  right:2.5rem;
+  z-index:3;
+  display:flex;
+  flex-direction:column-reverse;
+  align-items:flex-start;
+  justify-content:space-between;
+  width:1.225rem;
+  height:7.2rem;
+  padding:.2rem;
+  border:1px solid #000;
+  background:var(--paper);
+  box-sizing:border-box;
+}
+
+.volumemeterhint{
+  position:absolute;
+  bottom:.2rem;
+  right:100%;
+  margin-right:1.6rem;
+  white-space:nowrap;
+  color:var(--soil-color, transparent);
+  text-shadow:
+    0 0 4px var(--glow, transparent),
+    0 0 8px var(--glow, transparent),
+    0 0 14px var(--glow, transparent),
+    0 0 22px var(--glow, transparent);
+  opacity:0;
+  /* visibility as a second, independent gate alongside opacity — belt and
+     suspenders against any engine-specific quirk where opacity:0 alone
+     doesn't fully suppress a text-shadow from compositing/painting */
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .15s ease-out, visibility .15s;
+}
+
+.volumemeter:hover .volumemeterhint{
+  opacity:1;
+  visibility:visible;
+}
+
+.volumemeter .bar{
+  flex:0 0 .4rem;
+  width:100%;
+  background:#000;
+  opacity:.15;
+  transition: opacity .12s ease-out;
+}
+
+.volumemeter .bar[data-active="true"]{
+  opacity:1;
+}
+
+
+
+/* seed slots */
+
+#seedSlots{ 
+  position:absolute; 
+  inset:0; 
+  pointer-events:none; 
+}
+
+.seedslot{ 
+  position:absolute; 
+  width:10px; 
+  height:10px; 
+  transform:translate(-50%,-50%); 
+  pointer-events:auto; 
+  cursor:pointer; }
+
+.seedslot:hover{ 
+  filter: 
+    drop-shadow(0 0 6px var(--glow, transparent)); 
+}
+
+.seedslot .dot{ 
+  position:absolute; 
+  inset:0; 
+  border-radius:50%; 
+  border:1px 
+    solid #000; 
+}
+
+.seedslot .txt{
+  position:absolute;
+  left:calc(10px + .35rem);   
+  top:50%;
+  transform:translateY(-50%);
+  white-space:nowrap;
+}
+
+@keyframes seedTextPulse{ 0%,100%{ transform:translateY(-50%) scale(1);} 50%{transform:translateY(-50%) scale(1.1); } }
+@keyframes seedGradientPulse{ 0%{ background-position:0% 50%; } 100%{ background-position:200% 50%; } }
+
+.seedslot.empty .txt{
+  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--soil-color,#fff) 50%, var(--text-color,#fff) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
+}
+
+
+
+/* roots */
+
+#connectionsLayer{ 
+  position:absolute; 
+  inset:0; 
+  width:100%; 
+  height:100%; 
+  pointer-events:none; 
+}
+
+
+
+/* plant slots */
+
+#plantSlots{ 
+  position:absolute; 
+  inset:0; pointer-events:none; 
+}
+
+.plantmark{
+  position:absolute; 
+  width:140px; 
+  height:140px; 
+  transform:translate(-50%,-50%);
+  cursor:grab; 
+  pointer-events:auto;
+}
+
+.plantmark:active{
+  cursor:grabbing;
+}
+
+.plantmark:hover .labeldot,
+.plantmark:hover .txt{
+  filter: drop-shadow(0 0 6px var(--glow, transparent));
+}
+
+.plantmark svg{ 
+  width:100%; 
+  height:100%; 
+  overflow:visible; 
+}
+
+.plantmark .labeldot{
+  position:absolute; top:50%; left:100%; transform:translateY(-50%);
+  margin-left:.4rem; width:10px; height:10px; border-radius:50%; border:1px solid #000;
+  /* without this the 1px border adds outside the 10px box (no global
+     box-sizing:border-box reset in this file), rendering 12x12 — a seed's
+     own dot is sized via inset:0 instead, which doesn't have this problem,
+     so the two would otherwise visibly differ even at "the same" 10px */
+  box-sizing:border-box;
+}
+
+.plantmark .txt{
+  position:absolute; 
+  top:50%; 
+  left:100%; 
+  transform:translateY(-50%);
+  margin-left:calc(.4rem + 10px + .35rem); 
+  white-space:nowrap; pointer-events:none;
+}
+
+.plantmark.playing .txt{
+  background:linear-gradient(90deg, var(--text-color,#fff) 0%, var(--seed-color,#fff) 50%, var(--text-color,#fff) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation: seedTextPulse 1.6s ease-in-out infinite, seedGradientPulse 2.4s linear infinite;
+}
+
+@keyframes plantPinPulse{
+  0%,100%{ 
+    transform:translateY(-50%) scale(1); 
+    background:var(--seed-color,currentColor); 
+  }  
+  50%{ 
+    transform:translateY(-50%) scale(1.6); 
+    background:var(--dot-color,currentColor); 
+  }
+}
+
+.plantmark.pinned .labeldot{ 
+  animation:plantPinPulse 1s ease-in-out infinite; 
+}
+
+
+
+/* modal styling */
+
+.modal{
+  width:100%; 
+  max-width:480px; 
+  max-height:85vh; 
+  overflow:auto;
+  background:var(--paper); 
+  color:var(--ink); 
+  border:2px solid #000; 
+  border-radius:0;
+}
+
+.modal .cardbody{ 
+  padding: 1.6rem; 
+}
+
+.modal h2{ 
+  margin: 0 0 .2rem; 
+  font-size: inherit; 
+}
+
+.modal .sub{ 
+  margin-bottom: 1.2rem; 
+}
+
+.modal .actions{ 
+  margin-top:1.5rem; 
+  justify-content:flex-end; 
+}
+
+.titlebar{
+  height:18px; 
+  border-bottom:2px solid #000; 
+  display:flex; 
+  align-items:center; 
+  gap:.4rem; 
+  padding:0 6px;
+  background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
+}
+
+.titlebar .closebox{ 
+  width:9px; 
+  height:9px; 
+  border:1px solid #000; 
+  background:var(--paper); 
+  flex-shrink:0; 
+}
+
+.cardbody{ 
+  padding:.8rem .9rem; 
+}
+
+.sub{ 
+  color:var(--muted); 
+  margin:0 0 1.6rem; 
+  line-height:1.4; 
+}
+
+label{ 
+  display:block; 
+  color:var(--muted); 
+  margin-bottom:.3rem; 
+}
+
+.cardtitle{ 
+  color:var(--ink); 
+  margin-bottom:.5rem; 
+}
+
+.row{ 
+  margin-bottom:.8rem; 
+}
+
+input[type="text"], select{
+  width:100%; 
+  padding:.4rem .5rem; 
+  border-radius:0; 
+  border:1px solid #000;
+  background:var(--paper); 
+  color:var(--ink); 
+  font-family:inherit; 
+  font-size:inherit;
+  box-sizing:border-box;
+}
+
+
+
+/* save and cancel buttons */
+
+button.primary{
+  padding:.45rem 1rem; 
+  border-radius:999px; 
+  border:1px solid #000; 
+  background:#000; 
+  color:var(--paper);
+  font-family:inherit; 
+  font-size:inherit; 
+  cursor:pointer; 
+  font-weight:600;
+}
+
+button.primary:active{ 
+  background:var(--paper); 
+  color:#000; 
+}
+button.primary:disabled{ 
+  opacity:.35; 
+  cursor:not-allowed; 
+}
+
+button.ghost{
+  background:none; 
+  border:1px solid #000; 
+  color:var(--ink); 
+  border-radius:999px;
+  padding:.3rem .8rem; 
+  cursor:pointer; 
+  font-size:inherit; 
+  font-family:inherit;
+}
+
+button.ghost:disabled{ 
+  opacity:.35; 
+  cursor:not-allowed; 
+}
+
+
+
+/* loading scrim */
+
+.scrim{
+  display:none; 
+  position:fixed; 
+  inset:0;
+  align-items:center; 
+  justify-content:center; 
+  padding:1.5rem; 
+  z-index:2;
+}
+
+.scrim.open{
+  display:flex;
+}
+
+#entryScrim{ 
+  z-index:10; 
+}
+
+#loadingScreen{
+  position:fixed; inset:0; 
+  z-index:9;
+  background:var(--paper);
+  display:flex; align-items:center; 
+  justify-content:center;
+}
+
+.entryprogress{
+  border:1px solid #000;
+  height:.6rem;
+  overflow:hidden;
+}
+
+.entryprogressbar{
+  height:100%;
+  width:0%;
+  background:#000;
+  transition:width .15s ease-out;
+}
+
+
+
+/* season settings + seed list */
+
 .card{
   position:fixed; 
   top:2.5rem; 
@@ -477,21 +646,6 @@ body{
 
 #seedListCard{
   top:calc(2.5rem + 2.3rem + .6rem);
-}
-
-/* garden info panel — right side instead of left, and wider, since it's
-   mostly prose rather than form controls */
-.card.right{
-  left:auto;
-  right:2.5rem;
-  top:calc(2.5rem + 2.3rem + .6rem);
-}
-.card.wide{
-  max-width:380px;
-}
-#gardenInfoCard .cardbody{
-  max-height:70vh;
-  overflow-y:auto;
 }
 
 #seedListItems{
@@ -547,27 +701,7 @@ body{
   line-height:1;
 }
 
-.titlebar{
-  height:18px; border-bottom:2px solid #000; display:flex; align-items:center; gap:.4rem; padding:0 6px;
-  background-image: repeating-linear-gradient(#000 0 1px, transparent 1px 3px);
-}
-.titlebar .closebox{ width:9px; height:9px; border:1px solid #000; background:var(--paper); flex-shrink:0; }
-.cardbody{ padding:.8rem .9rem; }
 
-.sub{ color:var(--muted); margin:0 0 1.6rem; line-height:1.4; }
-label{ display:block; color:var(--muted); margin-bottom:.3rem; }
-/* a panel's own heading (seed list, settings) rather than a form field's
-   label — ink instead of the muted color plain labels get */
-.cardtitle{ color:var(--ink); margin-bottom:.5rem; }
-.row{ margin-bottom:.8rem; }
-input[type="text"], select{
-  width:100%; padding:.4rem .5rem; border-radius:0; border:1px solid #000;
-  background:var(--paper); color:var(--ink); font-family:inherit; font-size:inherit;
-  /* without this, width:100% is the CONTENT width (no global box-sizing
-     reset in this file) — padding+border then add on top of that and
-     overflow past the modal's own right padding instead of respecting it */
-  box-sizing:border-box;
-}
 
 /* tags */
 
@@ -622,18 +756,38 @@ input[type="text"], select{
 
 
 
-/* colors — one per row, keeps the whole panel narrow and tall */
+/* colors */
 
-.colorgrid{ display:grid; grid-template-columns:1fr; gap:.5rem; }
-.colorpick span{ color:var(--muted); }
-.colorpick{ display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; }
+.colorgrid{ 
+  display:grid; 
+  grid-template-columns:1fr; 
+  gap:.5rem; 
+}
+
+.colorpick span{ 
+  color:var(--muted); 
+}
+
+.colorpick{ 
+  display:flex; 
+  flex-direction:column; 
+  align-items:flex-start; 
+  gap:.25rem; 
+}
+
 .colorpick input[type="color"]{
-  width:100%; height:24px; border:1px solid #000; border-radius:0; background:none; padding:2px; cursor:pointer;
+  width:100%; 
+  height:24px; 
+  border:1px solid #000; 
+  border-radius:0; 
+  background:none; 
+  padding:2px; 
+  cursor:pointer;
 }
 
 
 
-/* pattern picker */
+/* field pattern picker */
 
 .patternbank{ 
   display:flex; 
@@ -701,124 +855,27 @@ input[type="text"], select{
 }
 
 
-/* save and cancel buttons */
 
-button.primary{
-  padding:.45rem 1rem; 
-  border-radius:999px; 
-  border:1px solid #000; 
-  background:#000; 
-  color:var(--paper);
-  font-family:inherit; 
-  font-size:inherit; 
-  cursor:pointer; 
-  font-weight:600;
+/* visitor info */
+
+.card.right{
+  left:auto;
+  right:2.5rem;
+  top:calc(2.5rem + 2.3rem + .6rem);
 }
 
-button.primary:active{ 
-  background:var(--paper); 
-  color:#000; 
-}
-button.primary:disabled{ 
-  opacity:.35; 
-  cursor:not-allowed; 
+.card.wide{
+  max-width:320px;
 }
 
-button.ghost{
-  background:none; 
-  border:1px solid #000; 
-  color:var(--ink); 
-  border-radius:999px;
-  padding:.3rem .8rem; 
-  cursor:pointer; 
-  font-size:inherit; 
-  font-family:inherit;
-}
-
-button.ghost:disabled{ 
-  opacity:.35; 
-  cursor:not-allowed; 
+#gardenInfoCard .cardbody{
+  max-height:70vh;
+  overflow-y:auto;
 }
 
 
 
-/* modal base */
-
-.scrim{
-  display:none; 
-  position:fixed; 
-  inset:0;
-  align-items:center; 
-  justify-content:center; 
-  padding:1.5rem; 
-  z-index:2;
-}
-
-.scrim.open{
-  display:flex;
-}
-
-/* sits above every other layer (nav, toggles, arrow pad included), since
-   it's meant to fully gate the page until dismissed */
-#entryScrim{ z-index:10; }
-
-/* opaque cover over the field — sits below the entry gate (z-index 10) so
-   it's never the thing on top, but above everything else, blocking the
-   local/randomized defaults from flashing before the real synced garden
-   loads in. Removed outright once that data arrives (see hideLoadingScreen). */
-#loadingScreen{
-  position:fixed; inset:0; z-index:9;
-  background:var(--paper);
-  display:flex; align-items:center; justify-content:center;
-}
-
-/* fills while every seed/plant sound preloads behind the entry gate (see
-   preloadGardenAudio) — enterBtn stays disabled until it's full or the
-   preload gives up waiting, so wandering in doesn't hit any first-listen lag */
-.entryprogress{
-  border:1px solid #000;
-  height:.6rem;
-  overflow:hidden;
-}
-.entryprogressbar{
-  height:100%;
-  width:0%;
-  background:#000;
-  transition:width .15s ease-out;
-}
-
-.modal{
-  width:100%; 
-  max-width:480px; 
-  max-height:85vh; 
-  overflow:auto;
-  background:var(--paper); 
-  color:var(--ink); 
-  border:2px solid #000; 
-  border-radius:0;
-}
-
-.modal .cardbody{ 
-  padding: 1.6rem; 
-}
-
-.modal h2{ 
-  margin: 0 0 .2rem; 
-  font-size: inherit; 
-}
-
-.modal .sub{ 
-  margin-bottom: 1.2rem; 
-}
-
-.modal .actions{ 
-  margin-top:1.5rem; 
-  justify-content:flex-end; 
-}
-
-
-
-/* plant modal file label */
+/* file label */
 
 .filelabel{
   display:flex; 
@@ -842,7 +899,7 @@ button.ghost:disabled{
 
 
 
-/* plant modal drawing space */
+/* plant drawing space */
 
 #pCanvas{ 
   border:2px solid #000; 

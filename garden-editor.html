@@ -33,14 +33,14 @@
 
 
 <!-- top right - counter -->
-<div class="visitorcount" id="visitorCountBtn" title="about this garden">
+<div class="visitorcount" id="visitorCountBtn" title="୨ৎ welcome friend ༄">
   <span class="dot"></span><span id="visitorCountText">1 here now</span>
 </div>
 
   
 <!-- bottom right - audio meter -->
 <div class="volumemeter" id="volumeMeter">
-  <span class="volumemeterhint">જ⁀➴ double-click to explore another garden</span>
+  <span class="volumemeterhint">જ⁀➴ double-click to teleport ₊˚⋆˚</span>
   <span class="bar"></span>
   <span class="bar"></span>
   <span class="bar"></span>
@@ -75,6 +75,7 @@
     <div class="cardbody">
       <label class="cardtitle">୨ৎ cuttings જ⁀➴ loops ༄</label>
       <p class="sub" style="margin-bottom:.3rem;">cut a sound ~ plant a loop ~ propagate n grow</p>
+      <p class="sub">approach the plants to listen to their songs ~<br>click to keep them going<br>move their position to change their pitch</p>
       <div class="entryprogress" id="entryProgress"><div class="entryprogressbar" id="entryProgressBar"></div></div>
       <p class="sub" id="entryProgressLabel" style="margin:.5rem 0 1.2rem;">waking up the garden...</p>
       <div class="actions">
@@ -144,21 +145,19 @@
 </div>
 
 
-<!-- modal: garden info, opened from the visitor counter -->
+<!-- modal: visitor info -->
 <div class="card wide right" id="gardenInfoCard">
   <div class="titlebar"><span class="closebox"></span></div>
   <div class="cardbody">
-    <p class="sub">you're here in 1 of many sound gardens<br>planted by <span id="plantedByNames"></span></p>
-    <p class="sub">approach the plants to listen to their songs ~<br>click to keep them going<br>move their position to change their pitch</p>
-    <p class="sub">secret tip ~<br>look for portals to enter other gardens, or<br>if it feels like a new season, you can create a new one</p>
-    <p class="sub" style="margin-bottom:.5rem;">invite a friend to join and find the hidden portals</p>
+    <label class="cardtitle">୨ৎ welcome to one of many sound gardens ༄</label>
+    <p class="sub">to plant a sound, start with the seed list, then cut and loop as you like and plant it in an empty spot when you're ready</p>
+    <p class="sub" style="margin-bottom:.5rem;">garden coordinates</p>
     <div class="copyrow">
       <input type="text" id="gardenUrl" readonly>
       <button type="button" class="ghost" id="copyUrlBtn">copy</button>
     </div>
-    <p class="sub" style="color:var(--paper);" aria-hidden="true">or if it feels like a new season, you can create a new one</p>
-    <p class="sub">want to plant your own sounds?<br>start with the seed list<br>cut and loop as you like<br>plant in an empty spot on the field</p>
-    <p class="sub" style="margin-bottom:0;">made with playhtml<br>font: deer diary</p>
+    <p class="sub" style="margin-bottom:.5rem !important;">this garden was planted by <span id="plantedByNames"></span></p>
+    <p class="sub" style="margin-bottom:.5rem !important;">made with <a href="https://playhtml.fun/" target="_blank">playhtml ↗</a></p>
   </div>
 </div>
 
