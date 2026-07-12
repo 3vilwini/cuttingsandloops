@@ -99,17 +99,8 @@ function svgEl(tag, attrs){
   return el;
 }
 
-/* ---- create garden ---- */
-// a namespace for this garden's uploaded files (see uploadSeedFile's
-// X-Garden-Id header) — does not decide which synced room a visitor joins,
-// see connectChannels below. Derived from the page's own path AND query
-// string (not just pathname) rather than a random id per load, so every
-// visitor to the same garden page uploads into the same stable folder
-// (and re-uploading to a slot correctly overwrites the old file there,
-// instead of leaving it orphaned under a new random id) — the query
-// string has to be included now that ?g=<id> is what actually
-// distinguishes one garden from another; pathname alone would put every
-// garden's uploads in the same folder and overwrite across gardens.
+
+// create garden ?g=<id> (uploadSeedFile's X-Garden-Id, connectChannels). page path AND query distinguishes one garden from another
 garden.id = (location.pathname + location.search).replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
 
 /* ==========================================================================
@@ -636,59 +627,26 @@ document.getElementById("enterBtn").addEventListener("click", () => {
 });
 
 /* ==========================================================================
-   PLAYHTML — plants and garden meta (colors/tags/pattern/scale) sync live
-   across everyone who has the link, via Page Data (one JSON blob per
-   channel), plus always-on cursor presence.
-
-   LIMITATION: playhtml syncs JSON only. A plant's audioRef is a `blob:` URL,
-   valid only in the browser tab that uploaded it, unless UPLOAD_ENDPOINT is
-   configured — without it, a plant's metadata syncs to every visitor but the
-   audio itself is only playable by whoever planted it.
-
-   `cursors: { enabled: true }` is required — `cursors: {}` leaves the cursor
-   client disabled.
+   PLAYHTML — garden meta syncs live (one JSON blob per channel), plus always-on cursor presence.
    ========================================================================== */
 // init() returns a promise; createPageData() (inside connectChannels) isn't
 // usable until it resolves, so this has to chain off .then().
-//
-// room is only passed explicitly when ?g=<id> is actually present. playhtml's
-// own default (confirmed by inspecting window.playhtml.roomId at runtime) is
-// origin + pathname ONLY, with the .html extension stripped and the query
-// string dropped entirely — that's what silently let every ?g= value share
-// one room before. But that native default is also where THE ORIGINAL
-// garden (no ?g= at all) has always actually lived — passing an explicit
-// room unconditionally would point the bare URL at a brand-new empty room
-// instead of that real one, orphaning it exactly the way the file rename
-// once did. So: no ?g= -> no room override, keep using playhtml's real
-// default; ?g=<id> present -> use garden.id (pathname + search, sanitized)
-// so each numbered garden actually gets its own separate room.
+// room is only passed when ?g=<id> is present 
 const gardenParam = new URLSearchParams(location.search).get("g");
 playhtml.init({
   ...(gardenParam ? { room: garden.id } : {}),
   cursors: { enabled: true },
 }).then(connectChannels);
 
-// fallback so a slow/broken connection doesn't block the page forever —
-// if connectChannels() never even ran, preloadGardenAudio() never got a
-// chance to enable this either, so it's done here instead
 setTimeout(() => {
   const enterBtn = document.getElementById("enterBtn");
   enterBtn.disabled = false;
   enterBtn.textContent = "feel the grass";
 }, 6000);
 
-/* preloads every seed/plant sound into the browser's HTTP cache while the
-   entry gate is up (see connectChannels), so wandering in right after
-   clicking through doesn't make the first pass near any plant wait on it —
-   ensurePlantAudio()/the seed list's play button fetch the exact same URL
-   again later, which the browser then just serves from cache instantly.
-   enterBtn stays disabled until everything's loaded (or ENTRY_PRELOAD_TIMEOUT_MS
-   gives up waiting on a slow/broken file, rather than blocking forever). */
+// preloads every seed/plant sound into browser's cache while entry gate is up (see connectChannels) 
 const ENTRY_PRELOAD_TIMEOUT_MS = 8000;
 function preloadGardenAudio(){
-  // {label, ref} instead of bare URLs, so a failed one can be reported by
-  // name — see the console.warn in finish() below, the one place to spot a
-  // dead sound (broken URL, stale blob: ref, etc.) without hunting for it
   const items = [
     ...Object.values(garden.plants || {}).map(p => ({ label:`plant "${p.name}"`, ref:p.audioRef })),
     ...Object.values(garden.seeds || {}).map(s => ({ label:`seed "${s.title} - ${s.artist}"`, ref:s.audioRef })),
@@ -723,16 +681,13 @@ function preloadGardenAudio(){
     const a = new Audio();
     a.preload = "auto";
     a.addEventListener("canplaythrough", bump, { once:true });
-    a.addEventListener("error", () => { failed.push(item); bump(); }, { once:true });   // don't let one bad file block everything else
+    a.addEventListener("error", () => { failed.push(item); bump(); }, { once:true });  
     a.src = item.ref;
   }
   setTimeout(finish, ENTRY_PRELOAD_TIMEOUT_MS);
 }
 
-/* live visitor count — window.cursors.allColors is playhtml's own list of
-   currently-connected players in this room; .length is "here right now".
-   It isn't available the instant init() returns (the cursor room connects
-   async), so poll briefly until it exists, then just listen. */
+// live visitor count — window.cursors.allColors is playhtml
 const visitorCountText = document.getElementById("visitorCountText");
 function renderVisitorCount(){
   const n = window.cursors ? window.cursors.allColors.length : 1;
@@ -747,30 +702,21 @@ function renderVisitorCount(){
   }
 })();
 
-/* connect once, immediately on load — guarded so a stray repeat call is a
-   no-op. Channel names are fixed (not per-visitor garden.id) so every
-   visitor on this same URL joins the same synced documents, exactly like
-   playhtml's cursor room does by default (scoped to location.pathname +
-   search). garden.id is only ever used to namespace uploaded files. */
 function connectChannels(){
   if(plantSlotsChannel) return;
 
   plantSlotsChannel = playhtml.createPageData("garden-plants", garden.plants);
   garden.plants = plantSlotsChannel.getData();
-  renderPlantSlots();   // draw whatever was already planted by anyone — the
-                        // only render calls before this point ran with the
-                        // empty local default, since this pull is async
+  renderPlantSlots();   
   plantSlotsChannel.onUpdate(data => { garden.plants = data; renderPlantSlots(); });
 
-  // colors/tags/pattern/scale. Whole-object/array replacement is fine here —
-  // it's only *index* assignment into a top-level array that playhtml's
-  // Page Data rejects, and meta is a plain object throughout.
+  // szn settings - colors/tags/pattern/scale
   metaChannel = playhtml.createPageData("garden-meta", garden.meta);
   garden.meta = metaChannel.getData();
   applyMetaToUI();
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
 
-  // tag-press easter egg — see checkTagPresses above
+  // tag-press easter egg — see checkTagPresses 
   tagPressChannel = playhtml.createPageData("tag-presses", {});
   tagPressChannel.onUpdate(checkTagPresses);
 
@@ -782,9 +728,6 @@ function connectChannels(){
   preloadGardenAudio();
 }
 
-/* re-renders everywhere seed title/artist text shows up: the field markers
-   themselves, the seed-list panel, and the plant modal's "sampled from"
-   options — kept in one place so nothing can drift out of sync. */
 function onSeedsChanged(){
   renderSeedSlots();
   renderSeedList();
@@ -792,12 +735,8 @@ function onSeedsChanged(){
   renderConnections();
 }
 
-/* pushes garden.meta as a whole to everyone else in the room */
 function syncMeta(){ metaChannel?.setData(draft => Object.assign(draft, garden.meta)); }
 
-/* the reverse of applyColors()/etc — takes garden.meta (just replaced by an
-   incoming sync, or restored on connect) and pushes it into the actual
-   inputs + re-renders, instead of reading the inputs to build garden.meta. */
 function applyMetaToUI(){
   cBg1.value = garden.meta.colors.background[0];
   cBg2.value = garden.meta.colors.background[1];
@@ -1149,57 +1088,23 @@ const hoverSquare = document.getElementById("hoverSquare");
 
 const localPlantAudioRefs = {};
 const localSeedAudioRefs = {};
-// keyed by plant id, not a per-marker closure variable — a pin-toggle click
-// re-renders the whole plant layer (fresh DOM node, fresh closure) before a
-// second click could ever land, so timing has to survive that rebuild
 const lastPlantClickTimes = {};
-
-/* pinning is local/per-visitor only — deliberately never synced via
-   playhtml, so each person decides for themselves which plants keep
-   playing continuously. Keyed by plant id (not stored on the synced plant
-   object itself), so it survives renderPlantSlots() rebuilding the DOM on
-   every position sync from other visitors. */
 const pinnedPlantIds = new Set();
-
-/* ambient wandering sound: every plant's volume is a function of how far
-   the "listener" (wherever the cursor is, or wherever arrow-key panning has
-   taken you) currently is from it — recomputed continuously in
-   updateAmbientAudio() below, not gated by hovering any one element.
-   Multiple nearby plants can be audible at once (the "layering"), and each
-   one's volume glides toward its target every frame instead of snapping
-   (the "decay" as you wander away). */
 const listener = { x: CX, y: CY };
-
-/* the listener position only ever moves on a real mousemove/pan — if the
-   user clicks away to another tab or app, those events just stop firing
-   and everything would otherwise keep playing forever at whatever volume
-   it happened to be at. windowFocused gates the final volume in
-   updateAmbientAudio() so leaving actually fades everything to silence,
-   instead of freezing in place. */
-let windowFocused = true;
+let windowFocused = true; // holds listener position unless moving away from window or tab
 window.addEventListener("blur", () => { windowFocused = false; });
 window.addEventListener("focus", () => { windowFocused = true; });
 
-const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent, unless pinned
-const MAX_VOICES = 6;         // only the closest N (plus any pinned) actually play at once
+const AUDIBLE_RADIUS = 400;   // beyond this a plant is silent unless pinned
+const MAX_VOICES = 6;         // only the closest N (plus any pinned) can play at once
 const PIN_VOLUME = 0.8;       // floor volume for a pinned plant, regardless of distance
-const STICK_MS = 3000;        // how long a plant keeps playing at its last volume after you leave range, before it starts fading
-const DECAY_MS = 3500;        // once fading, how long the eased trail-off takes to reach silence
-const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame (0-1, higher = snappier)
-// ease-in cubic: barely drops at first, then falls away faster — a plant
-// that had already built up volume holds onto most of it a while longer
-// before curving down, instead of decaying at a constant rate the whole way
+const STICK_MS = 3000;        // how long a plant keeps playing at volume after you leave range before it starts fading
+const DECAY_MS = 3500;        // once fading, how long until sound fully decays 
+const VOLUME_LERP = 0.08;     // how fast volume glides toward its target each frame 
 const decayEase = t => t*t*t;
-
-/* a faint footprint dropped every so often you actually move (mouse or
-   keyboard/arrow-pad panning both update listener.x/y, so both leave a
-   trail) — checked once per frame in updateAmbientAudio(), same as
-   everything else audio-related, even though this part is purely visual. */
 let lastTrailX = listener.x, lastTrailY = listener.y;
-const TRAIL_MIN_DIST = 30;      // spawn a new footprint every ~this many px of movement
+const TRAIL_MIN_DIST = 30;      // spawn new footprint after this many px of movement
 const TRAIL_LIFETIME_MS = 1800; // how long a footprint takes to fully fade and remove itself
-// decorative glyphs matching the site's own title treatment — one is picked
-// at random for each footprint instead of a plain dot
 const TRAIL_GLYPHS = ["݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
 function spawnTrailDot(x, y){
   const dot = document.createElement("span");
@@ -1207,29 +1112,13 @@ function spawnTrailDot(x, y){
   dot.textContent = TRAIL_GLYPHS[Math.floor(Math.random() * TRAIL_GLYPHS.length)];
   dot.style.left = x + "px";
   dot.style.top = y + "px";
-  // seed color -> sky color, same gradient-text technique as the seed/pinned pulse.
-  // background-image (not the "background" shorthand) — the shorthand resets
-  // background-clip to its initial value even when unmentioned, which would
-  // silently override the class's own background-clip:text rule below.
   dot.style.backgroundImage = `linear-gradient(135deg, ${garden.meta.colors.seed}, ${garden.meta.colors.background[0]})`;
   fieldEl.appendChild(dot);
   setTimeout(() => dot.remove(), TRAIL_LIFETIME_MS);
 }
 
-// currently-playing plant audio, keyed by plant id — survives re-renders
-// for the same reason pinnedPlantIds does, which is what lets a sound keep
-// fading/playing uninterrupted while someone else drags that plant around.
 const activePlantAudio = {};
 
-// which plants currently get the .playing pulse class — hovered/in-range,
-// still decaying (STICK_MS), or pinned, all read the same currentVolume
-// off activePlantAudio, so there's nothing pin-specific to check separately.
-// Walks every rendered plantmark (not just activePlantAudio's keys) so a
-// class survives renderPlantSlots() rebuilding the DOM out from under it.
-// Also clears/restores the label's inline color to match — renderPlantSlots()
-// always sets that color inline, and an inline style always beats a
-// stylesheet rule, so .plantmark.playing .txt's transparent (for the
-// gradient-clip pulse) needs this to actually take effect.
 const PLAYING_THRESHOLD = 0.02;
 function updatePlayingClasses(){
   for(const mark of document.querySelectorAll("#plantSlots .plantmark")){
@@ -1245,27 +1134,14 @@ const smoothstep = t => t*t*(3-2*t);
 function volumeForDistance(dist){
   return dist >= AUDIBLE_RADIUS ? 0 : smoothstep(1 - dist/AUDIBLE_RADIUS);
 }
-
-/* pitch follows vertical position on the field: one octave higher at the
-   very top, one octave lower at the very bottom, unchanged at dead center.
-   playbackRate shifts pitch and tempo together — the simplest native way
-   to do this without building a real Web Audio pitch-shifting graph. */
+// pitch follows vertical positioning
 function pitchForY(y){
   return Math.pow(2, (FIELD_H/2 - y) / (FIELD_H/2));
 }
 
-/* bottom-right sound level meter — not a control, just a readout of the
-   loudest currently-playing voice (0-1), updated every frame alongside
-   everything else in updateAmbientAudio(). Bars light up past their own
-   threshold, same idea as a classic VU meter. */
+// bottom-right audio meter thresholds
 const volumeMeterEl = document.getElementById("volumeMeter");
-// .bar only — volumeMeterEl also has a .volumemeterhint span as a sibling,
-// which .children would include and throw off the index-to-threshold mapping
 const volumeMeterBars = Array.from(volumeMeterEl.querySelectorAll(".bar"));
-// the last one is 0.99, not 1.0 — currentVolume glides toward its target via
-// a lerp (see updateAmbientAudio), which asymptotically approaches but can
-// never exactly equal 1.0 in floating point, so a literal 1.0 threshold here
-// would leave the top bar permanently unreachable
 const VOLUME_METER_THRESHOLDS = [0.063, 0.125, 0.188, 0.25, 0.313, 0.375, 0.438, 0.5, 0.563, 0.625, 0.688, 0.75, 0.813, 0.875, 0.938, 0.99];
 function updateVolumeMeter(level){
   volumeMeterBars.forEach((bar, i) => {
@@ -1273,14 +1149,7 @@ function updateVolumeMeter(level){
   });
 }
 
-/* double-click the meter to teleport to a random OTHER garden — see
-   .volumemeterhint in mood.css for the "double-click to teleport" text
-   that hints at this. Picks from [1, count] (the Worker's /garden-count
-   peek at the same D1 counter "new garden" allocates from — see
-   upload-worker/worker.js), excluding whichever garden this already is,
-   so it's never a no-op. Not every number in that range is guaranteed to
-   still have anything planted in it — the counter only tracks how many
-   have ever been created, not which ones stuck around. */
+// double-click meter to teleport to random garden (the Worker's /garden-count D1 counter "new garden" allocates from — see upload-worker/worker.js) 
 const volumeMeterHintEl = document.querySelector("#volumeMeter .volumemeterhint");
 const volumeMeterHintLabel = volumeMeterHintEl?.textContent;
 function flashVolumeMeterHint(message){
@@ -1310,10 +1179,6 @@ volumeMeterEl.addEventListener("dblclick", async () => {
   location.href = `${location.pathname}?g=${chosen}`;
 });
 
-// creates a plant's Audio element once, starting silent — updateAmbientAudio
-// snaps it straight to its target volume on the first frame (see justArrived
-// below), so play() only ever happens here, never repeatedly on every little
-// hover in and out
 function ensurePlantAudio(p){
   if(activePlantAudio[p.id]) return;
   const ref = p.audioRef || localPlantAudioRefs[p.id];
@@ -1332,15 +1197,6 @@ function stopPlantAudio(id){
   delete activePlantAudio[id];
 }
 
-/* the one continuous audio update — recomputes every plant's distance from
-   the listener, decides who's audible (the closest MAX_VOICES within
-   range, plus anything pinned), and glides each one's volume toward its
-   target every frame instead of snapping. A plant you've wandered away
-   from doesn't start fading immediately — it sticks at its last volume for
-   STICK_MS, then eases down to silence over DECAY_MS (decayEase), holding
-   onto more of its volume for longer instead of decaying at a flat rate —
-   and only gets torn down once it's actually silent, instead of tearing
-   down and re-fetching on every back-and-forth. */
 function updateAmbientAudio(){
   const now = performance.now();
   const plants = Object.values(garden.plants || {});
@@ -1355,8 +1211,6 @@ function updateAmbientAudio(){
     ensurePlantAudio(p);
     const entry = activePlantAudio[p.id];
     if(!entry) continue;
-    // in range (or pinned) — live volume, and reset the stick timer since
-    // it's not "away" anymore
     entry.targetVolume = Math.max(volumeForDistance(p._dist), pinnedPlantIds.has(p.id) ? PIN_VOLUME : 0);
     entry.leftRangeAt = null;
   }
@@ -1365,7 +1219,7 @@ function updateAmbientAudio(){
     if(desired.has(id)) continue;
     if(entry.leftRangeAt == null){
       entry.leftRangeAt = now;
-      entry.volumeAtLeave = entry.currentVolume;   // snapshot — the curve trails off from here, not from 1
+      entry.volumeAtLeave = entry.currentVolume;   
     }
     const sinceLeft = now - entry.leftRangeAt;
     if(sinceLeft < STICK_MS){
@@ -1378,16 +1232,10 @@ function updateAmbientAudio(){
   let loudest = 0;
   for(const id in activePlantAudio){
     const entry = activePlantAudio[id];
-    // tabbed/clicked away — fade toward silence regardless of each plant's
-    // own real target, without touching that target itself, so proximity
-    // and the stick/decay curve just pick back up where they left off the
-    // instant focus returns
+    // click away —> fade toward silence, click back -> focus returns to where listener left off
     const effectiveTarget = windowFocused ? entry.targetVolume : 0;
     if(entry.justArrived){
-      // no fade-in — a plant that just came into range (or got pinned)
-      // snaps straight to its computed volume on this first frame instead
-      // of creeping up via the lerp below, which still governs every
-      // frame after this one (moving around in range, leaving, decaying)
+      // no fade-in — entry not affected by LERP
       entry.currentVolume = effectiveTarget;
       entry.justArrived = false;
     } else {
@@ -1404,7 +1252,6 @@ function updateAmbientAudio(){
   updateVolumeMeter(loudest);
   updatePlayingClasses();
 
-  // a footprint every so often you actually move, not on every frame
   if(Math.hypot(listener.x - lastTrailX, listener.y - lastTrailY) >= TRAIL_MIN_DIST){
     spawnTrailDot(listener.x, listener.y);
     lastTrailX = listener.x; lastTrailY = listener.y;
@@ -1415,22 +1262,13 @@ function updateAmbientAudio(){
 requestAnimationFrame(updateAmbientAudio);
 let plantDraftFile = null;
 let pendingPlantPos = null;
-let editingPlantId = null;   // null while planting new — set to a plant's id while editing it
-let selectedSampledFrom = [];   // "title - artist" strings, multi-select chips — see renderSampledFromBank
-// no color picker anymore — a new plant's drawing color is always the
-// inverse of the garden's current seed color; editing an existing plant
-// keeps whatever color it already has, so old and new strokes still match
+let editingPlantId = null;   
+let selectedSampledFrom = [];   
 let plantDraftColor = "#000000";
 
 const pctx = pCanvas.getContext("2d");
-// butt cap/miter join (canvas defaults) instead of round — jagged edges,
-// no smoothing, matching the field's SVG polylines exactly
 pctx.lineWidth = 1.5; pctx.lineCap = "butt"; pctx.lineJoin = "miter";
 let drawing = false;
-// the canvas is just live drawing feedback in the modal — what actually gets
-// saved/rendered on the map is the raw stroke points themselves (see
-// renderPlantSlots), as SVG polylines, so the marker is the drawing itself
-// instead of a rasterized square thumbnail.
 let plantDraftPaths = [];
 let currentStroke = null;
 function canvasPos(e){
@@ -1467,10 +1305,6 @@ pFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ 
 
 pName.addEventListener("input", validatePlant);
 function validatePlant(){
-  // a drawing is required now — no plant without one, so there's never a
-  // plain colored box on the map, only ever the drawing itself. A new
-  // audio file is only required when planting new — editing can keep
-  // whatever audio was already there.
   const needsFile = !editingPlantId;
   pSaveBtn.disabled = (needsFile && !plantDraftFile) || !pName.value.trim() || !plantDraftPaths.length;
 }
@@ -1486,11 +1320,6 @@ function redrawPaths(paths){
   }
 }
 
-/* "sampled from" options are just every filled seed's "title - artist"
-   text, doubling as the option's own value — reused as-is in both the
-   plant modal and the seed-list panel (see renderSeedList). */
-/* chip multi-select, same look/interaction as the "feels like" tag bank —
-   one chip per filled seed, toggled on/off, tracked in selectedSampledFrom. */
 function renderSampledFromBank(){
   pSampledFromBank.innerHTML = "";
   const seeds = Object.values(garden.seeds || {});
@@ -1520,7 +1349,7 @@ function toggleSampledFrom(label){
 
 function openPlantModal(pos){
   editingPlantId = null;
-  pSub.textContent = "plant your own sound mixed from the seedlist, and watch it grow next to others.";
+  pSub.textContent = "plant your own sound mixed from the seed list, and watch it grow next to others.";
   pSaveBtn.textContent = "plant";
   pendingPlantPos = pos || { x: CX, y: CY };
   plantDraftFile = null;
@@ -1535,9 +1364,7 @@ function openPlantModal(pos){
   plantScrim.classList.add("open");
 }
 
-/* editing reuses the same modal — pre-filled with the plant's current
-   name/drawing, position unchanged. A new audio file is optional; leaving
-   it blank keeps what was already there (see pSaveBtn below). */
+// editing reuses the same modal pre-filled with current plant data
 function openPlantEditModal(p){
   editingPlantId = p.id;
   pSaveBtn.textContent = "save";
@@ -1548,8 +1375,6 @@ function openPlantEditModal(p){
   plantDraftColor = p.color; pctx.strokeStyle = p.color;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
   redrawPaths(plantDraftPaths);
-  // backward-compat: sampledFrom used to be a single string before this
-  // became a multi-select
   selectedSampledFrom = Array.isArray(p.sampledFrom) ? p.sampledFrom.slice() : (p.sampledFrom ? [p.sampledFrom] : []);
   renderSampledFromBank();
   pDeleteBtn.style.display = "";
@@ -1590,9 +1415,6 @@ pSaveBtn.addEventListener("click", async () => {
     sampledFrom: selectedSampledFrom.slice(),
     paths: plantDraftPaths, color: plantDraftColor,
     x: pendingPlantPos.x, y: pendingPlantPos.y,
-    // preserved across edits — this is when the plant was first planted,
-    // not last touched, so editing an existing plant doesn't bump the
-    // garden info panel's "last planted" date
     plantedAt: existing?.plantedAt || Date.now(),
   };
   garden.plants[plantId] = plant;
@@ -1603,12 +1425,9 @@ pSaveBtn.addEventListener("click", async () => {
 });
 
 /* ==========================================================================
-   INITIAL RENDER — first paint, must stay last: needs every DOM-query const above it already initialized
+   INITIAL RENDER 
    ========================================================================== */
 
-// connectChannels() runs async (after playhtml.init resolves) and re-renders
-// on its own once the real synced data arrives — these are just the
-// unsynced first paint using local defaults.
 renderSeedSlots();
 renderPlantSlots();
 renderSeedList();
