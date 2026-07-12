@@ -5,24 +5,17 @@
 import { playhtml } from "https://unpkg.com/playhtml";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
-// the deployed Worker (upload-worker/worker.js) that streams uploads into
-// R2 — left empty, plant/seed uploads fall back to session-only blob URLs
-// instead, which still work locally but can't be shared across visitors.
+// the deployed Worker (upload-worker/worker.js) that streams uploads into R2
 const UPLOAD_ENDPOINT = "https://sound-garden-uploads.renxchristiane.workers.dev";
 const MAX_TAGS = 3;
 const PATTERNS = [
-  { id:"lattice", label:"lattice" },   // grid of very thin light lines
-  { id:"array",   label:"array" },     // dots arranged in a spiral
-  { id:"furrow",  label:"furrow" },    // straight horizontal lines
+  { id:"lattice", label:"lattice" },   
+  { id:"array",   label:"array" },    
+  { id:"furrow",  label:"furrow" },    
 ];
 
-const FIELD_W = 2400, FIELD_H = 1600;   // the field is bigger than the viewport — arrow keys pan it
+const FIELD_W = 2400, FIELD_H = 1600;   
 const STEP = 95;
-
-// how close to the field edge a plant can be dragged (see the mousedown
-// handler in renderPlantSlots) — keeps its 140px drawing (70px each way
-// from center) and, on the right, its name label too from running off
-// the edge of the field.
 const PLANT_MARGIN_LEFT = 70;
 const PLANT_MARGIN_RIGHT = 280;
 const PLANT_MARGIN_Y = 70;
@@ -32,47 +25,36 @@ const garden = {
   meta: {
     tags: [],
     colors: {
-      background: ["#3AB704", "#E2FFCB"],   // [sky, soil] — top-to-bottom gradient stops
-      seed: "#FFD8B6",                       // also colors the field pattern + decorative seed markers
-      text: "#FFFFFF",                       // label color
+      background: ["#3AB704", "#E2FFCB"],  
+      seed: "#FFD8B6",                      
+      text: "#FFFFFF",                      
     },
-    pattern: "lattice",       // "lattice" | "array" | "furrow"
-    scale: 1,                 // multiplies pattern spacing/dot size
+    pattern: "lattice",     
+    scale: 1,                 
   },
-  plants: {},   // plantId -> { id, name, audioRef, sampledFrom (string[]), paths ([[{x,y},...],...]), color, x, y }
-  // note: "pinned" is intentionally not part of this shape — see pinnedPlantIds
-  seeds: {},    // slot index (string "0".."9") -> { title, artist, audioRef }
+  plants: {},   // plantId -> { id, name, audioRef, sampledFrom, paths, color, x, y }
+  seeds: {},    // slot index (string "0".."9") 
 };
 
-// declared here rather than down by connectChannels() (where they'd
-// conceptually belong) because applyColors() runs at top-level during
-// initial page load and calls syncMeta(), which reads metaChannel — a
-// `let` declared later would be a temporal-dead-zone ReferenceError there.
 let plantSlotsChannel = null;
 let metaChannel = null;
 let tagPressChannel = null;
 let seedsChannel = null;
 
-/* garden.meta itself now lives in playhtml's synced Page Data (see
-   connectChannels below) — that's the real persistence, shared across every
-   visitor to this URL, not just this browser. No localStorage needed. */
-
+// random id per browser session for playthml unique clicks (not 2 distinct user ids) 
 function newId(len=8){
   return crypto.randomUUID ? crypto.randomUUID().slice(0,len) : Math.random().toString(36).slice(2,2+len);
 }
 
-// one random id per browser tab/session — just enough to tell "two distinct
-// people" apart for the tag-press easter egg below, not a real user identity
 const clientId = newId();
 
-/* hex "#rrggbb" -> "r,g,b" so the seed color can be used at low opacity for the field pattern */
+// hex "#rrggbb" -> "r,g,b" so seed color can be used at low opacity for field pattern 
 function hexToRgb(hex){
   const m = hex.replace("#","").match(/.{2}/g).map(h => parseInt(h,16));
   return m.join(",");
 }
 
-/* true color inversion (255-channel), for the empty-seed hover glow — the
-   literal "opposite color" of the seed color used for a planted seed's glow */
+// color inversion - used mostly on seed color 
 function invertHex(hex){
   const [r,g,b] = hex.replace("#","").match(/.{2}/g).map(h => parseInt(h,16));
   const toHex = n => (255-n).toString(16).padStart(2,"0");
@@ -81,8 +63,7 @@ function invertHex(hex){
 
 const randInt = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
 
-/* hsl -> hex, so random defaults can be constrained to sane saturation/lightness
-   ranges instead of raw random RGB (which mostly produces muddy, low-contrast colors) */
+// hsl -> hex, so random defaults can be constrained to complementary saturation/lightness instead of random RGB 
 function hsl2hex(h, s, l){
   s/=100; l/=100;
   const k = n => (n + h/30) % 12;
@@ -92,14 +73,10 @@ function hsl2hex(h, s, l){
   return `#${toHex(0)}${toHex(8)}${toHex(4)}`;
 }
 
-/* random but constrained: a saturated seed color, a sky->soil pair with real
-   lightness contrast, labels picked for contrast against the sky, plus a
-   random field pattern and scale. Only fieldScale's own min/max/step (not
-   hardcoded here) decide the range, so this stays correct if that slider's
-   HTML attributes ever change. */
+// saturated seed color, sky->soil gradient, labels contrast against sky, random field pattern and scale 
 function randomizeDefaults(){
   const bgHue = randInt(0,359);
-  const seedHue = (bgHue + 180 + randInt(-40,40) + 360) % 360; // roughly complementary -> pops against the field
+  const seedHue = (bgHue + 180 + randInt(-40,40) + 360) % 360; 
   const skyLightness = randInt(35,45);
   cBg1.value = hsl2hex(bgHue, randInt(55,75), skyLightness);
   cBg2.value = hsl2hex((bgHue + randInt(-15,15) + 360) % 360, randInt(30,50), randInt(85,92));
@@ -121,6 +98,7 @@ function svgEl(tag, attrs){
   for(const k in attrs) el.setAttribute(k, attrs[k]);
   return el;
 }
+
 /* ---- create garden ---- */
 // a namespace for this garden's uploaded files (see uploadSeedFile's
 // X-Garden-Id header) — does not decide which synced room a visitor joins,
@@ -139,41 +117,29 @@ garden.id = (location.pathname + location.search).replace(/[^\w.-]+/g, "_").repl
    ========================================================================== */
 
 
-/* seed slots — one fixed layout per pattern (not random), so a given pattern
-   always shows its seeds in the same arrangement, matching how that pattern
-   reads visually (grid cells for lattice, spiral arms for array, rows for furrow). */
+// seed slots — one fixed layout per pattern 
 const CX = FIELD_W/2, CY = FIELD_H/2;
 const SEED_COLS = [-600,-300,0,300,600];
 
-/* base offsets from field center, one fixed layout per pattern (10 seeds each) —
-   actual on-screen position is these offsets times the current scale, so slot
-   placement spreads/tightens together with the pattern itself. */
 const LATTICE_ROWS = [
   { dy:-300, xs:[-500, 0, 500] },
   { dy:0,    xs:[-625, -210, 210, 625] },
   { dy:300,  xs:[-500, 0, 500] },
 ];
 const SEED_SLOTS_BASE = {
-  // 3 / 4 / 3 rows — deliberately not the same grid as furrow, so the two
-  // patterns' seed layouts actually look different from each other
   lattice: LATTICE_ROWS.flatMap(row => row.xs.map(dx => ({ dx, dy:row.dy }))),
-  // every other column (both its seeds together) nudged lower than its
-  // neighbors, so a long name doesn't run into the column right next to it
   furrow: SEED_COLS.flatMap((dx, col) => {
     const extra = col % 2 === 1 ? 130 : 0;
     return [{dx,dy:-130+extra}, {dx,dy:130+extra}];
   }),
 };
 function arraySlotOffsets(scale){
-  // same spiral formula the pattern itself uses, so seeds land along its arms
   return Array.from({length:10}, (_,i) => {
     const t = 1 + i*0.9, r = 52*t*scale;
     return { dx:r*Math.cos(t), dy:r*Math.sin(t) };
   });
 }
-/* the current pattern's seed positions, in field coordinates — the single
-   source of truth both renderSeedSlots and the field's hover/click
-   handling (seedOccupiedBoxes) read from. */
+
 function seedFieldOffsets(){
   const scale = garden.meta.scale || 1;
   return garden.meta.pattern === "array"
@@ -181,22 +147,16 @@ function seedFieldOffsets(){
     : SEED_SLOTS_BASE[garden.meta.pattern].map(o => ({ dx:o.dx*scale, dy:o.dy*scale }));
 }
 
-/* draws the current garden.meta.colors/pattern onto the field (gradient)
-   and the SVG layer (pattern lines/dots), sized to the whole (bigger-than-
-   viewport) field rather than just what's on screen. */
+// svg pattern and background sized to full field rather viewport only 
 function renderField(){
   const { background, text, seed } = garden.meta.colors;
   const fieldEl = document.getElementById("field");
   fieldEl.style.background = `linear-gradient(to bottom, ${background[0]}, ${background[1]})`; // sky -> soil
   fieldEl.style.color = text;
-  // the volume meter's hover hint is soil-colored with a seed-color glow (see .volumemeterhint)
   const volumeMeterEl = document.getElementById("volumeMeter");
   volumeMeterEl.style.setProperty("--glow", seed);
   volumeMeterEl.style.setProperty("--soil-color", background[1]);
   renderSeedSlots();
-  // plant labeldots are colored from garden.meta.colors.text too — without
-  // this they'd keep whatever color was current when each plant last
-  // rendered, drifting out of sync with the seed dots the moment "labels" changes
   renderPlantSlots();
 
   const svg = document.getElementById("patternLayer");
@@ -206,16 +166,13 @@ function renderField(){
   const rgb = hexToRgb(seed);
 
   const scale = garden.meta.scale || 1;
-  const LATTICE_BASE = 104;   // grid cell size (doubled again from 52)
-  const FURROW_BASE = 26;     // independent of LATTICE_BASE now, so furrow's spacing doesn't change too
+  const LATTICE_BASE = 104;   
+  const FURROW_BASE = 26;     
 
   if(garden.meta.pattern === "array"){
-    // dots arranged in an outward spiral from center, spaced evenly along
-    // the curve (not by fixed angle step, or it thins into spokes at radius) —
-    // wider pitch + smaller dots so it reads as a spiral, not concentric rings.
     const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
     const a = 16 * scale;      // spiral pitch — distance between successive arms
-    const dotGap = 10 * scale; // arc-length distance between dots — doubled density vs before
+    const dotGap = 10 * scale; // arc-length distance between dots 
     const dotR = Math.max(0.6, 0.9 * scale);
     const group = svgEl("g", { fill:`rgba(${rgb},.55)` });
     let t = 1;
@@ -226,7 +183,6 @@ function renderField(){
     }
     svg.appendChild(group);
   } else {
-    // lattice (grid) or furrow (horizontal-only) — both are a tiled <pattern>
     const spacing = (garden.meta.pattern === "lattice" ? LATTICE_BASE : FURROW_BASE) * scale;
     const defs = svgEl("defs", {});
     const pattern = svgEl("pattern", { id:"fieldPattern", width:spacing, height:spacing, patternUnits:"userSpaceOnUse" });
@@ -240,7 +196,7 @@ function renderField(){
     svg.appendChild(svgEl("rect", { width:"100%", height:"100%", fill:"url(#fieldPattern)" }));
   }
 
-  applyViewToggles(); // re-apply since renderSeedSlots() just rebuilt the label spans
+  applyViewToggles(); 
 }
 
 const viewportEl = document.getElementById("viewport");
@@ -248,11 +204,9 @@ const fieldEl = document.getElementById("field");
 fieldEl.style.width = FIELD_W + "px";
 fieldEl.style.height = FIELD_H + "px";
 
-/* ---- arrow-key panning, same idea as the main garden view ---- */
+// arrow-key wander 
 function panBy(dx, dy){
   viewportEl.scrollBy({ left:dx, top:dy, behavior:"smooth" });
-  // ambient sound follows you even when you're navigating by keyboard,
-  // not just when the mouse itself is moving over the field
   listener.x = Math.max(0, Math.min(FIELD_W, listener.x + dx));
   listener.y = Math.max(0, Math.min(FIELD_H, listener.y + dy));
 }
@@ -274,10 +228,7 @@ requestAnimationFrame(() => {
    HOT SOIL SPOTS — mirrors mood.css "hot soil spots"
    ========================================================================== */
 
-/* planting is only allowed on a hot spot — a fixed grid spread evenly across
-   the field, unrelated to the decorative seed markers (those are clickable
-   some other way, not this). A spot with a plant in it already is excluded,
-   so hovering/clicking an existing plant never offers it as a target. */
+/* one plant her hot spot - exclude seed areas or live plant areas as targets */
 const HOTSPOT_COLS = 15, HOTSPOT_ROWS = 8, HOTSPOT_MARGIN = 150;
 function hotSpotPositions(){
   const usableW = FIELD_W - HOTSPOT_MARGIN * 2, usableH = FIELD_H - HOTSPOT_MARGIN * 2;
@@ -293,23 +244,11 @@ function hotSpotPositions(){
   return spots;
 }
 
-// half of the hover square's 140x140 footprint (matches .hoversquare/
-// .plantmark/pCanvas) — a square hit test, not a circular radius, so the
-// square appears/disappears exactly at its own visible edge, not some
-// smaller invisible area inside it.
 const HOTSPOT_HALF = 70;
-/* a plant's *actual* rendered box (drawing + its name label, which sits to
-   the right and can extend well past the 140px drawing itself for a longer
-   name) — measured live rather than assumed, so a "plant here" square never
-   lands on top of a long label's overflow. */
+
 function occupiedBoxes(){
   const fieldRect = fieldEl.getBoundingClientRect();
   return Array.from(document.querySelectorAll("#plantSlots .plantmark")).map(m => {
-    // .plantmark's own rect stops at 140x140 even though its name label is
-    // an absolutely-positioned child sitting outside that box (to the
-    // right) — an overflowing absolutely-positioned child never enlarges
-    // its ancestor's own bounding rect, so the label has to be measured
-    // separately and unioned in, or a long name's overflow goes unprotected
     const markRect = m.getBoundingClientRect();
     const txtEl = m.querySelector(".txt");
     const txtRect = txtEl ? txtEl.getBoundingClientRect() : markRect;
@@ -321,12 +260,6 @@ function occupiedBoxes(){
     };
   });
 }
-// same idea as occupiedBoxes above, but for seed slots — a hot spot whose
-// square would cover a seed's own clickable area (dot + label) is skipped,
-// so hovering near a seed always reads as "click the seed", never "plant
-// here". Unlike occupiedBoxes this is a box-vs-square overlap test rather
-// than a point-in-box test, since a seed's dot is much smaller than a hot
-// spot's 140x140 square and a point test would almost never catch it.
 function seedOccupiedBoxes(){
   const fieldRect = fieldEl.getBoundingClientRect();
   return Array.from(document.querySelectorAll("#seedSlots .seedslot")).map(m => {
@@ -346,9 +279,6 @@ function nearestHotSpot(x, y){
   const seedBoxes = seedOccupiedBoxes();
   let best = null, bestDist = Infinity;
   for(const s of hotSpotPositions()){
-    // a hot spot inside an existing plant's real rendered box (drawing +
-    // label) is never offered — being near a plant means dragging it, not
-    // planting a new one on top of it
     if(boxes.some(b => s.x >= b.left && s.x <= b.right && s.y >= b.top && s.y <= b.bottom)) continue;
     const sqLeft = s.x - HOTSPOT_HALF, sqRight = s.x + HOTSPOT_HALF, sqTop = s.y - HOTSPOT_HALF, sqBottom = s.y + HOTSPOT_HALF;
     if(seedBoxes.some(b => sqLeft < b.right && sqRight > b.left && sqTop < b.bottom && sqBottom > b.top)) continue;
@@ -359,11 +289,10 @@ function nearestHotSpot(x, y){
   return best;
 }
 
-const NO_SEEDS_MSG = "you can’t plant just yet! add at least one seed as the source before other plants can grow";
+const NO_SEEDS_MSG = "you can’t plant yet! add at least one seed (a source sound) before you can grow something here.";
 fieldEl.addEventListener("mousemove", e => {
   const r = fieldEl.getBoundingClientRect();
-  // ambient sound's "listener" position — same field-space coordinates as
-  // a plant's own x/y, so distance comparisons in updateAmbientAudio() just work
+  // listener position 
   listener.x = e.clientX - r.left;
   listener.y = e.clientY - r.top;
   const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
@@ -381,7 +310,7 @@ fieldEl.addEventListener("click", e => {
   const r = fieldEl.getBoundingClientRect();
   const spot = nearestHotSpot(e.clientX - r.left, e.clientY - r.top);
   if(!spot) return;   // clicking away from a hot spot does nothing now
-  if(!Object.keys(garden.seeds || {}).length) return;   // can't plant until at least one seed exists
+  if(!Object.keys(garden.seeds || {}).length) return;   
   openPlantModal(spot);
 });
 
@@ -390,28 +319,20 @@ fieldEl.addEventListener("click", e => {
    ========================================================================== */
 
 const builderCardEl = document.getElementById("builderCard");
-// declared here (not down by the click listener below) because hideBuilder()
-// is called immediately, and showBuilder()/hideBuilder() both reference this
-// button to show whether the panel is open — same TDZ trap as before if this
-// were declared any later.
 const navToggleBtn = document.getElementById("navToggleBtn");
 
-/* ---- modal exclusivity: opening either one always closes the other ----
-   the swirl button itself shows pressed (inverted) while the panel is open —
-   it's the only way to open or close it now, so that state has to be obvious. */
+// opening one modal closes the other open modal 
 function showBuilder(){ hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo(); builderCardEl.style.display = ""; navToggleBtn.setAttribute("data-open", "true"); }
 function hideBuilder(){ builderCardEl.style.display = "none"; navToggleBtn.setAttribute("data-open", "false"); }
 
-// closed by default for every visitor — opened only via the nav swirl icon
+// closed by default 
 hideBuilder();
 
-/* ---- nav stack (icon-only): toggle the builder window ---- */
 navToggleBtn.addEventListener("click", () => {
   const hidden = builderCardEl.style.display === "none";
   if(hidden) showBuilder(); else hideBuilder();
 });
 
-/* the seed-list panel — every seed added so far, each with a download link */
 const seedListCardEl = document.getElementById("seedListCard");
 const seedListToggleBtn = document.getElementById("seedListToggleBtn");
 function showSeedList(){ hideBuilder(); hidePlantModal(); hideSeedModal(); hideGardenInfo(); seedListCardEl.style.display = ""; seedListToggleBtn.setAttribute("data-open", "true"); }
@@ -426,41 +347,21 @@ seedListToggleBtn.addEventListener("click", () => {
    TOP CENTER — CLICKABLE TAGS — mirrors mood.css "top center - clickable tags"
    ========================================================================== */
 
-/* top-center readout of the chosen tags — mirrors the bank, glows the
-   garden's seed color on hover, and doubles as the tag-press easter egg
-   trigger (see checkTagPresses). */
+// top center tags — mirrors the bank, glows seed color on hover, easter egg click (see checkTagPresses)
 const tagDisplayEl = document.getElementById("tagDisplay");
 function renderTagDisplay(){
   tagDisplayEl.innerHTML = "";
   for(const t of garden.meta.tags){
     const s = document.createElement("span");
     s.textContent = t;
-    s.title = "click here with a friend ˚Ი⑅𐑼˖";   // hints at the two-person press below
+    s.title = "click here with a friend ˚Ი⑅𐑼˖";   
     s.style.setProperty("--glow", garden.meta.colors.seed);
     s.addEventListener("click", () => pressTag(t));
     tagDisplayEl.appendChild(s);
   }
 }
 
-/* two DISTINCT people (browser tabs) pressing the same tag within a couple
-   seconds of each other opens a SoundCloud tag search in a new tab for
-   everyone currently on the page — a little synced "press together to
-   unlock" moment. Each press writes to its own "tag:clientId" key rather
-   than appending to a shared per-tag array — two people pressing close
-   together would otherwise each read-modify-write that array from a stale
-   pre-merge view, and whichever write lands last silently overwrites the
-   other's entry (confirmed: two near-simultaneous presses settled on only
-   one surviving entry every time). Keying by clientId means concurrent
-   presses never touch the same key, so neither can clobber the other.
-   checkTagPresses (run on every update, by everyone) groups the flat
-   "tag:clientId" -> ts map back by tag and looks for 2+ distinct clientIds
-   still inside the time window; stale keys just linger harmlessly since
-   they're always re-filtered by ts on read.
-   window.open (not a direct navigation) is used so nobody loses their place
-   in the garden — but browsers only allow window.open without a popup
-   block when it's called synchronously from a real user gesture, so this
-   reliably opens for whichever tab's click completes the pair, and may be
-   silently blocked in tabs that are just idling on an earlier press. */
+// soundcloud easter egg
 const TAG_PRESS_WINDOW_MS = 2000;
 function pressTag(t){
   tagPressChannel?.setData(draft => {
@@ -488,7 +389,7 @@ function checkTagPresses(data){
    BOTTOM LEFT — TOGGLE BAR — mirrors mood.css "bottom left - toggle bar"
    ========================================================================== */
 
-/* ---- bottom toggle bar: seeds / plants / roots / labels visibility ---- */
+// bottom left toggles: seeds / plants / roots / labels 
 const VIEW_STATE = { seeds:true, plants:true, labels:true, roots:true };
 function applyViewToggles(){
   document.getElementById("seedSlots").style.display = VIEW_STATE.seeds ? "" : "none";
@@ -497,9 +398,7 @@ function applyViewToggles(){
   document.querySelectorAll("#seedSlots .txt, #plantSlots .txt")
     .forEach(el => el.style.display = VIEW_STATE.labels ? "" : "none");
 }
-// shared by the bottom-bar buttons themselves and anything else that wants
-// to flip one of these (a filled seed's click uses this same function for
-// "roots" — same mechanism, not a separate parallel toggle)
+
 function toggleView(key){
   VIEW_STATE[key] = !VIEW_STATE[key];
   document.querySelectorAll(`#viewToggles button[data-key="${key}"]`)
@@ -515,8 +414,7 @@ document.querySelectorAll("#viewToggles button").forEach(b => {
    SEED SLOTS — mirrors mood.css "seed slots"
    ========================================================================== */
 
-/* an empty slot invites a click (opens the add-seed modal); a filled one
-   shows "title - artist" and previews on hover, same as a plant does. */
+// empty slot -> click to open add-seed modal, filled slot shows "title - artist" -> click to open seed list
 function renderSeedSlots(){
   const layer = document.getElementById("seedSlots");
   layer.innerHTML = "";
@@ -526,8 +424,7 @@ function renderSeedSlots(){
     el.className = "seedslot" + (seed ? "" : " empty");
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
-    // a planted seed glows its own seed color on hover; an empty one glows
-    // the exact opposite (inverted) color, so the two states read distinctly
+    // planted seed glows seed color on hover, empty slot glow inverted color
     el.style.setProperty("--glow", seed ? garden.meta.colors.seed : invertHex(garden.meta.colors.seed));
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
