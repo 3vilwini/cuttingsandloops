@@ -578,7 +578,7 @@ button.ghost:disabled{
 
 
 
-/* loading scrim — js hideLoadingScreen(), preloadGardenAudio() */
+/* loading scrim — js preloadGardenAudio() */
 
 .scrim{
   display:none; 
@@ -594,16 +594,8 @@ button.ghost:disabled{
   display:flex;
 }
 
-#entryScrim{ 
-  z-index:10; 
-}
-
-#loadingScreen{
-  position:fixed; inset:0; 
-  z-index:9;
-  background:var(--paper);
-  display:flex; align-items:center; 
-  justify-content:center;
+#entryScrim{
+  z-index:10;
 }
 
 .entryprogress{

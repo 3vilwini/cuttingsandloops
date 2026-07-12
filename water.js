@@ -825,17 +825,10 @@ playhtml.init({
   cursors: { enabled: true },
 }).then(connectChannels);
 
-// #loadingScreen covers the field until connectChannels() has pulled the
-// real synced state (see the end of that function) — this timeout is just
-// a fallback so a slow/broken connection doesn't block the page forever,
-// falling back to showing the local defaults rather than a permanent cover.
-function hideLoadingScreen(){
-  document.getElementById("loadingScreen")?.remove();
-}
+// fallback so a slow/broken connection doesn't block the page forever —
+// if connectChannels() never even ran, preloadGardenAudio() never got a
+// chance to enable this either, so it's done here instead
 setTimeout(() => {
-  hideLoadingScreen();
-  // if connectChannels() never even ran, preloadGardenAudio() never got a
-  // chance to enable this either — nothing left to preload in that case
   const enterBtn = document.getElementById("enterBtn");
   enterBtn.disabled = false;
   enterBtn.textContent = "feel the grass";
@@ -943,7 +936,6 @@ function connectChannels(){
   onSeedsChanged();
   seedsChannel.onUpdate(data => { garden.seeds = data; onSeedsChanged(); });
 
-  hideLoadingScreen();
   preloadGardenAudio();
 }
 
