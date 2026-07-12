@@ -218,8 +218,6 @@ document.addEventListener("keydown", e => {
   if(move){ e.preventDefault(); panBy(move[0], move[1]); }
 });
 
-// start centered on the field, like the main garden view does — deferred a
-// frame so the viewport has actually been laid out before we measure it
 requestAnimationFrame(() => {
   viewportEl.scrollTo({ left: FIELD_W/2 - viewportEl.clientWidth/2, top: FIELD_H/2 - viewportEl.clientHeight/2 });
 });
@@ -228,7 +226,7 @@ requestAnimationFrame(() => {
    HOT SOIL SPOTS — mirrors mood.css "hot soil spots"
    ========================================================================== */
 
-/* one plant her hot spot - exclude seed areas or live plant areas as targets */
+// one plant her hot spot - exclude seed areas or live plant areas as targets 
 const HOTSPOT_COLS = 15, HOTSPOT_ROWS = 8, HOTSPOT_MARGIN = 150;
 function hotSpotPositions(){
   const usableW = FIELD_W - HOTSPOT_MARGIN * 2, usableH = FIELD_H - HOTSPOT_MARGIN * 2;
@@ -424,7 +422,7 @@ function renderSeedSlots(){
     el.className = "seedslot" + (seed ? "" : " empty");
     el.style.left = (CX + o.dx) + "px"; el.style.top = (CY + o.dy) + "px";
     el.style.color = garden.meta.colors.text;
-    // planted seed glows seed color on hover, empty slot glow inverted color
+    // planted seed glows seed color on hover, empty slot glows inverted color
     el.style.setProperty("--glow", seed ? garden.meta.colors.seed : invertHex(garden.meta.colors.seed));
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
@@ -437,22 +435,16 @@ function renderSeedSlots(){
 
     if(seed){
       el.addEventListener("mouseenter", () => {
-        // peek at the roots regardless of the persistent toggle state —
-        // mouseleave reverts to whatever that toggle actually says
+        // hovering on seed shows roots 
         document.getElementById("connectionsLayer").style.display = "";
       });
       el.addEventListener("mouseleave", () => {
         applyViewToggles();
       });
-      // click opens the seed list panel instead of touching roots at all —
-      // hover is what shows them now, see mouseenter/mouseleave above
+      // click to open seed list panel 
       el.addEventListener("click", e => { e.stopPropagation(); showSeedList(); });
     } else {
-      // stopPropagation matters here — without it this click also bubbles to
-      // the field's own click handler, which independently checks proximity
-      // to a *plant* hot spot (a completely different, denser grid) and
-      // would immediately close this seed modal and open the plant one
-      // instead, since a seed slot and a plant hot spot can easily overlap
+      // stopPropagation ignores plant hotspots when clicking on seed
       el.addEventListener("click", e => { e.stopPropagation(); openSeedModal(i); });
     }
     layer.appendChild(el);
@@ -463,12 +455,7 @@ function renderSeedSlots(){
    ROOTS — mirrors mood.css "roots"
    ========================================================================== */
 
-/* dashed curved lines from every filled seed to each plant whose
-   sampledFrom includes it. Always rendered (same as the seed/plant/label
-   layers) — visibility is purely VIEW_STATE.roots via applyViewToggles, the
-   same "roots" switch in the bottom bar. Clicking a filled seed doesn't
-   pick which one to show anymore — it just flips that same switch, via
-   toggleView, exactly like clicking the bottom-bar button does. */
+// roots are dashed curved lines
 function renderConnections(){
   const svg = document.getElementById("connectionsLayer");
   svg.innerHTML = "";
@@ -487,27 +474,18 @@ function renderConnections(){
     const from = { x: CX + o.dx, y: CY + o.dy };
     const connected = plants.filter(p => Array.isArray(p.sampledFrom) && p.sampledFrom.includes(label));
     for(const p of connected){
-      // ends on the plant's own labeldot, not its drawing's center — measured
-      // live (same idea as occupiedBoxes/seedOccupiedBoxes) rather than
-      // computed from margin/size constants, so it stays correct even if
-      // that dot's CSS changes. Falls back to the plant's raw x/y if the
-      // dot isn't actually rendered right now (e.g. the "plants" toggle is off).
+      // root connects on the plant dot, not at the drawing's center 
       const dotEl = document.querySelector(`#plantSlots .plantmark[data-plant-id="${p.id}"] .labeldot`);
       const dotRect = dotEl?.getBoundingClientRect();
       const toX = dotRect?.width ? dotRect.left + dotRect.width/2 - fieldRect.left : p.x;
       const toY = dotRect?.width ? dotRect.top + dotRect.height/2 - fieldRect.top : p.y;
-      // bow the line out to the side, perpendicular to the straight path
-      // between them, so overlapping connections stay visually distinct
-      // instead of stacking as straight lines
       const dx = toX - from.x, dy = toY - from.y;
       const len = Math.hypot(dx, dy) || 1;
       const bow = 40;
       const midX = (from.x + toX) / 2 - (dy / len) * bow;
       const midY = (from.y + toY) / 2 + (dx / len) * bow;
 
-      // gradient from the seed's own dot color to this plant's dot color,
-      // so the line itself reads as flowing from one to the other — each
-      // connection needs its own gradient since the endpoints differ
+      // gradient from the seed dot color to plants dot color
       const gradientId = `rootGradient-${gradientCount++}`;
       const gradient = document.createElementNS(SVG_NS, "linearGradient");
       gradient.setAttribute("id", gradientId);
@@ -526,8 +504,6 @@ function renderConnections(){
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", `url(#${gradientId})`);
       path.setAttribute("stroke-width", "1.5");
-      // tight dotted line: a near-zero dash length with a round cap draws a
-      // small dot at each point, spaced close together, instead of dashes
       path.setAttribute("stroke-linecap", "round");
       path.setAttribute("stroke-dasharray", "0.1 3");
       path.setAttribute("vector-effect", "non-scaling-stroke");
@@ -545,23 +521,19 @@ function renderPlantSlots(){
   layer.innerHTML = "";
   Object.values(garden.plants || {}).forEach(p => {
     const el = document.createElement("div");
-    // pinned is local-only state, never read from the synced plant object —
-    // see the note by its declaration
+    // pinned is local-only 
     el.className = "plantmark" + (pinnedPlantIds.has(p.id) ? " pinned" : "");
     el.dataset.plantId = p.id;   // lets renderConnections find this plant's own labeldot
     el.style.left = p.x + "px"; el.style.top = p.y + "px";
-    // same seed color a filled seed's own hover glow uses (see .seedslot:hover)
     const dotColor = invertHex(garden.meta.colors.seed);
     el.style.setProperty("--glow", garden.meta.colors.seed);
     el.style.setProperty("--dot-color", dotColor);
     el.style.setProperty("--seed-color", garden.meta.colors.seed);
-    // --text-color/--soil-color match what a seed slot sets, for the shared
-    // seedTextPulse/seedGradientPulse animations; --sky-color is this plant's
-    // own (label -> sky, not label -> soil — see .plantmark.playing .txt)
     el.style.setProperty("--text-color", garden.meta.colors.text);
     el.style.setProperty("--soil-color", garden.meta.colors.background[1]);
     el.style.setProperty("--sky-color", garden.meta.colors.background[0]);
 
+    // plant drawing
     if(p.paths && p.paths.length){
       const svg = document.createElementNS(SVG_NS, "svg");
       svg.setAttribute("viewBox", `0 0 ${pCanvas.width} ${pCanvas.height}`);
@@ -586,37 +558,23 @@ function renderPlantSlots(){
       el.appendChild(fallback);
     }
 
-    // inverse of the current seed color (not the fixed p.color used for the
-    // drawing/roots) — recomputed live so it stays in sync if seed color
-    // changes later, same reasoning as renderField() calling renderPlantSlots()
+    // inverse of the current seed color 
     const labelDot = document.createElement("span");
     labelDot.className = "labeldot";
     labelDot.style.background = invertHex(garden.meta.colors.seed);
     el.appendChild(labelDot);
 
-    // the planter's name — same "txt" class the seed labels use, so the
-    // existing "labels" toggle shows/hides this one too for free
+    // label for plants is name of gardener
     const label = document.createElement("span");
     label.className = "txt";
     label.textContent = p.name;
     label.style.color = garden.meta.colors.text;
-    // updatePlayingClasses() clears this inline color back to "" whenever the
-    // plant is actually playing, so .plantmark.playing .txt's own transparent
-    // (for the gradient-clip pulse) can win — an inline color always beats a
-    // stylesheet rule regardless of specificity, so it can't be left set here
     el.appendChild(label);
 
-    // no per-element hover audio anymore — updateAmbientAudio() plays/fades
-    // every plant continuously based on distance from the cursor, so simply
-    // being near one (not necessarily directly over it) is enough
-    el.addEventListener("click", e => e.stopPropagation()); // don't let this also trigger the field's plant-here click
+ 
+    el.addEventListener("click", e => e.stopPropagation()); 
 
-    // drag to reposition (from anywhere on the marker) — persists for
-    // everyone via plantSlotsChannel. A mousedown that never actually moves
-    // is a plain click instead: toggles pinned. A second one landing soon
-    // after (hand-rolled double-click detection, not the native dblclick
-    // event, so it isn't thrown off by renderPlantSlots rebuilding this
-    // element's DOM node in between) opens this plant for editing.
+    // drag to reposition 
     el.addEventListener("mousedown", e => {
       e.stopPropagation();
       e.preventDefault();
@@ -627,24 +585,17 @@ function renderPlantSlots(){
         const dx = ev.clientX - startX, dy = ev.clientY - startY;
         if(!moved && Math.hypot(dx, dy) < 4) return;
         moved = true;
-        // keeps the drawing itself (70px half of its own 140px box) and its
-        // name label (which only ever extends to the right) from being
-        // draggable close enough to the field edge to run off it
+        // keep the drawing and label to stay within bounds on the field
         p.x = Math.max(PLANT_MARGIN_LEFT, Math.min(FIELD_W - PLANT_MARGIN_RIGHT, origX + dx));
         p.y = Math.max(PLANT_MARGIN_Y, Math.min(FIELD_H - PLANT_MARGIN_Y, origY + dy));
         el.style.left = p.x + "px"; el.style.top = p.y + "px";
-        // pitch/volume both update on their own every frame in
-        // updateAmbientAudio() — no need to touch audio here while dragging.
-        // roots aren't on any per-frame loop, though — without this, a
-        // connection line stays frozen at the old spot until the drag ends
         renderConnections();
       }
       function onUp(){
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
         if(moved){
-          // position is real shared state — every visitor sees this move,
-          // and it's what drives everyone's pitch/volume for this plant too
+          // position is shared state (affecting pitch for everyone)
           garden.plants[p.id] = p;
           plantSlotsChannel?.setData(draft => { draft[p.id] = p; });
         } else if(Date.now() - (lastPlantClickTimes[p.id] || 0) < 350){
@@ -652,9 +603,7 @@ function renderPlantSlots(){
           openPlantEditModal(p);
         } else {
           lastPlantClickTimes[p.id] = Date.now();
-          // pin/unpin is local-only — nothing written to plantSlotsChannel.
-          // updateAmbientAudio() picks up the change on its next frame, so
-          // no direct play/stop call is needed here either.
+          // pin/unpin is local-only 
           if(pinnedPlantIds.has(p.id)) pinnedPlantIds.delete(p.id);
           else pinnedPlantIds.add(p.id);
           renderPlantSlots();
@@ -673,8 +622,7 @@ function renderPlantSlots(){
    MODAL / LOADING SCRIM — mirrors mood.css "loading scrim" + "modal styling"
    ========================================================================== */
 
-// Escape closes whatever's open — works even while typing in one of these
-// panels' own fields, unlike the arrow-key panning guard above.
+// esc closes an open modal 
 document.addEventListener("keydown", e => {
   if(e.key !== "Escape") return;
   if(document.getElementById("confirmScrim").classList.contains("open")){ hideConfirmDialog(false); return; }
@@ -682,9 +630,7 @@ document.addEventListener("keydown", e => {
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList(); hideGardenInfo();
 });
 
-// the click (or Escape) that dismisses this is also what satisfies the
-// browser's autoplay-gesture requirement, so updateAmbientAudio()'s
-// eventual audio.play() calls are actually allowed to produce sound
+// the click to enter satisfies browser requirement for autoplaying sound
 document.getElementById("enterBtn").addEventListener("click", () => {
   document.getElementById("entryScrim").classList.remove("open");
 });
@@ -873,7 +819,7 @@ const tagBankEl = document.getElementById("tagBank");
 const tagCountLabel = document.getElementById("tagCountLabel");
 function renderTagBank(){
   tagBankEl.innerHTML = "";
-  // bank tags first, in fixed order
+  // bank tags first
   for(const t of TAG_BANK){
     const chosen = garden.meta.tags.includes(t);
     const b = document.createElement("button");
@@ -883,8 +829,7 @@ function renderTagBank(){
     b.addEventListener("click", () => toggleTag(t));
     tagBankEl.appendChild(b);
   }
-  // then any custom (typed-in) tags — these aren't in TAG_BANK, so they need
-  // their own chips or they'd be stored in state but never shown.
+  // custom tag chips are created as user inputs
   for(const t of garden.meta.tags){
     if(TAG_BANK.includes(t)) continue;
     const b = document.createElement("button");
@@ -914,7 +859,7 @@ document.getElementById("tagCustomBtn").addEventListener("click", () => {
   syncMeta();
 });
 
-/* ---- colors ---- */
+// colors - sky, soil, seed, label
 const cBg1 = document.getElementById("cBg1"), cBg2 = document.getElementById("cBg2");
 const cText = document.getElementById("cText"), cSeed = document.getElementById("cSeed");
 function applyColors(){
@@ -924,7 +869,7 @@ function applyColors(){
 }
 [cBg1,cBg2,cText,cSeed].forEach(el => el.addEventListener("input", applyColors));
 
-/* ---- scale slider ---- */
+// field pattern scale slider
 const fieldScale = document.getElementById("fieldScale");
 const fieldScaleLabel = document.getElementById("fieldScaleLabel");
 fieldScale.addEventListener("input", () => {
@@ -934,7 +879,7 @@ fieldScale.addEventListener("input", () => {
   syncMeta();
 });
 
-/* ---- pattern picker ---- */
+// field pattern picker
 const patternBankEl = document.getElementById("patternBank");
 function renderPatternBank(){
   patternBankEl.innerHTML = "";
@@ -954,20 +899,12 @@ function renderPatternBank(){
 
 renderTagBank();
 renderPatternBank();
-
-// these local defaults only matter for whoever connects to this garden's
-// shared channel first ever — connectChannels() below immediately overwrites
-// garden.meta with whatever's already synced for everyone else on this URL.
 randomizeDefaults();
-renderPatternBank();   // re-render — the pattern picker's buttons were drawn
-                        // just above using the old default, before this
-                        // randomized garden.meta.pattern existed
+renderPatternBank();   
 applyColors();
 
-// whichever seed-list preview is currently playing, if any — clicking a
-// different seed's play button stops this one first, so at most one
-// preview plays at a time, same jukebox assumption as everywhere else
-let seedListPlaying = null;   // { audioEl, btn, progress } | null
+// play seed preview automatically stops other preview
+let seedListPlaying = null;  
 function stopSeedListPreview(){
   if(!seedListPlaying) return;
   seedListPlaying.audioEl.pause();
@@ -977,7 +914,7 @@ function stopSeedListPreview(){
 }
 
 function renderSeedList(){
-  stopSeedListPreview();   // this rebuilds every row's DOM node below, so any old button reference would go stale
+  stopSeedListPreview();   
   const list = document.getElementById("seedListItems");
   list.innerHTML = "";
   const seeds = Object.values(garden.seeds || {});
@@ -1001,7 +938,7 @@ function renderSeedList(){
     play.addEventListener("click", () => {
       const wasThisOne = seedListPlaying?.btn === play;
       stopSeedListPreview();
-      if(wasThisOne) return;   // clicking the currently-playing one again just stops it
+      if(wasThisOne) return;   
       const audioEl = new Audio(seed.audioRef);
       audioEl.addEventListener("timeupdate", () => {
         if(audioEl.duration) progress.style.width = (audioEl.currentTime / audioEl.duration * 100) + "%";
@@ -1012,10 +949,6 @@ function renderSeedList(){
       seedListPlaying = { audioEl, btn: play, progress };
     });
     const dl = document.createElement("a");
-    // seed.audioRef is R2's public .r2.dev URL, cross-origin from this page — a plain
-    // <a download> to it is silently ignored by the browser (it just opens the file
-    // instead of saving it), so route through the worker's /download proxy instead,
-    // which sets Content-Disposition: attachment and actually forces the save dialog
     const seedKey = new URL(seed.audioRef).pathname.replace(/^\//, "");
     dl.href = `${UPLOAD_ENDPOINT}/download/${seedKey}`;
     dl.download = `${seed.title} - ${seed.artist}`;
@@ -1039,9 +972,6 @@ function renderSeedList(){
    VISITOR INFO — mirrors mood.css "visitor info"
    ========================================================================== */
 
-/* the "about this garden" panel, opened from the visitor counter — mostly
-   static copy, except the "planted by" line, which is only worth
-   recomputing at the moment someone actually opens it, not kept live */
 const gardenInfoCardEl = document.getElementById("gardenInfoCard");
 const visitorCountBtn = document.getElementById("visitorCountBtn");
 const gardenUrlInput = document.getElementById("gardenUrl");
@@ -1051,8 +981,7 @@ function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
   document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
-  // plants from before plantedAt existed just don't count toward this —
-  // there's no way to recover when they were actually planted
+  // plants don't hold date data other than latest plant for visitor info panel
   const timestamps = Object.values(garden.plants || {}).map(p => p.plantedAt).filter(Boolean);
   const lastPlanted = timestamps.length ? new Date(Math.max(...timestamps)) : null;
   document.getElementById("lastPlantedDate").textContent = lastPlanted
@@ -1073,8 +1002,6 @@ copyUrlBtn.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(gardenUrlInput.value);
   } catch {
-    // clipboard permission denied (Safari is strict about this) — fall back
-    // to selecting the text so the user can still copy it with cmd/ctrl+C
     copied = false;
     gardenUrlInput.select();
   }
@@ -1082,13 +1009,7 @@ copyUrlBtn.addEventListener("click", async () => {
   setTimeout(() => { copyUrlBtn.textContent = label; }, 1500);
 });
 
-/* a "garden" is just location.pathname + location.search — playhtml's own
-   default room scoping, unchanged here — so starting a new one is just
-   navigating to a URL nobody's used yet. The id itself comes from the
-   Worker's atomic counter (GardenCounter, see upload-worker/worker.js) —
-   not generated locally, since two people clicking this at once could
-   otherwise land on the exact same "new" number and collide into one
-   shared room instead of two separate ones. */
+// new "garden" is location.pathname + location.search — playhtml default room scoping — id from Worker's atomic counter (GardenCounter, see upload-worker/worker.js) 
 const newGardenLabel = newGardenBtn?.textContent;
 newGardenBtn?.addEventListener("click", async () => {
   newGardenBtn.disabled = true;
@@ -1108,16 +1029,10 @@ newGardenBtn?.addEventListener("click", async () => {
 
 /* ==========================================================================
    FILE LABEL / PLANT DRAWING SPACE — mirrors mood.css "file label" + "plant drawing space"
-   ambient audio, cursor trail, and the volume meter's threshold logic live
-   inside this block too (not under their own matching CSS sections) — they
-   share the `listener` object with the planting/drag code below and
-   splitting them out would risk a temporal-dead-zone reference, so this
-   whole continuum stays as one unit rather than being sliced apart.
+   PLUS ambient audio, cursor trail, volume meter threshold logic live here (not under their own matching CSS sections)
    ========================================================================== */
 
-/* streams a file straight to the Worker, which writes it into R2 and hands
-   back the public URL. Throws on any failure — the caller decides what to
-   fall back to (see the plant save handler). */
+// streams a file straight to the Worker, which writes it into R2 and hands back public URL
 async function uploadSeedFile(file, key){
   if(!UPLOAD_ENDPOINT) throw new Error("UPLOAD_ENDPOINT not configured");
   const res = await fetch(`${UPLOAD_ENDPOINT}/upload`, {
@@ -1135,12 +1050,6 @@ async function uploadSeedFile(file, key){
   return url;
 }
 
-/* best-effort companion to uploadSeedFile — deleting a seed/plant from the
-   synced state doesn't touch the underlying R2 object on its own, so both
-   delete handlers below call this too. Silently skipped for a blob: ref
-   (session-only, never uploaded, nothing on R2 to delete) and swallows any
-   network failure — an orphaned file is a much smaller problem than a
-   delete button that errors out because the network hiccuped. */
 async function deleteR2File(audioRef){
   if(!UPLOAD_ENDPOINT || !audioRef || audioRef.startsWith("blob:")) return;
   const key = new URL(audioRef).pathname.replace(/^\//, "");
@@ -1148,9 +1057,7 @@ async function deleteR2File(audioRef){
 }
 
 /* ==========================================================================
-   SEEDS — clicking an empty seed slot lets you name/upload a sound for it.
-   A filled slot just shows "title - artist" and previews on hover; there's
-   no re-editing a seed once it's set, unlike plants.
+   SEEDS 
    ========================================================================== */
 const seedScrim = document.getElementById("seedScrim");
 const sTitle = document.getElementById("sTitle");
@@ -1189,9 +1096,7 @@ function openSeedModal(slotIndex){
 function hideSeedModal(){ seedScrim?.classList.remove("open"); }
 sCancelBtn.addEventListener("click", hideSeedModal);
 
-/* generic yes/no confirmation — resolves true if the user confirms, false
-   if they cancel/Escape/click away. One shared modal, re-used for every
-   confirmation in the app rather than a bespoke dialog per action. */
+// generic yes/no confirmation used for all dialogs
 const confirmScrim = document.getElementById("confirmScrim");
 const confirmMsg = document.getElementById("confirmMsg");
 const confirmOkBtn = document.getElementById("confirmOkBtn");
@@ -1226,10 +1131,7 @@ sSaveBtn.addEventListener("click", async () => {
 });
 
 /* ==========================================================================
-   PLANTING — a plant carries a small freehand drawing and gets placed
-   wherever the user clicked on the field. Hovering an empty patch of ground
-   shows a square outline; clicking it opens this modal with that spot
-   pre-filled as the plant's position.
+   PLANT
    ========================================================================== */
 const plantScrim = document.getElementById("plantScrim");
 const pSub = document.getElementById("pSub");
