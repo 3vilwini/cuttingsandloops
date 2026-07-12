@@ -1088,7 +1088,7 @@ function renderSeedList(){
     const empty = document.createElement("p");
     empty.className = "sub";
     empty.style.margin = "0";
-    empty.textContent = "no seeds yet — click an empty seed on the field to add one.";
+    empty.textContent = "no seeds yet ~ click an empty seed on the field to add one.";
     list.appendChild(empty);
     return;
   }
