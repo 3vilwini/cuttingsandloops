@@ -576,6 +576,17 @@ button.ghost:disabled{
   cursor:not-allowed; 
 }
 
+button.easteregg{
+  background:none; 
+  border:0px solid #000; 
+  color:var(--ink); 
+  border-radius:999px;
+  padding:.3rem .8rem; 
+  cursor:pointer; 
+  font-size:inherit; 
+  font-family:inherit;
+}
+
 
 
 /* loading scrim — js preloadGardenAudio() */
