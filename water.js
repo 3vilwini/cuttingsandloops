@@ -1,11 +1,11 @@
-/* ==========================================================================
-   SETUP / GLOBAL — mirrors mood.css "global style"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   SETUP / GLOBAL — css global style
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.*/
 
 import { playhtml } from "https://unpkg.com/playhtml";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
-// the deployed Worker (upload-worker/worker.js) that streams uploads into R2
+// deployed Worker (upload-worker/worker.js) that streams uploads into R2
 const UPLOAD_ENDPOINT = "https://sound-garden-uploads.renxchristiane.workers.dev";
 const MAX_TAGS = 3;
 const PATTERNS = [
@@ -103,9 +103,9 @@ function svgEl(tag, attrs){
 // create garden ?g=<id> (uploadSeedFile's X-Garden-Id, connectChannels). page path AND query distinguishes one garden from another
 garden.id = (location.pathname + location.search).replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "garden";
 
-/* ==========================================================================
-   GARDEN / FIELD — mirrors mood.css "garden"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   GARDEN / FIELD — css garden
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 
 // seed slots — one fixed layout per pattern 
@@ -213,9 +213,9 @@ requestAnimationFrame(() => {
   viewportEl.scrollTo({ left: FIELD_W/2 - viewportEl.clientWidth/2, top: FIELD_H/2 - viewportEl.clientHeight/2 });
 });
 
-/* ==========================================================================
-   HOT SOIL SPOTS — mirrors mood.css "hot soil spots"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   HOT SOIL SPOTS — css hot soil spots
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // one plant her hot spot - exclude seed areas or live plant areas as targets 
 const HOTSPOT_COLS = 15, HOTSPOT_ROWS = 8, HOTSPOT_MARGIN = 150;
@@ -303,9 +303,9 @@ fieldEl.addEventListener("click", e => {
   openPlantModal(spot);
 });
 
-/* ==========================================================================
-   TOP LEFT — NAV BUTTONS — mirrors mood.css "top left - nav buttons"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   TOP LEFT — NAV BUTTONS — css "top left - nav buttons"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 const builderCardEl = document.getElementById("builderCard");
 const navToggleBtn = document.getElementById("navToggleBtn");
@@ -332,9 +332,9 @@ seedListToggleBtn.addEventListener("click", () => {
   if(hidden) showSeedList(); else hideSeedList();
 });
 
-/* ==========================================================================
-   TOP CENTER — CLICKABLE TAGS — mirrors mood.css "top center - clickable tags"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   TOP CENTER — CLICKABLE TAGS — css "top center - clickable tags"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // top center tags — mirrors the bank, glows seed color on hover, easter egg click (see checkTagPresses)
 const tagDisplayEl = document.getElementById("tagDisplay");
@@ -374,9 +374,9 @@ function checkTagPresses(data){
   }
 }
 
-/* ==========================================================================
-   BOTTOM LEFT — TOGGLE BAR — mirrors mood.css "bottom left - toggle bar"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   BOTTOM LEFT — TOGGLE BAR — css "bottom left - toggle bar"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // bottom left toggles: seeds / plants / roots / labels 
 const VIEW_STATE = { seeds:true, plants:true, labels:true, roots:true };
@@ -399,9 +399,9 @@ document.querySelectorAll("#viewToggles button").forEach(b => {
   b.addEventListener("click", () => toggleView(b.dataset.key));
 });
 
-/* ==========================================================================
-   SEED SLOTS — mirrors mood.css "seed slots"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   SEED SLOTS — css "seed slots"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // empty slot -> click to open add-seed modal, filled slot shows "title - artist" -> click to open seed list
 function renderSeedSlots(){
@@ -442,9 +442,9 @@ function renderSeedSlots(){
   });
 }
 
-/* ==========================================================================
-   ROOTS — mirrors mood.css "roots"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   ROOTS — css "roots"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // roots are dashed curved lines
 function renderConnections(){
@@ -503,9 +503,9 @@ function renderConnections(){
   }
 }
 
-/* ==========================================================================
-   PLANT SLOTS — mirrors mood.css "plant slots"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   PLANT SLOTS — css "plant slots"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 function renderPlantSlots(){
   const layer = document.getElementById("plantSlots");
@@ -609,9 +609,9 @@ function renderPlantSlots(){
   renderConnections();   // plants (and their positions) may have changed
 }
 
-/* ==========================================================================
-   MODAL / LOADING SCRIM — mirrors mood.css "loading scrim" + "modal styling"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   MODAL / LOADING SCRIM — css "loading scrim" + "modal styling"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // esc closes an open modal 
 document.addEventListener("keydown", e => {
@@ -626,9 +626,9 @@ document.getElementById("enterBtn").addEventListener("click", () => {
   document.getElementById("entryScrim").classList.remove("open");
 });
 
-/* ==========================================================================
-   PLAYHTML — garden meta syncs live (one JSON blob per channel), plus always-on cursor presence.
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   PLAYHTML — garden meta syncs live (one JSON blob per channel) + cursor presence
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 // init() returns a promise; createPageData() (inside connectChannels) isn't
 // usable until it resolves, so this has to chain off .then().
 // room is only passed when ?g=<id> is present 
@@ -749,9 +749,9 @@ function applyMetaToUI(){
   renderField();
 }
 
-/* ==========================================================================
-   SEASON SETTINGS + SEED LIST — mirrors mood.css "season settings + seed list" + "tags" + "colors" + "field pattern picker" + "scale slider"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   SEASON SETTINGS + SEED LIST — css "season settings + seed list" + "tags" + "colors" + "field pattern picker" + "scale slider"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 /* ---- tag bank ---- */
 const tagBankEl = document.getElementById("tagBank");
@@ -907,9 +907,9 @@ function renderSeedList(){
   }
 }
 
-/* ==========================================================================
-   VISITOR INFO — mirrors mood.css "visitor info"
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   VISITOR INFO — css "visitor info"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 const gardenInfoCardEl = document.getElementById("gardenInfoCard");
 const visitorCountBtn = document.getElementById("visitorCountBtn");
@@ -966,10 +966,9 @@ newGardenBtn?.addEventListener("click", async () => {
   }
 });
 
-/* ==========================================================================
-   FILE LABEL / PLANT DRAWING SPACE — mirrors mood.css "file label" + "plant drawing space"
-   PLUS ambient audio, cursor trail, volume meter threshold logic live here (not under their own matching CSS sections)
-   ========================================================================== */
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   FILE LABEL / PLANT DRAWING SPACE — css "file label" + "plant drawing space"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 // streams a file straight to the Worker, which writes it into R2 and hands back public URL
 async function uploadSeedFile(file, key){
@@ -995,9 +994,9 @@ async function deleteR2File(audioRef){
   fetch(`${UPLOAD_ENDPOINT}/delete/${key}`, { method: "DELETE" }).catch(() => {});
 }
 
-/* ==========================================================================
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
    SEEDS 
-   ========================================================================== */
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 const seedScrim = document.getElementById("seedScrim");
 const sTitle = document.getElementById("sTitle");
 const sArtist = document.getElementById("sArtist");
@@ -1069,9 +1068,9 @@ sSaveBtn.addEventListener("click", async () => {
   sSaveBtn.disabled = false; sSaveBtn.textContent = "add seed";
 });
 
-/* ==========================================================================
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
    PLANT
-   ========================================================================== */
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 const plantScrim = document.getElementById("plantScrim");
 const pSub = document.getElementById("pSub");
 const pFile = document.getElementById("pFile");
@@ -1424,9 +1423,9 @@ pSaveBtn.addEventListener("click", async () => {
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant";
 });
 
-/* ==========================================================================
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
    INITIAL RENDER 
-   ========================================================================== */
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 renderSeedSlots();
 renderPlantSlots();
