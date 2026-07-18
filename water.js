@@ -955,13 +955,13 @@ const newGardenBtn = document.getElementById("newGardenBtn");
 function showGardenInfo(){
   hideBuilder(); hidePlantModal(); hideSeedModal(); hideSeedList();
   const names = [...new Set(Object.values(garden.plants || {}).map(p => p.name).filter(Boolean))];
-  document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet";
+  document.getElementById("plantedByNames").textContent = names.length ? names.join(", ") : "no one yet :-(";
   // plants don't hold date data other than latest plant for visitor info panel
   const timestamps = Object.values(garden.plants || {}).map(p => p.plantedAt).filter(Boolean);
   const lastPlanted = timestamps.length ? new Date(Math.max(...timestamps)) : null;
   document.getElementById("lastPlantedDate").textContent = lastPlanted
     ? lastPlanted.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" })
-    : "not yet";
+    : "[date]";
   gardenUrlInput.value = location.href;
   gardenInfoCardEl.style.display = "";
 }
