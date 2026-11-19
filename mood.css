@@ -1055,9 +1055,16 @@ button.easteregg#newGardenBtn{
   animation-play-state:paused;
 }
 
-.marqueetrack span{
+/* one run of the whole message; every phrase carries a wide space after it, which
+   is also the space between the end of one run and the start of the next */
+.marqueetrack .marqueerun{
+  display:flex;
   flex-shrink:0;
-  padding-right:3rem;   /* the space between one run of the message and the next */
+}
+
+.marqueetrack .marqueerun span{
+  flex-shrink:0;
+  padding-right:5rem;
 }
 
 .marqueetrack a{

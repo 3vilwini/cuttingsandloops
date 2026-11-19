@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119t">
+<link rel="stylesheet" href="mood.css?v=20261119u">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119t";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119t";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119u";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119u";
 
 const gardenListEl = document.getElementById("gardenList");
 const indexEl = document.querySelector("main.gardenindex");
@@ -141,14 +141,26 @@ function makeChip(text, g){
 // the message scrolling along the bottom. it's repeated until one run is at least
 // as wide as the bar, then that run is laid out twice, so sliding it by exactly
 // half its width loops with no seam
-const MARQUEE_TEXT = "welcome to the sound garden multiverse ୨ৎ wander around જ⁀➴ smell the sounds ༄ feel the grass ✩‧₊ hope u like it (˶ᵔ ᵕ ᵔ˶) ‹𝟹";
-const MARQUEE_PX_PER_SECOND = 50;
+// each phrase is its own piece so there can be a wide gap between them (mood.css)
+const MARQUEE_PHRASES = [
+  "welcome to the sound garden multiverse ୨ৎ",
+  "wander around જ⁀➴",
+  "smell the sounds ༄",
+  "feel the grass ✩‧₊",
+  "hope u like it (˶ᵔ ᵕ ᵔ˶) ‹𝟹",
+];
+const MARQUEE_PX_PER_SECOND = 30;
 function startMarquee(){
   const marquee = document.getElementById("tagMarquee");
   const track = document.getElementById("tagMarqueeTrack");
   const addRun = () => {
-    const item = document.createElement("span");
-    item.textContent = MARQUEE_TEXT;
+    const item = document.createElement("div");
+    item.className = "marqueerun";
+    for(const phrase of MARQUEE_PHRASES){
+      const piece = document.createElement("span");
+      piece.textContent = phrase;
+      item.appendChild(piece);
+    }
     track.appendChild(item);
     return item;
   };
