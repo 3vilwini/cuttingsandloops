@@ -20,17 +20,18 @@ function hexToRgb(hex){
 
 // fills an <svg> with the field's pattern in the seed color — "lattice" (grid),
 // "array" (dots in a spiral) or "furrow" (horizontal lines). drawn across the
-// whole FIELD_W x FIELD_H field; the caller picks which part of it shows via
-// the svg's own viewBox
-export function drawFieldPattern(svg, { pattern, scale = 1, seed }){
+// whole width x height area (the garden's FIELD_W x FIELD_H unless the caller
+// asks for more, e.g. a preview on a screen bigger than the field); the caller
+// picks which part of it shows via the svg's own viewBox
+export function drawFieldPattern(svg, { pattern, scale = 1, seed, width = FIELD_W, height = FIELD_H }){
   svg.innerHTML = "";
   const rgb = hexToRgb(seed);
-  const CX = FIELD_W/2, CY = FIELD_H/2;
+  const CX = width/2, CY = height/2;
   const LATTICE_BASE = 104;
   const FURROW_BASE = 26;
 
   if(pattern === "array"){
-    const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
+    const maxR = Math.hypot(width, height)/2 + 60;
     const a = 16 * scale;      // spiral pitch — distance between successive arms
     const dotGap = 10 * scale; // arc-length distance between dots
     const dotR = Math.max(0.6, 0.9 * scale);
@@ -54,6 +55,6 @@ export function drawFieldPattern(svg, { pattern, scale = 1, seed }){
     defs.appendChild(tile);
     svg.appendChild(defs);
     // explicit size, not 100% — percentages follow the svg's viewBox, which a caller may crop
-    svg.appendChild(svgEl("rect", { width:FIELD_W, height:FIELD_H, fill:"url(#fieldPattern)" }));
+    svg.appendChild(svgEl("rect", { width, height, fill:"url(#fieldPattern)" }));
   }
 }

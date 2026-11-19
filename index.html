@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119i">
+<link rel="stylesheet" href="mood.css?v=20261119j">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119i";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119i";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119j";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119j";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -50,18 +50,24 @@ function showPreview(settings){
   const { colors, pattern, scale } = settings;
   bgEl.style.setProperty("--sky", colors.background[0]);
   bgEl.style.setProperty("--soil", colors.background[1]);
-  // crop the big field down to its middle, at the window's own size, so the
-  // pattern is about as large here as it is inside the garden
+  // crop the pattern down to the window's own size, so it's about as large here
+  // as it is inside the garden. on a screen bigger than the garden's field the
+  // pattern is drawn over a bigger area, so it still reaches every edge
   const w = window.innerWidth, h = window.innerHeight;
-  previewSvg.setAttribute("viewBox", `${(FIELD_W - w) / 2} ${(FIELD_H - h) / 2} ${w} ${h}`);
+  const areaW = Math.max(FIELD_W, w), areaH = Math.max(FIELD_H, h);
+  previewSvg.setAttribute("viewBox", `${(areaW - w) / 2} ${(areaH - h) / 2} ${w} ${h}`);
   previewSvg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-  drawFieldPattern(previewSvg, { pattern, scale: scale || 1, seed: colors.seed });
+  drawFieldPattern(previewSvg, { pattern, scale: scale || 1, seed: colors.seed, width: areaW, height: areaH });
+  // the bottom bar's lettering sits straight on the page, so it follows the page's brightness
+  const mid = midColor(colors.background[0], colors.background[1]);
+  document.body.style.setProperty("--barink", contrast(mid, "#000000") >= contrast(mid, "#ffffff") ? "#000000" : "#ffffff");
   bgEl.classList.add("previewing");
 }
 
 function clearPreview(){
   bgEl.style.removeProperty("--sky");
   bgEl.style.removeProperty("--soil");
+  document.body.style.removeProperty("--barink");
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
@@ -275,7 +281,7 @@ function seededRandom(seed){
   };
 }
 
-const RIGHT_BUFFER = 240;   // px of empty space after the last column
+const RIGHT_BUFFER = 320;   // px of empty space after the furthest card
 
 function layoutCards(){
   const cards = [...gardenListEl.children];
@@ -315,9 +321,30 @@ function layoutCards(){
     }
     x += c.width + gap;
   }
-  // extra room past the last column, so scrolling to the end leaves a margin
-  gardenListEl.style.width = x + RIGHT_BUFFER + "px";
+  layoutWidth = x;
+  fitCanvas();
 }
+
+// the canvas is as wide as the furthest card (wherever it's been dragged to, by
+// anyone) plus a margin, so scrolling to the end always leaves empty space
+let layoutWidth = 0;
+function fitCanvas(){
+  let right = layoutWidth;
+  for(const card of gardenListEl.children){
+    const moved = /translate\(\s*(-?[\d.]+)px/.exec(card.style.transform || "");
+    right = Math.max(right, card.offsetLeft + (moved ? parseFloat(moved[1]) : 0) + card.offsetWidth);
+  }
+  gardenListEl.style.width = right + RIGHT_BUFFER + "px";
+}
+
+// playhtml moves cards by setting their transform — live while someone drags, and
+// when a move from another visitor arrives — so watch for that
+let fitQueued = false;
+new MutationObserver(records => {
+  if(fitQueued || records.every(r => r.target === gardenListEl)) return;   // the canvas's own width changes don't count
+  fitQueued = true;
+  setTimeout(() => { fitQueued = false; fitCanvas(); }, 0);   // not requestAnimationFrame: that pauses in a background tab
+}).observe(gardenListEl, { subtree: true, attributes: true, attributeFilter: ["style"] });
 window.addEventListener("resize", layoutCards);
 startMarquee();
 marqueeWidth = document.getElementById("tagMarquee").clientWidth;
@@ -334,13 +361,15 @@ indexEl.addEventListener("wheel", e => {
 // cursor trail, carried over from the garden (spawnTrailDot in water.js): little
 // glyph footprints fade out behind the pointer. there each one is tinted from the
 // garden's seed color to its sky; here, with no single garden, every footprint
-// gets its own random pair of colors
+// gets its own random pair of pinks (hot pink through rose, magenta and blush)
 const TRAIL_MIN_DIST = 30;       // spawn a footprint after this many px of movement
 const TRAIL_LIFETIME_MS = 1800;  // how long one takes to fade (matches trailFade in mood.css)
 const TRAIL_GLYPHS = ["݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
 let lastTrail = null;
 function spawnTrailDot(x, y){
-  const hue = Math.floor(Math.random() * 360);
+  const hue = 315 + Math.random() * 45;            // magenta (315) through pink to rose (360)
+  const hue2 = 315 + Math.random() * 45;
+  const lightA = 58 + Math.random() * 14, lightB = 68 + Math.random() * 14;
   const dot = document.createElement("span");
   dot.className = "traildot";
   dot.textContent = TRAIL_GLYPHS[Math.floor(Math.random() * TRAIL_GLYPHS.length)];
@@ -348,7 +377,7 @@ function spawnTrailDot(x, y){
   dot.style.zIndex = "3";
   dot.style.left = x + "px";
   dot.style.top = y + "px";
-  dot.style.backgroundImage = `linear-gradient(135deg, hsl(${hue} 90% 60%), hsl(${(hue + 70) % 360} 90% 65%))`;
+  dot.style.backgroundImage = `linear-gradient(135deg, hsl(${hue} 90% ${lightA}%), hsl(${hue2} 85% ${lightB}%))`;
   document.body.appendChild(dot);
   setTimeout(() => dot.remove(), TRAIL_LIFETIME_MS);
 }

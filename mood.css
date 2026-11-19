@@ -1009,9 +1009,7 @@ button.easteregg#newGardenBtn{
   min-width:0;
   overflow:hidden;
   pointer-events:auto;
-  background:var(--paper);
-  border:1px solid #000;
-  border-radius:999px;
+  color:var(--barink, var(--ink));
   padding:.3rem 0;
   white-space:nowrap;
   /* chips fade in and out at the edges instead of being cut off */
