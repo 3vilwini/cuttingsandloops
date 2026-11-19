@@ -939,7 +939,8 @@ button.easteregg{
   position:fixed;
   inset:0;
   z-index:0;
-  background:linear-gradient(to bottom, var(--sky), var(--soil));
+  /* drawn 25% longer than the window at each end, like the cards, so neither end color shows in full */
+  background:linear-gradient(to bottom, var(--sky) -25%, var(--soil) 125%);
   transition:--sky .5s ease, --soil .5s ease;
 }
 

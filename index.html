@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119s">
+<link rel="stylesheet" href="mood.css?v=20261119t">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119s";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119s";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119t";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119t";
 
 const gardenListEl = document.getElementById("gardenList");
 const indexEl = document.querySelector("main.gardenindex");
@@ -201,10 +201,10 @@ function renderGardens(gardens){
       const [sky, soil] = g.settings.colors.background;
       mid = midColor(sky, soil);
       const ink = contrast(mid, "#000000") >= contrast(mid, "#ffffff") ? "#000000" : "#ffffff";
-      // the fade is drawn longer than the card — sky starts 50% above the top and soil
-      // ends 50% below the bottom — so the card shows only the middle half of it and
-      // neither end color is ever fully visible
-      card.style.background = `linear-gradient(to bottom, ${sky} -50%, ${soil} 150%)`;
+      // the fade is drawn a bit longer than the card — sky starts 25% above the top and
+      // soil ends 25% below the bottom — so the card shows only the middle part of it
+      // and neither end color is ever fully visible
+      card.style.background = `linear-gradient(to bottom, ${sky} -25%, ${soil} 125%)`;
       card.style.setProperty("--ink", ink);
       card.style.setProperty("--muted", ink === "#000000" ? "#333333" : "#e6e6e6");
     }
