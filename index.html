@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119e">
+<link rel="stylesheet" href="mood.css?v=20261119f">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119e";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119e";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119f";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119f";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -159,13 +159,6 @@ function cardSize(g){
   return "small";
 }
 
-// shown on a card in place of tags while a garden has none yet
-const EMPTY_PLANT = [
-  "    _ \" _",
-  "   (_\\|/_)",
-  "    (/|\\)",
-].join("\n");
-
 // one dialog-box card per garden: its tags as the title, and the names of
 // whoever planted in it. built with textContent, never innerHTML, since tags and
 // names are typed in by visitors. can-move + a stable id makes each card
@@ -215,8 +208,9 @@ function renderGardens(gardens){
       for(const t of g.tags) name.appendChild(makeChip(t, g));
     } else {
       const none = document.createElement("span");
-      none.className = "sub asciiplant";
-      none.textContent = EMPTY_PLANT;
+      none.className = "sub";
+      none.style.margin = "0";
+      none.textContent = "no feels yet";
       name.appendChild(none);
     }
 
@@ -226,7 +220,7 @@ function renderGardens(gardens){
     label.className = "planterlabel";
     label.textContent = "planted by";
     const names = document.createElement("span");
-    names.textContent = g.contributors.length ? g.contributors.join(", ") : "no one yet";
+    names.textContent = g.contributors.length ? g.contributors.join(", ") : "just grass...";
 
     planters.append(label, names);
 

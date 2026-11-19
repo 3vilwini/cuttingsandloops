@@ -1246,14 +1246,3 @@ button.easteregg#newGardenBtn:disabled{
   background:var(--dot, #bbb);
   flex-shrink:0;
 }
-
-/* the little drawing that stands in for tags on a garden that has none yet —
-   needs a fixed-width font and preserved spaces or it falls apart */
-.gardencard .asciiplant{
-  display:block;
-  margin:0;
-  white-space:pre;
-  font-family:"Courier New", monospace;
-  font-size:1.3rem;
-  line-height:1.1;
-}
