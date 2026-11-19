@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119f">
+<link rel="stylesheet" href="mood.css?v=20261119g">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119f";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119f";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119g";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119g";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -311,6 +311,37 @@ function layoutCards(){
   gardenListEl.style.height = y + "px";
 }
 window.addEventListener("resize", layoutCards);
+
+// cursor trail, carried over from the garden (spawnTrailDot in water.js): little
+// glyph footprints fade out behind the pointer. there each one is tinted from the
+// garden's seed color to its sky; here, with no single garden, every footprint
+// gets its own random pair of colors
+const TRAIL_MIN_DIST = 30;       // spawn a footprint after this many px of movement
+const TRAIL_LIFETIME_MS = 1800;  // how long one takes to fade (matches trailFade in mood.css)
+const TRAIL_GLYPHS = ["݁˖","˖᯽","જ˚","˚ ༘♡","⋆｡˚","ੈ✩‧","⋆˚❀","༉‧₊"];
+let lastTrail = null;
+function spawnTrailDot(x, y){
+  const hue = Math.floor(Math.random() * 360);
+  const dot = document.createElement("span");
+  dot.className = "traildot";
+  dot.textContent = TRAIL_GLYPHS[Math.floor(Math.random() * TRAIL_GLYPHS.length)];
+  dot.style.position = "fixed";   // the garden's are placed in its field; these are placed on the screen
+  dot.style.zIndex = "3";
+  dot.style.left = x + "px";
+  dot.style.top = y + "px";
+  dot.style.backgroundImage = `linear-gradient(135deg, hsl(${hue} 90% 60%), hsl(${(hue + 70) % 360} 90% 65%))`;
+  document.body.appendChild(dot);
+  setTimeout(() => dot.remove(), TRAIL_LIFETIME_MS);
+}
+if(!matchMedia("(prefers-reduced-motion: reduce)").matches){
+  document.addEventListener("pointermove", e => {
+    if(e.pointerType === "touch") return;
+    if(!lastTrail || Math.hypot(e.clientX - lastTrail.x, e.clientY - lastTrail.y) >= TRAIL_MIN_DIST){
+      spawnTrailDot(e.clientX, e.clientY);
+      lastTrail = { x: e.clientX, y: e.clientY };
+    }
+  });
+}
 
 // every so often, ask who's around and update just the counts
 async function refreshHereNow(){
