@@ -29,9 +29,9 @@
    - POST /register-garden — a garden reports its (up to 3) tags, which are
      its name, its season settings (which the index previews on hover) and the
      names of the people who planted in it.
-     Body: { id, tags, settings, contributors, plantCount, seedCount, plantDrawing, fillOnly }. Normally it replaces
+     Body: { id, tags, settings, contributors, plantCount, seedCount, plantDrawings, fillOnly }. Normally it replaces
      what's stored; with fillOnly it only fills in what's still missing. Upsert into a second D1 table.
-   - GET /gardens — every registered garden's { id, tags, settings, contributors, plants, seeds, plantDrawing }, for the
+   - GET /gardens — every registered garden's { id, tags, settings, contributors, plants, seeds, plantDrawings }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
      fills those in from /garden-count as unnamed. Also carries `here`, how many
      visitors each garden has right now ({ "<id>": n }).
@@ -205,7 +205,16 @@ function parsePlantDrawing(d) {
   return paths.length ? { w: d.w, h: d.h, color: d.color, paths } : null;
 }
 
-// returns { id, tags, settings, contributors, plants, seeds, plantDrawing } for a usable registration, or null. the id
+// up to two plant drawings (a medium card shows one, a large card two). each one
+// is checked as above; unusable ones are dropped. null when nothing is usable, or
+// nothing was sent. an older page sends a single `plantDrawing`, which counts too
+function parsePlantDrawings(list) {
+  if (!Array.isArray(list)) return null;
+  const drawings = list.slice(0, 2).map(parsePlantDrawing).filter(Boolean);
+  return drawings.length ? drawings : null;
+}
+
+// returns { id, tags, settings, contributors, plants, seeds, plantDrawings } for a usable registration, or null. the id
 // can't be beyond how many gardens have actually been created, so nobody can
 // fill the table with made-up ids; tags are capped to the app's own limit of 3.
 // settings are optional (older pages only send tags) and unusable ones are
@@ -227,7 +236,7 @@ function parseGardenRegistration(body, count) {
     contributors: parseContributors(body.contributors),
     plants: parseCount(body.plantCount),
     seeds: parseCount(body.seedCount),
-    plantDrawing: parsePlantDrawing(body.plantDrawing),
+    plantDrawings: parsePlantDrawings(body.plantDrawings ?? (body.plantDrawing ? [body.plantDrawing] : null)),
     fillOnly: body.fillOnly === true,
   };
 }
@@ -258,7 +267,10 @@ async function handleRegisterGarden(request, env) {
       "contributors = COALESCE(gardens.contributors, excluded.contributors), " +
       "plants = COALESCE(gardens.plants, excluded.plants), " +
       "seeds = COALESCE(gardens.seeds, excluded.seeds), " +
-      "plant_drawing = COALESCE(gardens.plant_drawing, excluded.plant_drawing), " +
+      // a drawing stored before there could be two is a single object ('{'), not a
+      // list ('['): let that one be replaced too
+      "plant_drawing = CASE WHEN gardens.plant_drawing IS NULL OR substr(gardens.plant_drawing, 1, 1) = '{' " +
+      "THEN COALESCE(excluded.plant_drawing, gardens.plant_drawing) ELSE gardens.plant_drawing END, " +
       "updated_at = gardens.updated_at"
     : "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, plant_drawing, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) " +
       "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
@@ -277,7 +289,7 @@ async function handleRegisterGarden(request, env) {
       parsed.contributors && JSON.stringify(parsed.contributors),
       parsed.plants,
       parsed.seeds,
-      parsed.plantDrawing && JSON.stringify(parsed.plantDrawing),
+      parsed.plantDrawings && JSON.stringify(parsed.plantDrawings),
       Date.now()
     )
     .run();
@@ -339,6 +351,14 @@ async function currentPresence(env) {
   return here;
 }
 
+// stored as a list of drawings; one saved before there could be two is a single
+// object, which becomes a list of one
+function storedDrawings(text) {
+  if (!text) return [];
+  const value = JSON.parse(text);
+  return Array.isArray(value) ? value : [value];
+}
+
 async function handleListGardens(env) {
   await ensureGardensTable(env);
   const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, plants, seeds, plant_drawing, updated_at FROM gardens ORDER BY id").all();
@@ -349,7 +369,7 @@ async function handleListGardens(env) {
     contributors: r.contributors ? JSON.parse(r.contributors) : [],
     plants: r.plants || 0,
     seeds: r.seeds || 0,
-    plantDrawing: r.plant_drawing ? JSON.parse(r.plant_drawing) : null,
+    plantDrawings: storedDrawings(r.plant_drawing),
     updatedAt: r.updated_at,
   }));
   return new Response(JSON.stringify({ gardens, here: await currentPresence(env) }), {

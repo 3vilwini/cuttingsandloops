@@ -4,8 +4,8 @@
 
 import { playhtml } from "https://unpkg.com/playhtml";
 // UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
-import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119j";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119j";
+import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119k";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119k";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
 const MAX_TAGS = 3;
@@ -636,25 +636,30 @@ const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
 // what puts a garden on the index with its colors the first time anyone opens it.
 // the values are copied out one by one so what goes over the wire is plain
 // data, not the synced store's proxy objects
-// one of the garden's plant drawings, for the index's large card: the plant with
-// the most drawn points (usually the most interesting one), thinned down and
-// rounded to whole numbers so it stays small. strokes are lists of [x, y]
-function pickPlantDrawing(){
-  let best = null, bestPoints = 0;
+// up to two of the garden's plant drawings, for the index's cards (a medium card
+// shows one, a large one shows two): the plants with the most drawn points
+// (usually the most interesting), each thinned down and rounded to whole numbers
+// so it stays small. strokes are lists of [x, y]
+function pickPlantDrawings(){
+  const candidates = [];
   for(const pl of Object.values(garden.plants || {})){
     if(!pl.paths || !pl.paths.length || !/^#[0-9a-fA-F]{6}$/.test(pl.color)) continue;
-    const n = pl.paths.reduce((sum, stroke) => sum + stroke.length, 0);
-    if(n > bestPoints){ best = pl; bestPoints = n; }
+    const points = pl.paths.reduce((sum, stroke) => sum + stroke.length, 0);
+    candidates.push({ pl, points });
   }
-  if(!best) return undefined;
-  const step = Math.max(1, Math.ceil(bestPoints / 500));
-  const paths = [];
-  for(const stroke of best.paths.slice(0, 30)){
-    const pts = [];
-    stroke.forEach((pt, i) => { if(i % step === 0 || i === stroke.length - 1) pts.push([Math.round(pt.x), Math.round(pt.y)]); });
-    if(pts.length >= 2) paths.push(pts);
+  candidates.sort((a, b) => b.points - a.points);
+  const drawings = [];
+  for(const { pl, points } of candidates.slice(0, 2)){
+    const step = Math.max(1, Math.ceil(points / 500));
+    const paths = [];
+    for(const stroke of pl.paths.slice(0, 30)){
+      const pts = [];
+      stroke.forEach((pt, i) => { if(i % step === 0 || i === stroke.length - 1) pts.push([Math.round(pt.x), Math.round(pt.y)]); });
+      if(pts.length >= 2) paths.push(pts);
+    }
+    if(paths.length) drawings.push({ w: pCanvas.width, h: pCanvas.height, color: pl.color, paths });
   }
-  return paths.length ? { w: pCanvas.width, h: pCanvas.height, color: best.color, paths } : undefined;
+  return drawings.length ? drawings : undefined;
 }
 
 function registerCurrentGarden(fillOnly = false){
@@ -671,7 +676,7 @@ function registerCurrentGarden(fillOnly = false){
     seedCount: fillOnly && !seedCount ? undefined : seedCount,
     // an empty list on connect may just mean the plants haven't synced yet — say nothing instead
     contributors: fillOnly && !contributors.length ? undefined : contributors,
-    plantDrawing: pickPlantDrawing(),
+    plantDrawings: pickPlantDrawings(),
     fillOnly,
     settings: {
       colors: { background: [...m.colors.background], seed: m.colors.seed, text: m.colors.text },

@@ -1099,12 +1099,12 @@ button.easteregg#newGardenBtn:disabled{
 
 .gardencard.medium{
   width:26rem;
-  height:15rem;
+  height:17rem;
 }
 
 .gardencard.large{
   width:32rem;
-  height:23rem;
+  height:22rem;
 }
 
 .gardencard.medium .cardbody,
@@ -1140,31 +1140,62 @@ button.easteregg#newGardenBtn:disabled{
   background-color:#fff;
 }
 
-/* a large card with a plant drawing: tags on top left, the drawing filling the
-   left column under them, who planted and who's here down the right */
-.gardencard.large.hasdrawing .cardbody{
+/* a card with plant drawings (one on a medium card, two on a large one): they sit
+   at their real size, 140px, under the tags */
+.gardencard.hasdrawing .cardbody{
   grid-template-rows:auto 1fr auto;
 }
 
-.gardencard.large.hasdrawing .tagbank{
+.gardencard.hasdrawing .tagbank{
+  grid-column:1;
   grid-row:1;
 }
 
-.gardencard.large.hasdrawing .planters{
-  grid-row:2;
-}
-
-.gardencard.large.hasdrawing .herenow{
-  grid-row:3;
+.gardencard .plantdrawings{
+  display:flex;
+  align-items:flex-end;
+  gap:1rem;
 }
 
 .gardencard .plantdrawing{
+  flex-shrink:0;
+  overflow:visible;
+}
+
+/* medium: drawing bottom left, who planted and who's here down the right */
+.gardencard.medium.hasdrawing .plantdrawings{
   grid-column:1;
   grid-row:2 / span 2;
-  width:100%;
-  height:100%;
-  min-height:0;
-  overflow:visible;
+  align-self:end;
+}
+
+.gardencard.medium.hasdrawing .planters{
+  grid-column:2;
+  grid-row:2;
+}
+
+.gardencard.medium.hasdrawing .herenow{
+  grid-column:2;
+  grid-row:3;
+}
+
+/* large: who planted top right, the two drawings side by side across the middle,
+   who's here along the bottom */
+.gardencard.large.hasdrawing .planters{
+  grid-column:2;
+  grid-row:1;
+  align-self:start;
+}
+
+.gardencard.large.hasdrawing .plantdrawings{
+  grid-column:1 / span 2;
+  grid-row:2;
+  align-self:end;
+}
+
+.gardencard.large.hasdrawing .herenow{
+  grid-column:1 / span 2;
+  grid-row:3;
 }
 
 .gardencard:active{

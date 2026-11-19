@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119j">
+<link rel="stylesheet" href="mood.css?v=20261119k">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119j";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119j";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119k";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119k";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -94,23 +94,24 @@ function contrast(a, b){
   return (hi + .05) / (lo + .05);
 }
 
-// a plant's strokes as an <svg>; the points are numbers from the Worker, set as
-// attributes (never as markup)
+// a plant's strokes as an <svg>, same size and line style as in the garden; the
+// points are numbers from the Worker, set as attributes (never as markup)
 function makePlantDrawing(d){
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("class", "plantdrawing");
   svg.setAttribute("viewBox", `0 0 ${d.w} ${d.h}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.setAttribute("width", d.w);    // the garden draws a plant at its canvas size (140 x 140)
+  svg.setAttribute("height", d.h);
   svg.setAttribute("aria-hidden", "true");
   for(const stroke of d.paths){
     const line = document.createElementNS(NS, "polyline");
     line.setAttribute("points", stroke.map(([x, y]) => `${x},${y}`).join(" "));
     line.setAttribute("fill", "none");
     line.setAttribute("stroke", d.color);
-    line.setAttribute("stroke-width", "2");
-    line.setAttribute("stroke-linecap", "round");
-    line.setAttribute("stroke-linejoin", "round");
+    line.setAttribute("stroke-width", "1.5");   // the same line style as renderPlantSlots in water.js
+    line.setAttribute("stroke-linecap", "butt");
+    line.setAttribute("stroke-linejoin", "miter");
     line.setAttribute("vector-effect", "non-scaling-stroke");
     svg.appendChild(line);
   }
@@ -254,12 +255,18 @@ function renderGardens(gardens){
 
     body.append(name, planters, here);
 
-    // the large card also shows one of the garden's plant drawings, in the
-    // plant's own color, the way it's drawn out in the garden
-    if(cardSize(g) === "large" && g.plantDrawing){
-      body.appendChild(makePlantDrawing(g.plantDrawing));
+    // a medium card shows one of the garden's plant drawings, a large card two —
+    // each in the plant's own color and at the size it's drawn out in the garden
+    const showDrawings = ({ medium: 1, large: 2 })[cardSize(g)] || 0;
+    const drawings = g.plantDrawings.slice(0, showDrawings);
+    if(drawings.length){
+      const holder = document.createElement("div");
+      holder.className = "plantdrawings";
+      for(const d of drawings) holder.appendChild(makePlantDrawing(d));
+      body.appendChild(holder);
       card.classList.add("hasdrawing");
     }
+
     card.append(bar, body);
     gardenListEl.appendChild(card);
   }
