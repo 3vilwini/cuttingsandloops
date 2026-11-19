@@ -1153,13 +1153,26 @@ button.easteregg#newGardenBtn:disabled{
   margin-bottom:0;
 }
 
-/* chips are the same size and font as the ones shown inside a garden (.tagdisplay span) */
+/* chips are the same size and font as the ones shown inside a garden (.tagdisplay span),
+   white with a black outline whatever the card's colors are */
 .gardencard .tag,
 .marqueetrack .tag{
   padding:.5rem .9rem;
   font-family:inherit;
   font-size:inherit;
   line-height:normal;
+  background:#fff;
+  color:#000;
+  border:1px solid #000;
+  transition:box-shadow .2s ease;
+}
+
+/* hovering a card lights every tag in it with its garden's seed color, the same
+   glow tags get inside a garden; in the marquee each chip glows on its own hover */
+.gardencard:hover .tag,
+.gardencard:focus-visible .tag,
+.marqueetrack .tag:hover{
+  box-shadow:0 0 10px 3px var(--glow, transparent);
 }
 
 .gardencard .tag{

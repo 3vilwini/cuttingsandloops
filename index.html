@@ -65,10 +65,9 @@ function clearPreview(){
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
-// chips wear the garden's own colors: its seed color as the fill and its text
-// color as the lettering. when those two are too close to read (a white text
-// color on a pale seed, say), the lettering falls back to black or white,
-// whichever stands out from the fill
+// chips are plain white with a black outline; the garden's seed color only shows
+// as a glow when they're hovered (see mood.css). the card itself picks black or
+// white lettering, whichever reads better against its sky-to-soil fade
 function luminance(hex){
   const [r, g, b] = [1, 3, 5].map(i => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
@@ -80,11 +79,6 @@ function contrast(a, b){
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + .05) / (lo + .05);
 }
-function readableOn(fill, preferred){
-  if(contrast(fill, preferred) >= 3) return preferred;
-  return contrast(fill, "#000000") >= contrast(fill, "#ffffff") ? "#000000" : "#ffffff";
-}
-
 // the card itself is the garden's sky fading into its soil. its lettering is
 // black or white, whichever reads better against the middle of that fade
 function midColor(a, b){
@@ -93,19 +87,12 @@ function midColor(a, b){
   ).join("");
 }
 
-// a tag chip in its garden's colors (see above)
+// a tag chip; --glow is the garden's seed color, used for the hover glow
 function makeChip(text, g){
   const chip = document.createElement("span");
   chip.className = "tag";
-  chip.setAttribute("data-selected", "true");
   chip.textContent = text;
-  if(g.settings){
-    const fill = g.settings.colors.seed;
-    const ink = readableOn(fill, g.settings.colors.text);
-    chip.style.background = fill;
-    chip.style.color = ink;
-    chip.style.borderColor = ink;
-  }
+  if(g.settings) chip.style.setProperty("--glow", g.settings.colors.seed);
   return chip;
 }
 
