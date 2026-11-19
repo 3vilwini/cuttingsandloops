@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119n">
+<link rel="stylesheet" href="mood.css?v=20261119o">
 </head>
 <body>
 
@@ -29,10 +29,11 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119n";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119n";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119o";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119o";
 
 const gardenListEl = document.getElementById("gardenList");
+const indexEl = document.querySelector("main.gardenindex");
 const gardenStatusEl = document.getElementById("gardenStatus");
 const newGardenBtn = document.getElementById("newGardenBtn");
 // the cards are made after the list arrives, so playhtml is started first and
@@ -309,7 +310,7 @@ function layoutCards(){
   const cards = [...gardenListEl.children];
   if(!cards.length) return;
   const gap = 28;
-  const areaH = gardenListEl.clientHeight;
+  const areaH = baseHeight();
 
   // cards come in different sizes, so they're dealt out in columns, top to bottom,
   // starting a new column to the right when the next one won't fit
@@ -347,16 +348,35 @@ function layoutCards(){
   fitCanvas();
 }
 
-// the canvas is as wide as the furthest card (wherever it's been dragged to, by
-// anyone) plus a margin, so scrolling to the end always leaves empty space
+// the room the cards are laid out in: the window's height less the page's own padding
+function baseHeight(){
+  const cs = getComputedStyle(indexEl);
+  return indexEl.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+}
+
+// the canvas stretches to hold every card wherever it's been dragged to (by anyone):
+// out to the right and down it grows and scrolls, with a margin past the furthest
+// card; a card dragged past the left or top edge pushes the canvas over so it can
+// still be reached, since a page can't scroll to negative positions
 let layoutWidth = 0;
 function fitCanvas(){
-  let right = layoutWidth;
+  const gap = 28;
+  const base = baseHeight();
+  let minX = 0, minY = 0, maxX = layoutWidth, maxY = base;
   for(const card of gardenListEl.children){
-    const moved = /translate\(\s*(-?[\d.]+)px/.exec(card.style.transform || "");
-    right = Math.max(right, card.offsetLeft + (moved ? parseFloat(moved[1]) : 0) + card.offsetWidth);
+    const m = /translate\(\s*(-?[\d.]+)px(?:,\s*(-?[\d.]+)px)?/.exec(card.style.transform || "");
+    const x = card.offsetLeft + (m ? parseFloat(m[1]) : 0);
+    const y = card.offsetTop + (m && m[2] ? parseFloat(m[2]) : 0);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + card.offsetWidth);
+    maxY = Math.max(maxY, y + card.offsetHeight);
   }
-  gardenListEl.style.width = right + RIGHT_BUFFER + "px";
+  gardenListEl.style.marginLeft = minX < 0 ? gap - minX + "px" : "";
+  gardenListEl.style.marginTop = minY < 0 ? gap - minY + "px" : "";
+  gardenListEl.style.width = maxX + RIGHT_BUFFER + "px";
+  // only stretch down for a card that's really out of the window, not a few pixels of scatter
+  gardenListEl.style.height = (maxY - base > 40 ? maxY + gap : base) + "px";
 }
 
 // playhtml moves cards by setting their transform — live while someone drags, and
@@ -372,9 +392,10 @@ startMarquee();
 marqueeWidth = document.getElementById("tagMarquee").clientWidth;
 
 // the page scrolls sideways, so an ordinary (vertical) mouse wheel scrolls it too
-const indexEl = document.querySelector("main.gardenindex");
+// (unless the page also scrolls down, in which case the wheel keeps its usual job)
 indexEl.addEventListener("wheel", e => {
-  if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
+  const canScrollDown = indexEl.scrollHeight > indexEl.clientHeight + 1;   // a card was dragged below the window
+  if(!canScrollDown && Math.abs(e.deltaY) > Math.abs(e.deltaX)){
     indexEl.scrollLeft += e.deltaY;
     e.preventDefault();
   }

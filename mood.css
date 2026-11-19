@@ -963,8 +963,7 @@ main.gardenindex{
   position:fixed;
   inset:0;
   z-index:1;
-  overflow-x:auto;
-  overflow-y:hidden;
+  overflow:auto;   /* sideways by default; also down if a card is dragged below the window */
   box-sizing:border-box;
   padding:2.5rem 2.5rem 5rem;
 }
