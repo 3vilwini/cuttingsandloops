@@ -3,10 +3,10 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.*/
 
 import { playhtml } from "https://unpkg.com/playhtml";
+// UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
+import { UPLOAD_ENDPOINT, startNewGarden, registerGarden } from "./gardens.js";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
-// deployed Worker (upload-worker/worker.js) that streams uploads into R2
-const UPLOAD_ENDPOINT = "https://sound-garden-uploads.renxchristiane.workers.dev";
 const MAX_TAGS = 3;
 const PATTERNS = [
   { id:"lattice", label:"lattice" },   
@@ -668,6 +668,17 @@ playhtml.init({
   cursors: { enabled: true },
 }).then(connectChannels);
 
+// which garden this is, for the index page's list — 0 is the original (no ?g=)
+const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
+// reports this garden's tags (its name). on connect an empty list is skipped
+// so a room that hasn't finished syncing can't wipe a real name; after an
+// explicit tag edit, empty is a real answer and gets sent
+function registerCurrentGarden(skipIfEmpty = false){
+  if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
+  if(skipIfEmpty && !garden.meta.tags.length) return;
+  registerGarden(currentGardenId, garden.meta.tags);
+}
+
 setTimeout(() => {
   const enterBtn = document.getElementById("enterBtn");
   enterBtn.disabled = false;
@@ -744,6 +755,7 @@ function connectChannels(){
   metaChannel = playhtml.createPageData("garden-meta", garden.meta);
   garden.meta = metaChannel.getData();
   applyMetaToUI();
+  registerCurrentGarden(true);   // so gardens that already have tags show up by name on the index
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
 
   // tag-press easter egg — see checkTagPresses 
@@ -820,6 +832,7 @@ function toggleTag(t){
   else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
   renderTagBank();
   syncMeta();
+  registerCurrentGarden();
 }
 document.getElementById("tagCustomBtn").addEventListener("click", () => {
   const input = document.getElementById("tagCustomInput");
@@ -829,6 +842,7 @@ document.getElementById("tagCustomBtn").addEventListener("click", () => {
   input.value = "";
   renderTagBank();
   syncMeta();
+  registerCurrentGarden();
 });
 
 // colors - sky, soil, seed, label
@@ -990,9 +1004,7 @@ newGardenBtn?.addEventListener("click", async () => {
   newGardenBtn.disabled = true;
   newGardenBtn.textContent = "planting a new one…";
   try {
-    const res = await fetch(`${UPLOAD_ENDPOINT}/next-garden-id`, { method: "POST" });
-    if(!res.ok) throw new Error(`next-garden-id failed: ${res.status}`);
-    const { id } = await res.json();
+    const id = await startNewGarden();
     location.href = `${location.pathname}?g=${id}`;
   } catch(err) {
     console.warn("couldn't allocate a new garden id:", err);

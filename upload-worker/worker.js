@@ -1,6 +1,6 @@
 /* sound-garden seed uploads + garden id counter
    ---------------------------------------------------------------------
-   Five routes:
+   Seven routes:
    - POST /upload — receives a seed's audio file (raw bytes, streamed
      straight into R2 via the bucket binding, never buffered fully in
      memory) and returns the public URL to store in that slot's synced
@@ -26,6 +26,11 @@
    - GET /garden-count — read-only peek at the current count (same D1
      table, no increment). Used by the volume meter's
      double-click-to-teleport hint to pick a random existing garden.
+   - POST /register-garden — a garden reports its (up to 3) tags, which are
+     its name. Body: { id, tags }. Upsert into a second D1 table.
+   - GET /gardens — every registered garden's { id, tags }, for the index
+     page. Gardens nobody has tagged yet aren't in here; the index fills
+     those in from /garden-count as unnamed.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
    with an R2 bucket bound as SEEDS, a D1 database bound as GARDEN_DB
@@ -56,6 +61,12 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/garden-count") {
       return handleGardenCount(env);
+    }
+    if (request.method === "GET" && url.pathname === "/gardens") {
+      return handleListGardens(env);
+    }
+    if (request.method === "POST" && url.pathname === "/register-garden") {
+      return handleRegisterGarden(request, env);
     }
     return new Response("not found", { status: 404, headers: corsHeaders(env) });
   },
@@ -95,6 +106,65 @@ async function handleGardenCount(env) {
   const row = await env.GARDEN_DB.prepare("SELECT count FROM garden_counter WHERE id = 1").first();
   return new Response(JSON.stringify({ count: row?.count || 0 }), {
     headers: { ...corsHeaders(env), "Content-Type": "application/json" },
+  });
+}
+
+// a garden's name is its (up to) 3 "feels like" tags, which only exist inside
+// that garden's own playhtml room — a page can't read many rooms at once, so
+// each garden reports its tags here and the index page reads them back in one
+// request. id 0 is the original garden (the bare URL, no ?g=).
+async function ensureGardensTable(env) {
+  await env.GARDEN_DB.prepare(
+    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL)"
+  ).run();
+}
+
+// returns { id, tags } for a usable registration, or null. the id can't be
+// beyond how many gardens have actually been created, so nobody can fill the
+// table with made-up ids; tags are capped to the app's own limit of 3.
+function parseGardenRegistration(body, count) {
+  const id = body?.id;
+  if (!Number.isInteger(id) || id < 0 || id > count) return null;
+  if (!Array.isArray(body.tags) || body.tags.length > 3) return null;
+  const tags = [];
+  for (const t of body.tags) {
+    if (typeof t !== "string") return null;
+    const clean = t.trim().slice(0, 40);
+    if (clean) tags.push(clean);
+  }
+  return { id, tags };
+}
+
+async function handleRegisterGarden(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response("bad json", { status: 400, headers: corsHeaders(env) });
+  }
+  await ensureCounterTable(env);
+  const counter = await env.GARDEN_DB.prepare("SELECT count FROM garden_counter WHERE id = 1").first();
+  const parsed = parseGardenRegistration(body, counter?.count || 0);
+  if (!parsed) {
+    return new Response("invalid garden", { status: 400, headers: corsHeaders(env) });
+  }
+  await ensureGardensTable(env);
+  await env.GARDEN_DB
+    .prepare(
+      "INSERT INTO gardens (id, tags, updated_at) VALUES (?1, ?2, ?3) " +
+      "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, updated_at = excluded.updated_at"
+    )
+    .bind(parsed.id, JSON.stringify(parsed.tags), Date.now())
+    .run();
+  return new Response(null, { status: 204, headers: corsHeaders(env) });
+}
+
+async function handleListGardens(env) {
+  await ensureGardensTable(env);
+  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, updated_at FROM gardens ORDER BY id").all();
+  const gardens = results.map(r => ({ id: r.id, tags: JSON.parse(r.tags), updatedAt: r.updated_at }));
+  return new Response(JSON.stringify({ gardens }), {
+    headers: { ...corsHeaders(env), "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
 

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>୨ৎ cuttings જ⁀➴ loops ༄</title>
+<link rel="stylesheet" href="mood.css">
+</head>
+<body>
+
+<div class="gardenbg"></div>
+
+<!-- window: every garden, named by its "feels like" tags -->
+<div class="scrim open">
+  <div class="modal">
+    <div class="titlebar"><span class="closebox"></span></div>
+    <div class="cardbody">
+      <label class="cardtitle">୨ৎ all the sound gardens ༄</label>
+      <p class="sub">each one feels like something ~ pick one to wander into</p>
+      <p class="sub" id="gardenStatus">gathering the gardens...</p>
+      <div id="gardenList"></div>
+      <div class="actions" style="margin-top:0; justify-content:flex-start;">
+        <button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
+   GARDEN INDEX — css "garden index"
+   ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
+
+import { fetchGardens, startNewGarden, gardenUrl } from "./gardens.js";
+
+const gardenListEl = document.getElementById("gardenList");
+const gardenStatusEl = document.getElementById("gardenStatus");
+const newGardenBtn = document.getElementById("newGardenBtn");
+
+// one row per garden, named by its tags — the same chosen-tag chips as the
+// "feels like" picker in season settings. built with textContent, never
+// innerHTML, since tags are typed in by visitors
+function renderGardens(gardens){
+  gardenListEl.innerHTML = "";
+  for(const g of gardens){
+    const row = document.createElement("a");
+    row.className = "gardenrow";
+    row.href = gardenUrl(g.id);
+
+    const name = document.createElement("div");
+    name.className = "tagbank";
+    if(g.tags.length){
+      for(const t of g.tags){
+        const chip = document.createElement("span");
+        chip.className = "tag";
+        chip.setAttribute("data-selected", "true");
+        chip.textContent = t;
+        name.appendChild(chip);
+      }
+    } else {
+      const none = document.createElement("span");
+      none.className = "sub";
+      none.style.margin = "0";
+      none.textContent = "no feels yet";
+      name.appendChild(none);
+    }
+
+    const num = document.createElement("span");
+    num.className = "gardennum";
+    num.textContent = g.id === 0 ? "the original" : `#${g.id}`;
+
+    row.append(name, num);
+    gardenListEl.appendChild(row);
+  }
+}
+
+fetchGardens()
+  .then(gardens => {
+    gardenStatusEl.hidden = true;
+    renderGardens(gardens);
+  })
+  .catch(err => {
+    console.warn("couldn't list the gardens:", err);
+    gardenStatusEl.textContent = "couldn't reach the gardens ~ try again in a moment";
+  });
+
+// same flow as the old in-garden button: ask the Worker for the next number, go there
+const newGardenLabel = newGardenBtn.textContent;
+newGardenBtn.addEventListener("click", async () => {
+  newGardenBtn.disabled = true;
+  newGardenBtn.textContent = "planting a new one…";
+  try {
+    location.href = gardenUrl(await startNewGarden());
+  } catch(err) {
+    console.warn("couldn't allocate a new garden id:", err);
+    newGardenBtn.disabled = false;
+    newGardenBtn.textContent = "couldn't start one — try again";
+    setTimeout(() => { newGardenBtn.textContent = newGardenLabel; }, 2500);
+  }
+});
+</script>
+
+</body>
+</html>
