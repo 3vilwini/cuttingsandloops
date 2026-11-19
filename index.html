@@ -65,27 +65,8 @@ function clearPreview(){
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
-// chips are plain white with a black outline; the garden's seed color only shows
-// as a glow when they're hovered (see mood.css). the card itself picks black or
-// white lettering, whichever reads better against its sky-to-soil fade
-function luminance(hex){
-  const [r, g, b] = [1, 3, 5].map(i => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
-  });
-  return .2126 * r + .7152 * g + .0722 * b;
-}
-function contrast(a, b){
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + .05) / (lo + .05);
-}
-// the card itself is the garden's sky fading into its soil. its lettering is
-// black or white, whichever reads better against the middle of that fade
-function midColor(a, b){
-  return "#" + [1, 3, 5].map(i =>
-    Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, "0")
-  ).join("");
-}
+// cards are plain white windows; the garden's colors show in the stripe on top
+// (its sky fading into its soil) and, for the tags, as a glow on hover (see mood.css)
 
 // a tag chip; --glow is the garden's seed color, used for the hover glow
 function makeChip(text, g){
@@ -148,14 +129,6 @@ function renderGardens(gardens){
     card.setAttribute("can-move", "");
     card.draggable = false;   // the browser's own link-drag would fight the card drag
     card.href = gardenUrl(g.id);
-    if(g.settings){
-      const [sky, soil] = g.settings.colors.background;
-      const mid = midColor(sky, soil);
-      const ink = contrast(mid, "#000000") >= contrast(mid, "#ffffff") ? "#000000" : "#ffffff";
-      card.style.background = `linear-gradient(to bottom, ${sky}, ${soil})`;
-      card.style.setProperty("--ink", ink);
-      card.style.setProperty("--muted", ink === "#000000" ? "#333333" : "#e6e6e6");
-    }
     card.addEventListener("pointerenter", () => showPreview(g.settings));
     card.addEventListener("pointerleave", clearPreview);
     card.addEventListener("focus", () => showPreview(g.settings));
@@ -170,6 +143,11 @@ function renderGardens(gardens){
 
     const bar = document.createElement("div");
     bar.className = "titlebar";
+    if(g.settings){
+      // the usual black stripes, over a fade from the garden's sky to its soil
+      const [sky, soil] = g.settings.colors.background;
+      bar.style.backgroundImage = `repeating-linear-gradient(#000 0 1px, transparent 1px 3px), linear-gradient(to right, ${sky}, ${soil})`;
+    }
     const closebox = document.createElement("span");
     closebox.className = "closebox";
     bar.appendChild(closebox);
