@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119r">
+<link rel="stylesheet" href="mood.css?v=20261119s">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119r";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119r";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119s";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119s";
 
 const gardenListEl = document.getElementById("gardenList");
 const indexEl = document.querySelector("main.gardenindex");
@@ -231,15 +231,8 @@ function renderGardens(gardens){
 
     const name = document.createElement("div");
     name.className = "tagbank";
-    if(g.tags.length){
-      for(const t of g.tags) name.appendChild(makeChip(t, g));
-    } else {
-      const none = document.createElement("span");
-      none.className = "sub";
-      none.style.margin = "0";
-      none.textContent = "no feels yet";
-      name.appendChild(none);
-    }
+    // no tags chosen yet: leave the top of the card blank
+    for(const t of g.tags) name.appendChild(makeChip(t, g));
 
     const planters = document.createElement("div");
     planters.className = "planters";
