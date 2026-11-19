@@ -27,9 +27,10 @@
      table, no increment). Used by the volume meter's
      double-click-to-teleport hint to pick a random existing garden.
    - POST /register-garden — a garden reports its (up to 3) tags, which are
-     its name, and its season settings, which the index previews on hover.
-     Body: { id, tags, settings }. Upsert into a second D1 table.
-   - GET /gardens — every registered garden's { id, tags, settings }, for the
+     its name, its season settings (which the index previews on hover) and the
+     names of the people who planted in it.
+     Body: { id, tags, settings, contributors }. Upsert into a second D1 table.
+   - GET /gardens — every registered garden's { id, tags, settings, contributors }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
      fills those in from /garden-count as unnamed.
 
@@ -120,13 +121,15 @@ let gardensTableReady = false;
 async function ensureGardensTable(env) {
   if (gardensTableReady) return;
   await env.GARDEN_DB.prepare(
-    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, contributors TEXT, updated_at INTEGER NOT NULL)"
   ).run();
-  // a table made before settings existed has no such column — add it. when it
+  // a table made before these columns existed lacks them — add each. when one
   // is already there this throws, which is the expected "nothing to do" case
-  try {
-    await env.GARDEN_DB.prepare("ALTER TABLE gardens ADD COLUMN settings TEXT").run();
-  } catch {}
+  for (const column of ["settings", "contributors"]) {
+    try {
+      await env.GARDEN_DB.prepare(`ALTER TABLE gardens ADD COLUMN ${column} TEXT`).run();
+    } catch {}
+  }
   gardensTableReady = true;
 }
 
@@ -149,7 +152,22 @@ function parseSettings(s) {
   };
 }
 
-// returns { id, tags, settings } for a usable registration, or null. the id
+// names of the people who planted in a garden: up to 12 distinct non-blank
+// strings, trimmed to 40 chars. null (not []) when the page didn't send any
+// list at all, so an older page doesn't erase what's stored
+function parseContributors(list) {
+  if (!Array.isArray(list)) return null;
+  const names = [];
+  for (const n of list) {
+    if (typeof n !== "string") continue;
+    const clean = n.trim().slice(0, 40);
+    if (clean && !names.includes(clean)) names.push(clean);
+    if (names.length === 12) break;
+  }
+  return names;
+}
+
+// returns { id, tags, settings, contributors } for a usable registration, or null. the id
 // can't be beyond how many gardens have actually been created, so nobody can
 // fill the table with made-up ids; tags are capped to the app's own limit of 3.
 // settings are optional (older pages only send tags) and unusable ones are
@@ -164,7 +182,7 @@ function parseGardenRegistration(body, count) {
     const clean = t.trim().slice(0, 40);
     if (clean) tags.push(clean);
   }
-  return { id, tags, settings: parseSettings(body.settings) };
+  return { id, tags, settings: parseSettings(body.settings), contributors: parseContributors(body.contributors) };
 }
 
 async function handleRegisterGarden(request, env) {
@@ -181,26 +199,34 @@ async function handleRegisterGarden(request, env) {
     return new Response("invalid garden", { status: 400, headers: corsHeaders(env) });
   }
   await ensureGardensTable(env);
-  // COALESCE: a registration without usable settings keeps whatever look was
-  // already stored instead of erasing it
+  // COALESCE: a registration without usable settings (or without a contributors
+  // list) keeps whatever was already stored instead of erasing it
   await env.GARDEN_DB
     .prepare(
-      "INSERT INTO gardens (id, tags, settings, updated_at) VALUES (?1, ?2, ?3, ?4) " +
+      "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
       "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
-      "settings = COALESCE(excluded.settings, gardens.settings), updated_at = excluded.updated_at"
+      "settings = COALESCE(excluded.settings, gardens.settings), " +
+      "contributors = COALESCE(excluded.contributors, gardens.contributors), updated_at = excluded.updated_at"
     )
-    .bind(parsed.id, JSON.stringify(parsed.tags), parsed.settings && JSON.stringify(parsed.settings), Date.now())
+    .bind(
+      parsed.id,
+      JSON.stringify(parsed.tags),
+      parsed.settings && JSON.stringify(parsed.settings),
+      parsed.contributors && JSON.stringify(parsed.contributors),
+      Date.now()
+    )
     .run();
   return new Response(null, { status: 204, headers: corsHeaders(env) });
 }
 
 async function handleListGardens(env) {
   await ensureGardensTable(env);
-  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, updated_at FROM gardens ORDER BY id").all();
+  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, updated_at FROM gardens ORDER BY id").all();
   const gardens = results.map(r => ({
     id: r.id,
     tags: JSON.parse(r.tags),
     settings: r.settings ? JSON.parse(r.settings) : null,
+    contributors: r.contributors ? JSON.parse(r.contributors) : [],
     updatedAt: r.updated_at,
   }));
   return new Response(JSON.stringify({ gardens }), {

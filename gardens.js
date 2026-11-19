@@ -20,17 +20,18 @@ export async function startNewGarden(){
   return id;
 }
 
-// a garden's name is its tags, and settings ({ colors, pattern, scale }) are
-// what the index previews on hover — report both so it can list and show it.
+// a garden's name is its tags, settings ({ colors, pattern, scale }) are what
+// the index previews on hover, and contributors are the names of whoever planted
+// in it — report them so the index can list and show it.
 // skipped on localhost: a local test garden 0 would otherwise overwrite the
 // real original garden's name and look in the shared list
-export async function registerGarden(id, { tags, settings }){
+export async function registerGarden(id, { tags, settings, contributors }){
   if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
   try {
     await fetch(`${UPLOAD_ENDPOINT}/register-garden`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, tags, settings }),
+      body: JSON.stringify({ id, tags, settings, contributors }),
     });
   } catch(err) {
     console.warn("couldn't register this garden's name:", err);
@@ -38,8 +39,8 @@ export async function registerGarden(id, { tags, settings }){
 }
 
 // every garden that exists: the original, plus 1..count from the counter, with
-// names and settings filled in for whichever have reported them ({ id, tags,
-// settings } — settings is null until a garden has). if that list can't be
+// names, settings and contributors filled in for whichever have reported them
+// ({ id, tags, settings, contributors } — settings is null until a garden has). if that list can't be
 // reached the gardens still come back, just unnamed — only losing the counter
 // too (nothing to list) throws.
 export async function fetchGardens(){
@@ -59,5 +60,6 @@ export async function fetchGardens(){
     id,
     tags: reported[id]?.tags || [],
     settings: reported[id]?.settings || null,
+    contributors: reported[id]?.contributors || [],
   }));
 }

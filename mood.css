@@ -967,7 +967,7 @@ main.gardenindex{
   padding:2.5rem 2.5rem 5rem;
 }
 
-main.gardenindex > *{
+.indexhead{
   box-sizing:border-box;
   max-width:680px;
   margin-left:auto;
@@ -1003,30 +1003,52 @@ button.easteregg#newGardenBtn:disabled{
   cursor:default;
 }
 
+/* the cards are scattered across this area by js layoutCards(); playhtml's
+   can-move then drags them and syncs where they've been put */
 #gardenList{
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(8.5rem, 1fr));
-  gap:.6rem;
+  position:relative;
+  width:100%;
 }
 
+/* each card is a little dialog box — same window look as the modals, a vertical
+   rectangle: the tags on top, who planted in it at the bottom */
 .gardencard{
-  aspect-ratio:1 / 1;
+  position:absolute;
+  width:9.5rem;
+  aspect-ratio:3 / 4;
   display:flex;
   flex-direction:column;
-  justify-content:space-between;
-  border:1px solid #000;
-  padding:.6rem;
+  box-sizing:border-box;
+  border:2px solid #000;
+  background:var(--paper);
   color:var(--ink);
   text-decoration:none;
-  box-sizing:border-box;
-  min-width:0;
-  background:var(--paper);
+  cursor:grab;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.gardencard:active{
+  cursor:grabbing;
 }
 
 .gardencard:hover,
 .gardencard:focus-visible{
-  background:#f0f0f0;
   outline:none;
+}
+
+.gardencard:hover .cardbody,
+.gardencard:focus-visible .cardbody{
+  background:#f0f0f0;
+}
+
+.gardencard .cardbody{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:.6rem;
+  min-height:0;
 }
 
 .gardencard .tagbank{
@@ -1042,6 +1064,14 @@ button.easteregg#newGardenBtn:disabled{
   white-space:nowrap;
 }
 
-.gardencard .gardennum{
+.gardencard .planters{
   color:var(--muted);
+  line-height:1.35;
+  overflow:hidden;
+  overflow-wrap:anywhere;
+}
+
+.gardencard .planterlabel{
+  display:block;
+  color:var(--ink);
 }

@@ -627,18 +627,21 @@ playhtml.init({
 
 // which garden this is, for the index page's list — 0 is the original (no ?g=)
 const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
-// reports this garden's tags (its name) and season settings (what the index
-// page previews on hover). on connect it's skipped when there are no tags: a
-// room that hasn't finished syncing still has the empty/random local defaults,
-// and would overwrite a real name and look. after an explicit edit, empty is a
-// real answer and gets sent. the values are copied out one by one so what goes
-// over the wire is plain data, not the synced store's proxy objects
+// reports this garden's tags (its name), season settings (what the index
+// page previews on hover) and the names of whoever planted in it. on connect
+// it's skipped when there are no tags and no plants: a room that hasn't finished
+// syncing still has the empty/random local defaults, and would overwrite a real
+// name and look. after an explicit edit, empty is a real answer and gets sent.
+// the values are copied out one by one so what goes over the wire is plain
+// data, not the synced store's proxy objects
 function registerCurrentGarden(skipIfEmpty = false){
   if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
   const m = garden.meta;
-  if(skipIfEmpty && !m.tags.length) return;
+  const contributors = [...new Set(Object.values(garden.plants || {}).map(pl => pl.name).filter(Boolean))].slice(0, 12);
+  if(skipIfEmpty && !m.tags.length && !contributors.length) return;
   registerGarden(currentGardenId, {
     tags: [...m.tags],
+    contributors,
     settings: {
       colors: { background: [...m.colors.background], seed: m.colors.seed, text: m.colors.text },
       pattern: m.pattern,
@@ -1464,6 +1467,7 @@ pDeleteBtn.addEventListener("click", () => {
   deleteR2File(garden.plants[id]?.audioRef);
   delete garden.plants[id];
   plantSlotsChannel?.setData(draft => { delete draft[id]; });
+  scheduleRegisterCurrentGarden();   // the index lists who planted here
   renderPlantSlots();
   hidePlantModal();
 });
@@ -1496,6 +1500,7 @@ pSaveBtn.addEventListener("click", async () => {
   if(audioName) plant.audioName = audioName;
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
+  scheduleRegisterCurrentGarden();   // the index lists who planted here
   renderPlantSlots();
   hidePlantModal();
   pSaveBtn.disabled = false; pSaveBtn.textContent = "plant";

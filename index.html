@@ -29,12 +29,16 @@
    GARDEN INDEX — css "garden index"
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
+import { playhtml } from "https://unpkg.com/playhtml";
 import { fetchGardens, startNewGarden, gardenUrl } from "./gardens.js";
 import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
 const newGardenBtn = document.getElementById("newGardenBtn");
+// the cards are made after the list arrives, so playhtml is started first and
+// then told about them (setupPlayElements) once they exist
+const playhtmlReady = playhtml.init().catch(err => console.warn("playhtml didn't start — cards won't be draggable:", err));
 const bgEl = document.getElementById("gardenBg");
 const previewSvg = document.getElementById("previewLayer");
 
@@ -62,19 +66,39 @@ function clearPreview(){
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
-// one square card per garden, named by its tags — the same chosen-tag chips as the
-// "feels like" picker in season settings. built with textContent, never
-// innerHTML, since tags are typed in by visitors
+// one dialog-box card per garden: its tags as the title, and the names of
+// whoever planted in it. built with textContent, never innerHTML, since tags and
+// names are typed in by visitors. can-move + a stable id makes each card
+// draggable and its position shared live between visitors (playhtml)
 function renderGardens(gardens){
   gardenListEl.innerHTML = "";
   for(const g of gardens){
     const card = document.createElement("a");
     card.className = "gardencard";
+    card.id = `gardencard-${g.id}`;
+    card.setAttribute("can-move", "");
+    card.draggable = false;   // the browser's own link-drag would fight the card drag
     card.href = gardenUrl(g.id);
     card.addEventListener("pointerenter", () => showPreview(g.settings));
     card.addEventListener("pointerleave", clearPreview);
     card.addEventListener("focus", () => showPreview(g.settings));
     card.addEventListener("blur", clearPreview);
+
+    // a drag ends in a click on the link — only let a real click through
+    let downAt = null;
+    card.addEventListener("pointerdown", e => { downAt = [e.clientX, e.clientY]; });
+    card.addEventListener("click", e => {
+      if(downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) e.preventDefault();
+    });
+
+    const bar = document.createElement("div");
+    bar.className = "titlebar";
+    const closebox = document.createElement("span");
+    closebox.className = "closebox";
+    bar.appendChild(closebox);
+
+    const body = document.createElement("div");
+    body.className = "cardbody";
 
     const name = document.createElement("div");
     name.className = "tagbank";
@@ -94,19 +118,66 @@ function renderGardens(gardens){
       name.appendChild(none);
     }
 
-    const num = document.createElement("span");
-    num.className = "gardennum";
-    num.textContent = g.id === 0 ? "the original" : `#${g.id}`;
+    const planters = document.createElement("div");
+    planters.className = "planters";
+    const label = document.createElement("span");
+    label.className = "planterlabel";
+    label.textContent = "planted by";
+    const names = document.createElement("span");
+    names.textContent = g.contributors.length ? g.contributors.join(", ") : "no one yet";
 
-    card.append(name, num);
+    planters.append(label, names);
+    body.append(name, planters);
+    card.append(bar, body);
     gardenListEl.appendChild(card);
   }
+  layoutCards();
 }
+
+// scatter the cards across the page instead of lining them up. each lands in
+// its own cell of a loose grid, nudged by a pseudo-random offset that comes only
+// from the garden's id — so everyone starts from the same arrangement, and
+// dragging (which playhtml syncs as an offset from here) moves them from there
+function seededRandom(seed){
+  let a = (seed + 1) * 2654435761 >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function layoutCards(){
+  const cards = [...gardenListEl.children];
+  if(!cards.length) return;
+  const cardW = cards[0].offsetWidth, cardH = cards[0].offsetHeight;
+  const gap = 28;
+  const cellW = cardW + gap, cellH = cardH + gap;
+  const areaW = gardenListEl.clientWidth;
+  const cols = Math.max(1, Math.floor((areaW + gap) / cellW));
+  const rows = Math.ceil(cards.length / cols);
+  // leftover width becomes slack for the scatter, so a wide page is used edge to edge
+  const slackX = Math.max(0, areaW - cols * cellW + gap);
+  cards.forEach((card, i) => {
+    const id = Number(card.id.replace("gardencard-", ""));
+    const rand = seededRandom(id);
+    const col = i % cols, row = Math.floor(i / cols);
+    const jx = (rand() - .5) * (gap + slackX / cols);
+    const jy = (rand() - .5) * gap * 2.2;
+    card.style.left = Math.max(0, col * (cellW + slackX / cols) + jx + slackX / cols / 2) + "px";
+    card.style.top = Math.max(0, row * (cellH + gap * .6) + jy + gap) + "px";
+  });
+  gardenListEl.style.height = rows * (cellH + gap * .6) + gap * 2 + "px";
+}
+window.addEventListener("resize", layoutCards);
 
 fetchGardens()
   .then(gardens => {
     gardenStatusEl.hidden = true;
     renderGardens(gardens);
+    playhtmlReady.then(() => playhtml.setupPlayElements());
   })
   .catch(err => {
     console.warn("couldn't list the gardens:", err);
