@@ -8,23 +8,21 @@
 </head>
 <body>
 
-<div class="gardenbg"></div>
+<!-- the page background; hovering a garden card previews that garden's season settings here -->
+<div class="gardenbg" id="gardenBg"><svg id="previewLayer" aria-hidden="true"></svg></div>
 
-<!-- window: every garden, named by its "feels like" tags -->
-<div class="scrim open">
-  <div class="modal">
-    <div class="titlebar"><span class="closebox"></span></div>
-    <div class="cardbody">
-      <label class="cardtitle">୨ৎ all the sound gardens ༄</label>
-      <p class="sub">each one feels like something ~ pick one to wander into</p>
-      <p class="sub" id="gardenStatus">gathering the gardens...</p>
-      <div id="gardenList"></div>
-      <div class="actions" style="margin-top:0; justify-content:flex-start;">
-        <button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- every garden, named by its "feels like" tags — cards float straight on the background -->
+<main class="gardenindex">
+  <header class="indexhead">
+    <label class="cardtitle">୨ৎ all the sound gardens ༄</label>
+    <p class="sub">each one feels like something ~ pick one to wander into</p>
+    <p class="sub" id="gardenStatus">gathering the gardens...</p>
+  </header>
+  <div id="gardenList"></div>
+</main>
+
+<!-- kept apart from the cards, always bottom right -->
+<button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
 
 <script type="module">
 /* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
@@ -32,20 +30,51 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { fetchGardens, startNewGarden, gardenUrl } from "./gardens.js";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
 const newGardenBtn = document.getElementById("newGardenBtn");
+const bgEl = document.getElementById("gardenBg");
+const previewSvg = document.getElementById("previewLayer");
 
-// one row per garden, named by its tags — the same chosen-tag chips as the
+// hovering (or keyboard-focusing) a card shows that garden's season settings
+// behind the window: its sky/soil gradient and its field pattern, drawn by the
+// same code the garden itself uses. gardens that haven't reported settings yet
+// have nothing to preview, so the background just stays as it is
+function showPreview(settings){
+  if(!settings) return;
+  const { colors, pattern, scale } = settings;
+  bgEl.style.setProperty("--sky", colors.background[0]);
+  bgEl.style.setProperty("--soil", colors.background[1]);
+  // crop the big field down to its middle, at the window's own size, so the
+  // pattern is about as large here as it is inside the garden
+  const w = window.innerWidth, h = window.innerHeight;
+  previewSvg.setAttribute("viewBox", `${(FIELD_W - w) / 2} ${(FIELD_H - h) / 2} ${w} ${h}`);
+  previewSvg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+  drawFieldPattern(previewSvg, { pattern, scale: scale || 1, seed: colors.seed });
+  bgEl.classList.add("previewing");
+}
+
+function clearPreview(){
+  bgEl.style.removeProperty("--sky");
+  bgEl.style.removeProperty("--soil");
+  bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
+}
+
+// one square card per garden, named by its tags — the same chosen-tag chips as the
 // "feels like" picker in season settings. built with textContent, never
 // innerHTML, since tags are typed in by visitors
 function renderGardens(gardens){
   gardenListEl.innerHTML = "";
   for(const g of gardens){
-    const row = document.createElement("a");
-    row.className = "gardenrow";
-    row.href = gardenUrl(g.id);
+    const card = document.createElement("a");
+    card.className = "gardencard";
+    card.href = gardenUrl(g.id);
+    card.addEventListener("pointerenter", () => showPreview(g.settings));
+    card.addEventListener("pointerleave", clearPreview);
+    card.addEventListener("focus", () => showPreview(g.settings));
+    card.addEventListener("blur", clearPreview);
 
     const name = document.createElement("div");
     name.className = "tagbank";
@@ -69,8 +98,8 @@ function renderGardens(gardens){
     num.className = "gardennum";
     num.textContent = g.id === 0 ? "the original" : `#${g.id}`;
 
-    row.append(name, num);
-    gardenListEl.appendChild(row);
+    card.append(name, num);
+    gardenListEl.appendChild(card);
   }
 }
 

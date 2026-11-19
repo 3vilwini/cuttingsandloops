@@ -917,46 +917,131 @@ button.easteregg{
 
 
 
-/* garden index — index.html, js gardens.js */
+/* garden index — index.html, js gardens.js, field.js */
 
+/* registered so the gradient's two colors can transition when a card is hovered
+   (browsers that don't support @property just switch instantly) */
+@property --sky{
+  syntax:"<color>";
+  inherits:false;
+  initial-value:#3ab704;
+}
+
+@property --soil{
+  syntax:"<color>";
+  inherits:false;
+  initial-value:#e2ffcb;
+}
+
+/* the page background — the default look until a card is hovered, then that
+   garden's sky/soil and field pattern as a preview (see showPreview) */
 .gardenbg{
   position:fixed;
   inset:0;
   z-index:0;
-  background:linear-gradient(to bottom, #3ab704, #e2ffcb);
+  background:linear-gradient(to bottom, var(--sky), var(--soil));
+  transition:--sky .5s ease, --soil .5s ease;
+}
+
+.gardenbg svg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  transition:opacity .5s ease;
+}
+
+.gardenbg.previewing svg{
+  opacity:1;
+}
+
+/* the cards float straight on the background — no window around them. the
+   page scrolls inside this layer because body itself is overflow:hidden */
+main.gardenindex{
+  position:fixed;
+  inset:0;
+  z-index:1;
+  overflow:auto;
+  box-sizing:border-box;
+  padding:2.5rem 2.5rem 5rem;
+}
+
+main.gardenindex > *{
+  box-sizing:border-box;
+  max-width:680px;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+/* title + blurb on a small paper chip so they stay readable on any preview */
+.indexhead{
+  background:var(--paper);
+  border:1px solid #000;
+  padding:.6rem .8rem .1rem;
+  margin-bottom:.6rem;
+}
+
+.indexhead .sub{
+  margin-bottom:.5rem;
+}
+
+.indexhead .sub[hidden]{
+  display:none;
+}
+
+button.easteregg#newGardenBtn{
+  position:fixed;
+  right:1.2rem;
+  bottom:1.2rem;
+  z-index:2;
+  background:var(--paper);
+  border:1px solid #000;
+}
+
+button.easteregg#newGardenBtn:disabled{
+  cursor:default;
 }
 
 #gardenList{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap:.6rem;
+}
+
+.gardencard{
+  aspect-ratio:1 / 1;
   display:flex;
   flex-direction:column;
-  gap:.5rem;
-  margin-bottom:1.2rem;
-}
-
-.gardenrow{
-  display:flex;
-  align-items:center;
   justify-content:space-between;
-  gap:.5rem;
   border:1px solid #000;
-  padding:.4rem .5rem;
+  padding:.6rem;
   color:var(--ink);
   text-decoration:none;
+  box-sizing:border-box;
+  min-width:0;
+  background:var(--paper);
 }
 
-.gardenrow:hover{
-  background:rgba(0,0,0,.06);
+.gardencard:hover,
+.gardencard:focus-visible{
+  background:#f0f0f0;
+  outline:none;
 }
 
-.gardenrow .tagbank{
+.gardencard .tagbank{
   margin-bottom:0;
 }
 
-.gardenrow .tag{
+.gardencard .tag{
   cursor:inherit;
+  max-width:100%;
+  box-sizing:border-box;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
-.gardenrow .gardennum{
+.gardencard .gardennum{
   color:var(--muted);
-  flex-shrink:0;
 }

@@ -27,10 +27,11 @@
      table, no increment). Used by the volume meter's
      double-click-to-teleport hint to pick a random existing garden.
    - POST /register-garden — a garden reports its (up to 3) tags, which are
-     its name. Body: { id, tags }. Upsert into a second D1 table.
-   - GET /gardens — every registered garden's { id, tags }, for the index
-     page. Gardens nobody has tagged yet aren't in here; the index fills
-     those in from /garden-count as unnamed.
+     its name, and its season settings, which the index previews on hover.
+     Body: { id, tags, settings }. Upsert into a second D1 table.
+   - GET /gardens — every registered garden's { id, tags, settings }, for the
+     index page. Gardens that haven't reported yet aren't in here; the index
+     fills those in from /garden-count as unnamed.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
    with an R2 bucket bound as SEEDS, a D1 database bound as GARDEN_DB
@@ -109,19 +110,50 @@ async function handleGardenCount(env) {
   });
 }
 
-// a garden's name is its (up to) 3 "feels like" tags, which only exist inside
-// that garden's own playhtml room — a page can't read many rooms at once, so
-// each garden reports its tags here and the index page reads them back in one
-// request. id 0 is the original garden (the bare URL, no ?g=).
+// a garden's name is its (up to) 3 "feels like" tags, and its look is its
+// season settings (colors, pattern, scale) — both only exist inside that
+// garden's own playhtml room, and a page can't read many rooms at once. so each
+// garden reports them here and the index page reads them back in one request,
+// naming each garden and previewing its look on hover. id 0 is the original
+// garden (the bare URL, no ?g=).
+let gardensTableReady = false;
 async function ensureGardensTable(env) {
+  if (gardensTableReady) return;
   await env.GARDEN_DB.prepare(
-    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, updated_at INTEGER NOT NULL)"
   ).run();
+  // a table made before settings existed has no such column — add it. when it
+  // is already there this throws, which is the expected "nothing to do" case
+  try {
+    await env.GARDEN_DB.prepare("ALTER TABLE gardens ADD COLUMN settings TEXT").run();
+  } catch {}
+  gardensTableReady = true;
 }
 
-// returns { id, tags } for a usable registration, or null. the id can't be
-// beyond how many gardens have actually been created, so nobody can fill the
-// table with made-up ids; tags are capped to the app's own limit of 3.
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const isHex = c => typeof c === "string" && HEX.test(c);
+
+// season settings as the app stores them: { colors: { background: [sky, soil],
+// seed, text }, pattern, scale }. rebuilt from checked pieces rather than passed
+// through, so nothing else a client sends ever gets stored. null if unusable.
+function parseSettings(s) {
+  const bg = s?.colors?.background;
+  if (!Array.isArray(bg) || bg.length !== 2 || !bg.every(isHex)) return null;
+  if (!isHex(s.colors.seed) || !isHex(s.colors.text)) return null;
+  if (!["lattice", "array", "furrow"].includes(s.pattern)) return null;
+  if (typeof s.scale !== "number" || !(s.scale >= 0.1 && s.scale <= 5)) return null;
+  return {
+    colors: { background: [bg[0], bg[1]], seed: s.colors.seed, text: s.colors.text },
+    pattern: s.pattern,
+    scale: s.scale,
+  };
+}
+
+// returns { id, tags, settings } for a usable registration, or null. the id
+// can't be beyond how many gardens have actually been created, so nobody can
+// fill the table with made-up ids; tags are capped to the app's own limit of 3.
+// settings are optional (older pages only send tags) and unusable ones are
+// dropped rather than failing the whole registration.
 function parseGardenRegistration(body, count) {
   const id = body?.id;
   if (!Number.isInteger(id) || id < 0 || id > count) return null;
@@ -132,7 +164,7 @@ function parseGardenRegistration(body, count) {
     const clean = t.trim().slice(0, 40);
     if (clean) tags.push(clean);
   }
-  return { id, tags };
+  return { id, tags, settings: parseSettings(body.settings) };
 }
 
 async function handleRegisterGarden(request, env) {
@@ -149,20 +181,28 @@ async function handleRegisterGarden(request, env) {
     return new Response("invalid garden", { status: 400, headers: corsHeaders(env) });
   }
   await ensureGardensTable(env);
+  // COALESCE: a registration without usable settings keeps whatever look was
+  // already stored instead of erasing it
   await env.GARDEN_DB
     .prepare(
-      "INSERT INTO gardens (id, tags, updated_at) VALUES (?1, ?2, ?3) " +
-      "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, updated_at = excluded.updated_at"
+      "INSERT INTO gardens (id, tags, settings, updated_at) VALUES (?1, ?2, ?3, ?4) " +
+      "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
+      "settings = COALESCE(excluded.settings, gardens.settings), updated_at = excluded.updated_at"
     )
-    .bind(parsed.id, JSON.stringify(parsed.tags), Date.now())
+    .bind(parsed.id, JSON.stringify(parsed.tags), parsed.settings && JSON.stringify(parsed.settings), Date.now())
     .run();
   return new Response(null, { status: 204, headers: corsHeaders(env) });
 }
 
 async function handleListGardens(env) {
   await ensureGardensTable(env);
-  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, updated_at FROM gardens ORDER BY id").all();
-  const gardens = results.map(r => ({ id: r.id, tags: JSON.parse(r.tags), updatedAt: r.updated_at }));
+  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, updated_at FROM gardens ORDER BY id").all();
+  const gardens = results.map(r => ({
+    id: r.id,
+    tags: JSON.parse(r.tags),
+    settings: r.settings ? JSON.parse(r.settings) : null,
+    updatedAt: r.updated_at,
+  }));
   return new Response(JSON.stringify({ gardens }), {
     headers: { ...corsHeaders(env), "Content-Type": "application/json", "Cache-Control": "no-store" },
   });

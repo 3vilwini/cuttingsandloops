@@ -5,6 +5,7 @@
 import { playhtml } from "https://unpkg.com/playhtml";
 // UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
 import { UPLOAD_ENDPOINT, startNewGarden, registerGarden } from "./gardens.js";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
 const MAX_TAGS = 3;
@@ -14,7 +15,6 @@ const PATTERNS = [
   { id:"furrow",  label:"furrow" },    
 ];
 
-const FIELD_W = 2400, FIELD_H = 1600;   
 const STEP = 95;
 const PLANT_MARGIN_LEFT = 70;
 const PLANT_MARGIN_RIGHT = 280;
@@ -47,12 +47,6 @@ function newId(len=8){
 }
 
 const clientId = newId();
-
-// hex "#rrggbb" -> "r,g,b" so seed color can be used at low opacity for field pattern 
-function hexToRgb(hex){
-  const m = hex.replace("#","").match(/.{2}/g).map(h => parseInt(h,16));
-  return m.join(",");
-}
 
 // color inversion - used mostly on seed color 
 function invertHex(hex){
@@ -93,11 +87,6 @@ function randomizeDefaults(){
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-function svgEl(tag, attrs){
-  const el = document.createElementNS(SVG_NS, tag);
-  for(const k in attrs) el.setAttribute(k, attrs[k]);
-  return el;
-}
 
 
 // create garden ?g=<id> (uploadSeedFile's X-Garden-Id, connectChannels). page path AND query distinguishes one garden from another
@@ -154,43 +143,11 @@ function renderField(){
   renderPlantSlots();
 
   const svg = document.getElementById("patternLayer");
-  svg.innerHTML = "";
   svg.setAttribute("viewBox", `0 0 ${FIELD_W} ${FIELD_H}`);
   svg.setAttribute("preserveAspectRatio", "none");
-  const rgb = hexToRgb(seed);
+  drawFieldPattern(svg, { pattern: garden.meta.pattern, scale: garden.meta.scale || 1, seed });
 
-  const scale = garden.meta.scale || 1;
-  const LATTICE_BASE = 104;   
-  const FURROW_BASE = 26;     
-
-  if(garden.meta.pattern === "array"){
-    const maxR = Math.hypot(FIELD_W, FIELD_H)/2 + 60;
-    const a = 16 * scale;      // spiral pitch — distance between successive arms
-    const dotGap = 10 * scale; // arc-length distance between dots 
-    const dotR = Math.max(0.6, 0.9 * scale);
-    const group = svgEl("g", { fill:`rgba(${rgb},.55)` });
-    let t = 1;
-    for(let r = a*t; r <= maxR; r = a*t){
-      const x = CX + r*Math.cos(t), y = CY + r*Math.sin(t);
-      group.appendChild(svgEl("circle", { cx:x.toFixed(1), cy:y.toFixed(1), r:dotR }));
-      t += dotGap / r;       // shrink angular step as radius grows -> even spacing
-    }
-    svg.appendChild(group);
-  } else {
-    const spacing = (garden.meta.pattern === "lattice" ? LATTICE_BASE : FURROW_BASE) * scale;
-    const defs = svgEl("defs", {});
-    const pattern = svgEl("pattern", { id:"fieldPattern", width:spacing, height:spacing, patternUnits:"userSpaceOnUse" });
-    const stroke = `rgba(${rgb},.4)`;
-    pattern.appendChild(svgEl("line", { x1:0, y1:spacing/2, x2:spacing, y2:spacing/2, stroke, "stroke-width":0.6 }));
-    if(garden.meta.pattern === "lattice"){
-      pattern.appendChild(svgEl("line", { x1:spacing/2, y1:0, x2:spacing/2, y2:spacing, stroke, "stroke-width":0.6 }));
-    }
-    defs.appendChild(pattern);
-    svg.appendChild(defs);
-    svg.appendChild(svgEl("rect", { width:"100%", height:"100%", fill:"url(#fieldPattern)" }));
-  }
-
-  applyViewToggles(); 
+  applyViewToggles();
 }
 
 const viewportEl = document.getElementById("viewport");
@@ -670,13 +627,31 @@ playhtml.init({
 
 // which garden this is, for the index page's list — 0 is the original (no ?g=)
 const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
-// reports this garden's tags (its name). on connect an empty list is skipped
-// so a room that hasn't finished syncing can't wipe a real name; after an
-// explicit tag edit, empty is a real answer and gets sent
+// reports this garden's tags (its name) and season settings (what the index
+// page previews on hover). on connect it's skipped when there are no tags: a
+// room that hasn't finished syncing still has the empty/random local defaults,
+// and would overwrite a real name and look. after an explicit edit, empty is a
+// real answer and gets sent. the values are copied out one by one so what goes
+// over the wire is plain data, not the synced store's proxy objects
 function registerCurrentGarden(skipIfEmpty = false){
   if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
-  if(skipIfEmpty && !garden.meta.tags.length) return;
-  registerGarden(currentGardenId, garden.meta.tags);
+  const m = garden.meta;
+  if(skipIfEmpty && !m.tags.length) return;
+  registerGarden(currentGardenId, {
+    tags: [...m.tags],
+    settings: {
+      colors: { background: [...m.colors.background], seed: m.colors.seed, text: m.colors.text },
+      pattern: m.pattern,
+      scale: m.scale,
+    },
+  });
+}
+
+// dragging a color picker fires a change per pixel — wait for it to settle
+let registerTimer = null;
+function scheduleRegisterCurrentGarden(){
+  clearTimeout(registerTimer);
+  registerTimer = setTimeout(() => registerCurrentGarden(), 1500);
 }
 
 setTimeout(() => {
@@ -777,7 +752,13 @@ function onSeedsChanged(){
   renderConnections();
 }
 
-function syncMeta(){ metaChannel?.setData(draft => Object.assign(draft, garden.meta)); }
+// every local settings/tag edit goes through here. skipped before the room is
+// connected (the load-time applyColors() call): that's the random local
+// default, not an edit, and shouldn't be reported as this garden's look
+function syncMeta(){
+  metaChannel?.setData(draft => Object.assign(draft, garden.meta));
+  if(metaChannel) scheduleRegisterCurrentGarden();
+}
 
 function applyMetaToUI(){
   cBg1.value = garden.meta.colors.background[0];
@@ -832,7 +813,6 @@ function toggleTag(t){
   else if(garden.meta.tags.length < MAX_TAGS) garden.meta.tags.push(t);
   renderTagBank();
   syncMeta();
-  registerCurrentGarden();
 }
 document.getElementById("tagCustomBtn").addEventListener("click", () => {
   const input = document.getElementById("tagCustomInput");
@@ -842,7 +822,6 @@ document.getElementById("tagCustomBtn").addEventListener("click", () => {
   input.value = "";
   renderTagBank();
   syncMeta();
-  registerCurrentGarden();
 });
 
 // colors - sky, soil, seed, label

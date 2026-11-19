@@ -20,16 +20,17 @@ export async function startNewGarden(){
   return id;
 }
 
-// a garden's name is its tags — report them so the index can list it by name.
+// a garden's name is its tags, and settings ({ colors, pattern, scale }) are
+// what the index previews on hover — report both so it can list and show it.
 // skipped on localhost: a local test garden 0 would otherwise overwrite the
-// real original garden's name in the shared list
-export async function registerGarden(id, tags){
+// real original garden's name and look in the shared list
+export async function registerGarden(id, { tags, settings }){
   if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
   try {
     await fetch(`${UPLOAD_ENDPOINT}/register-garden`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, tags }),
+      body: JSON.stringify({ id, tags, settings }),
     });
   } catch(err) {
     console.warn("couldn't register this garden's name:", err);
@@ -37,7 +38,8 @@ export async function registerGarden(id, tags){
 }
 
 // every garden that exists: the original, plus 1..count from the counter, with
-// names filled in for whichever have reported tags. if the names list can't be
+// names and settings filled in for whichever have reported them ({ id, tags,
+// settings } — settings is null until a garden has). if that list can't be
 // reached the gardens still come back, just unnamed — only losing the counter
 // too (nothing to list) throws.
 export async function fetchGardens(){
@@ -48,10 +50,14 @@ export async function fetchGardens(){
   if(countRes.status !== "fulfilled" || !countRes.value.ok) throw new Error("couldn't read the garden count");
   const { count } = await countRes.value.json();
 
-  const tagsById = {};
+  const reported = {};
   if(namesRes.status === "fulfilled" && namesRes.value.ok){
     const { gardens } = await namesRes.value.json();
-    for(const g of gardens) tagsById[g.id] = g.tags;
+    for(const g of gardens) reported[g.id] = g;
   }
-  return Array.from({ length: count + 1 }, (_, id) => ({ id, tags: tagsById[id] || [] }));
+  return Array.from({ length: count + 1 }, (_, id) => ({
+    id,
+    tags: reported[id]?.tags || [],
+    settings: reported[id]?.settings || null,
+  }));
 }
