@@ -29,9 +29,9 @@
    - POST /register-garden — a garden reports its (up to 3) tags, which are
      its name, its season settings (which the index previews on hover) and the
      names of the people who planted in it.
-     Body: { id, tags, settings, contributors, plantCount, seedCount, fillOnly }. Normally it replaces
+     Body: { id, tags, settings, contributors, plantCount, seedCount, plantDrawing, fillOnly }. Normally it replaces
      what's stored; with fillOnly it only fills in what's still missing. Upsert into a second D1 table.
-   - GET /gardens — every registered garden's { id, tags, settings, contributors, plants, seeds }, for the
+   - GET /gardens — every registered garden's { id, tags, settings, contributors, plants, seeds, plantDrawing }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
      fills those in from /garden-count as unnamed. Also carries `here`, how many
      visitors each garden has right now ({ "<id>": n }).
@@ -130,11 +130,11 @@ let gardensTableReady = false;
 async function ensureGardensTable(env) {
   if (gardensTableReady) return;
   await env.GARDEN_DB.prepare(
-    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, contributors TEXT, plants INTEGER, seeds INTEGER, updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, contributors TEXT, plants INTEGER, seeds INTEGER, plant_drawing TEXT, updated_at INTEGER NOT NULL)"
   ).run();
   // a table made before these columns existed lacks them — add each. when one
   // is already there this throws, which is the expected "nothing to do" case
-  for (const [column, type] of [["settings", "TEXT"], ["contributors", "TEXT"], ["plants", "INTEGER"], ["seeds", "INTEGER"]]) {
+  for (const [column, type] of [["settings", "TEXT"], ["contributors", "TEXT"], ["plants", "INTEGER"], ["seeds", "INTEGER"], ["plant_drawing", "TEXT"]]) {
     try {
       await env.GARDEN_DB.prepare(`ALTER TABLE gardens ADD COLUMN ${column} ${type}`).run();
     } catch {}
@@ -182,7 +182,30 @@ function parseCount(n) {
   return Number.isInteger(n) && n >= 0 && n <= 1000 ? n : null;
 }
 
-// returns { id, tags, settings, contributors, plants, seeds } for a usable registration, or null. the id
+// one plant's drawing, shown on the index's large card: { w, h, color, paths }
+// with paths as lists of [x, y]. rebuilt from checked numbers (nothing else a
+// client sends is kept) and kept small: at most 30 strokes, 600 points in all.
+// null if there's nothing usable
+function parsePlantDrawing(d) {
+  if (!d || !Number.isInteger(d.w) || !Number.isInteger(d.h)) return null;
+  if (d.w < 1 || d.w > 1000 || d.h < 1 || d.h > 1000 || !isHex(d.color) || !Array.isArray(d.paths)) return null;
+  const paths = [];
+  let points = 0;
+  for (const stroke of d.paths.slice(0, 30)) {
+    if (!Array.isArray(stroke)) continue;
+    const pts = [];
+    for (const pt of stroke.slice(0, 300)) {
+      if (!Array.isArray(pt) || pt.length !== 2 || !pt.every(n => typeof n === "number" && n >= 0 && n <= 1000)) continue;
+      pts.push([Math.round(pt[0]), Math.round(pt[1])]);
+    }
+    if (pts.length < 2 || points + pts.length > 600) continue;
+    points += pts.length;
+    paths.push(pts);
+  }
+  return paths.length ? { w: d.w, h: d.h, color: d.color, paths } : null;
+}
+
+// returns { id, tags, settings, contributors, plants, seeds, plantDrawing } for a usable registration, or null. the id
 // can't be beyond how many gardens have actually been created, so nobody can
 // fill the table with made-up ids; tags are capped to the app's own limit of 3.
 // settings are optional (older pages only send tags) and unusable ones are
@@ -204,6 +227,7 @@ function parseGardenRegistration(body, count) {
     contributors: parseContributors(body.contributors),
     plants: parseCount(body.plantCount),
     seeds: parseCount(body.seedCount),
+    plantDrawing: parsePlantDrawing(body.plantDrawing),
     fillOnly: body.fillOnly === true,
   };
 }
@@ -227,20 +251,22 @@ async function handleRegisterGarden(request, env) {
   // fillOnly: the opposite, only fills gaps — an existing look/list/name stays,
   // so a page that hasn't finished syncing can't overwrite the real thing
   const sql = parsed.fillOnly
-    ? "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) " +
+    ? "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, plant_drawing, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) " +
       "ON CONFLICT(id) DO UPDATE SET " +
       "tags = CASE WHEN gardens.tags = '[]' THEN excluded.tags ELSE gardens.tags END, " +
       "settings = COALESCE(gardens.settings, excluded.settings), " +
       "contributors = COALESCE(gardens.contributors, excluded.contributors), " +
       "plants = COALESCE(gardens.plants, excluded.plants), " +
       "seeds = COALESCE(gardens.seeds, excluded.seeds), " +
+      "plant_drawing = COALESCE(gardens.plant_drawing, excluded.plant_drawing), " +
       "updated_at = gardens.updated_at"
-    : "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) " +
+    : "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, plant_drawing, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) " +
       "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
       "settings = COALESCE(excluded.settings, gardens.settings), " +
       "contributors = COALESCE(excluded.contributors, gardens.contributors), " +
       "plants = COALESCE(excluded.plants, gardens.plants), " +
       "seeds = COALESCE(excluded.seeds, gardens.seeds), " +
+      "plant_drawing = COALESCE(excluded.plant_drawing, gardens.plant_drawing), " +
       "updated_at = excluded.updated_at";
   await env.GARDEN_DB
     .prepare(sql)
@@ -251,6 +277,7 @@ async function handleRegisterGarden(request, env) {
       parsed.contributors && JSON.stringify(parsed.contributors),
       parsed.plants,
       parsed.seeds,
+      parsed.plantDrawing && JSON.stringify(parsed.plantDrawing),
       Date.now()
     )
     .run();
@@ -314,7 +341,7 @@ async function currentPresence(env) {
 
 async function handleListGardens(env) {
   await ensureGardensTable(env);
-  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, plants, seeds, updated_at FROM gardens ORDER BY id").all();
+  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, plants, seeds, plant_drawing, updated_at FROM gardens ORDER BY id").all();
   const gardens = results.map(r => ({
     id: r.id,
     tags: JSON.parse(r.tags),
@@ -322,6 +349,7 @@ async function handleListGardens(env) {
     contributors: r.contributors ? JSON.parse(r.contributors) : [],
     plants: r.plants || 0,
     seeds: r.seeds || 0,
+    plantDrawing: r.plant_drawing ? JSON.parse(r.plant_drawing) : null,
     updatedAt: r.updated_at,
   }));
   return new Response(JSON.stringify({ gardens, here: await currentPresence(env) }), {

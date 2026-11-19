@@ -26,13 +26,13 @@ export async function startNewGarden(){
 // fill in what the registry doesn't have yet, never replace what's there.
 // skipped on localhost: a local test garden 0 would otherwise overwrite the
 // real original garden's name and look in the shared list
-export async function registerGarden(id, { tags, settings, contributors, plantCount, seedCount, fillOnly = false }){
+export async function registerGarden(id, { tags, settings, contributors, plantCount, seedCount, plantDrawing, fillOnly = false }){
   if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
   try {
     await fetch(`${UPLOAD_ENDPOINT}/register-garden`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, tags, settings, contributors, plantCount, seedCount, fillOnly }),
+      body: JSON.stringify({ id, tags, settings, contributors, plantCount, seedCount, plantDrawing, fillOnly }),
     });
   } catch(err) {
     console.warn("couldn't register this garden's name:", err);
@@ -100,6 +100,7 @@ export async function fetchGardens(){
     contributors: reported[id]?.contributors || [],
     plants: reported[id]?.plants || 0,
     seeds: reported[id]?.seeds || 0,
+    plantDrawing: reported[id]?.plantDrawing || null,
     here: here[id] || 0,
   }));
 }

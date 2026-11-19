@@ -88,6 +88,29 @@ function contrast(a, b){
   return (hi + .05) / (lo + .05);
 }
 
+// a plant's strokes as an <svg>; the points are numbers from the Worker, set as
+// attributes (never as markup)
+function makePlantDrawing(d){
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "plantdrawing");
+  svg.setAttribute("viewBox", `0 0 ${d.w} ${d.h}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.setAttribute("aria-hidden", "true");
+  for(const stroke of d.paths){
+    const line = document.createElementNS(NS, "polyline");
+    line.setAttribute("points", stroke.map(([x, y]) => `${x},${y}`).join(" "));
+    line.setAttribute("fill", "none");
+    line.setAttribute("stroke", d.color);
+    line.setAttribute("stroke-width", "2");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("stroke-linejoin", "round");
+    line.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(line);
+  }
+  return svg;
+}
+
 // a tag chip; --glow is the garden's seed color, used for the hover glow
 function makeChip(text, g){
   const chip = document.createElement("span");
@@ -218,6 +241,13 @@ function renderGardens(gardens){
     }
 
     body.append(name, planters, here);
+
+    // the large card also shows one of the garden's plant drawings, in the
+    // plant's own color, the way it's drawn out in the garden
+    if(cardSize(g) === "large" && g.plantDrawing){
+      body.appendChild(makePlantDrawing(g.plantDrawing));
+      card.classList.add("hasdrawing");
+    }
     card.append(bar, body);
     gardenListEl.appendChild(card);
   }

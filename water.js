@@ -636,6 +636,27 @@ const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
 // what puts a garden on the index with its colors the first time anyone opens it.
 // the values are copied out one by one so what goes over the wire is plain
 // data, not the synced store's proxy objects
+// one of the garden's plant drawings, for the index's large card: the plant with
+// the most drawn points (usually the most interesting one), thinned down and
+// rounded to whole numbers so it stays small. strokes are lists of [x, y]
+function pickPlantDrawing(){
+  let best = null, bestPoints = 0;
+  for(const pl of Object.values(garden.plants || {})){
+    if(!pl.paths || !pl.paths.length || !/^#[0-9a-fA-F]{6}$/.test(pl.color)) continue;
+    const n = pl.paths.reduce((sum, stroke) => sum + stroke.length, 0);
+    if(n > bestPoints){ best = pl; bestPoints = n; }
+  }
+  if(!best) return undefined;
+  const step = Math.max(1, Math.ceil(bestPoints / 500));
+  const paths = [];
+  for(const stroke of best.paths.slice(0, 30)){
+    const pts = [];
+    stroke.forEach((pt, i) => { if(i % step === 0 || i === stroke.length - 1) pts.push([Math.round(pt.x), Math.round(pt.y)]); });
+    if(pts.length >= 2) paths.push(pts);
+  }
+  return paths.length ? { w: pCanvas.width, h: pCanvas.height, color: best.color, paths } : undefined;
+}
+
 function registerCurrentGarden(fillOnly = false){
   if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
   const m = garden.meta;
@@ -650,6 +671,7 @@ function registerCurrentGarden(fillOnly = false){
     seedCount: fillOnly && !seedCount ? undefined : seedCount,
     // an empty list on connect may just mean the plants haven't synced yet — say nothing instead
     contributors: fillOnly && !contributors.length ? undefined : contributors,
+    plantDrawing: pickPlantDrawing(),
     fillOnly,
     settings: {
       colors: { background: [...m.colors.background], seed: m.colors.seed, text: m.colors.text },

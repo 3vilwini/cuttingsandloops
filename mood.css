@@ -1130,6 +1130,33 @@ button.easteregg#newGardenBtn:disabled{
   background-color:#fff;
 }
 
+/* a large card with a plant drawing: tags on top left, the drawing filling the
+   left column under them, who planted and who's here down the right */
+.gardencard.large.hasdrawing .cardbody{
+  grid-template-rows:auto 1fr auto;
+}
+
+.gardencard.large.hasdrawing .tagbank{
+  grid-row:1;
+}
+
+.gardencard.large.hasdrawing .planters{
+  grid-row:2;
+}
+
+.gardencard.large.hasdrawing .herenow{
+  grid-row:3;
+}
+
+.gardencard .plantdrawing{
+  grid-column:1;
+  grid-row:2 / span 2;
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:visible;
+}
+
 .gardencard:active{
   cursor:grabbing;
 }
