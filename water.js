@@ -640,8 +640,14 @@ function registerCurrentGarden(fillOnly = false){
   if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
   const m = garden.meta;
   const contributors = [...new Set(Object.values(garden.plants || {}).map(pl => pl.name).filter(Boolean))].slice(0, 12);
+  const plantCount = Object.keys(garden.plants || {}).length;
+  const seedCount = Object.keys(garden.seeds || {}).length;
   registerGarden(currentGardenId, {
     tags: [...m.tags],
+    // how full the garden is picks its card size on the index. like contributors,
+    // a zero on connect may just mean nothing has synced yet, so it's left out
+    plantCount: fillOnly && !plantCount ? undefined : plantCount,
+    seedCount: fillOnly && !seedCount ? undefined : seedCount,
     // an empty list on connect may just mean the plants haven't synced yet — say nothing instead
     contributors: fillOnly && !contributors.length ? undefined : contributors,
     fillOnly,
@@ -935,6 +941,7 @@ function renderSeedList(){
       deleteR2File(seed.audioRef);
       delete garden.seeds[i];
       seedsChannel?.setData(draft => { delete draft[i]; });
+      scheduleRegisterCurrentGarden();   // the index sizes its card by how many seeds/plants
       onSeedsChanged();
     });
     row.appendChild(progress); row.appendChild(play); row.appendChild(label); row.appendChild(dl); row.appendChild(del);
@@ -1106,6 +1113,7 @@ sSaveBtn.addEventListener("click", async () => {
   const seed = { title: sTitle.value.trim(), artist: sArtist.value.trim(), audioRef };
   garden.seeds[slot] = seed;
   seedsChannel?.setData(draft => { draft[slot] = seed; });
+  scheduleRegisterCurrentGarden();   // the index sizes its card by how many seeds/plants
   onSeedsChanged();
   hideSeedModal();
   sSaveBtn.disabled = false; sSaveBtn.textContent = "add seed";

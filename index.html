@@ -138,6 +138,16 @@ function hereNowText(n){
   return n > 0 ? `${n} here now` : "no one here now";
 }
 
+// three card sizes by how full a garden is: the plain vertical card for a
+// garden with nothing in it yet, a horizontal one once it has seeds or a few
+// plants, and a larger horizontal one for a garden with more than 6 plants
+// (5 and 6 plants fall in between, so they stay the medium size)
+function cardSize(g){
+  if(g.plants > 6) return "large";
+  if(g.plants > 0 || g.seeds > 0) return "medium";
+  return "small";
+}
+
 // one dialog-box card per garden: its tags as the title, and the names of
 // whoever planted in it. built with textContent, never innerHTML, since tags and
 // names are typed in by visitors. can-move + a stable id makes each card
@@ -146,7 +156,7 @@ function renderGardens(gardens){
   gardenListEl.innerHTML = "";
   for(const g of gardens){
     const card = document.createElement("a");
-    card.className = "gardencard";
+    card.className = `gardencard ${cardSize(g)}`;
     card.id = `gardencard-${g.id}`;
     card.setAttribute("can-move", "");
     card.draggable = false;   // the browser's own link-drag would fight the card drag
@@ -237,24 +247,43 @@ function seededRandom(seed){
 function layoutCards(){
   const cards = [...gardenListEl.children];
   if(!cards.length) return;
-  const cardW = cards[0].offsetWidth, cardH = cards[0].offsetHeight;
   const gap = 28;
-  const cellW = cardW + gap, cellH = cardH + gap;
   const areaW = gardenListEl.clientWidth;
-  const cols = Math.max(1, Math.floor((areaW + gap) / cellW));
-  const rows = Math.ceil(cards.length / cols);
-  // leftover width becomes slack for the scatter, so a wide page is used edge to edge
-  const slackX = Math.max(0, areaW - cols * cellW + gap);
-  cards.forEach((card, i) => {
-    const id = Number(card.id.replace("gardencard-", ""));
-    const rand = seededRandom(id);
-    const col = i % cols, row = Math.floor(i / cols);
-    const jx = (rand() - .5) * (gap + slackX / cols);
-    const jy = (rand() - .5) * gap;   // small enough that rows never overlap
-    card.style.left = Math.max(0, col * (cellW + slackX / cols) + jx + slackX / cols / 2) + "px";
-    card.style.top = Math.max(0, row * (cellH + gap * .6) + jy + gap) + "px";
-  });
-  gardenListEl.style.height = rows * (cellH + gap * .6) + gap * 2 + "px";
+
+  // cards come in different sizes, so they're dealt out in rows, left to right,
+  // starting a new row when the next one won't fit
+  const rows = [];
+  let row = null;
+  for(const card of cards){
+    const w = card.offsetWidth;
+    if(!row || row.width + gap + w > areaW){
+      row = { cards: [], width: -gap, height: 0 };
+      rows.push(row);
+    }
+    row.cards.push(card);
+    row.width += gap + w;
+    row.height = Math.max(row.height, card.offsetHeight);
+  }
+
+  let y = gap;
+  for(const r of rows){
+    // spread a row's leftover width between its cards (up to a point), centered
+    const extra = Math.max(0, areaW - r.width);
+    const spread = r.cards.length > 1 ? Math.min(extra / (r.cards.length - 1), gap * 2) : 0;
+    const total = r.width + spread * (r.cards.length - 1);
+    let x = Math.max(0, (areaW - total) / 2);
+    for(const card of r.cards){
+      // nudges come only from the garden's id, so everyone starts from the same scatter
+      const rand = seededRandom(Number(card.id.replace("gardencard-", "")));
+      const jx = (rand() - .5) * gap * .6;
+      const slackY = r.height - card.offsetHeight;
+      card.style.left = Math.max(0, x + jx) + "px";
+      card.style.top = y + slackY * rand() * .7 + (rand() - .5) * gap * .5 + "px";
+      x += card.offsetWidth + gap + spread;
+    }
+    y += r.height + gap;
+  }
+  gardenListEl.style.height = y + "px";
 }
 window.addEventListener("resize", layoutCards);
 

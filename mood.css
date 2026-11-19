@@ -1079,6 +1079,52 @@ button.easteregg#newGardenBtn:disabled{
   -webkit-user-select:none;
 }
 
+/* horizontal sizes: more room, so the tags sit on the left and who's planted
+   there and who's around sit on the right */
+.gardencard.medium,
+.gardencard.large{
+  aspect-ratio:auto;
+  max-width:calc(100vw - 5rem);
+}
+
+.gardencard.medium{
+  width:26rem;
+  height:15rem;
+}
+
+.gardencard.large{
+  width:40rem;
+  height:23rem;
+}
+
+.gardencard.medium .cardbody,
+.gardencard.large .cardbody{
+  display:grid;
+  grid-template-columns:1.2fr 1fr;
+  grid-template-rows:1fr auto;
+  column-gap:1.2rem;
+  align-items:start;
+}
+
+.gardencard.medium .tagbank,
+.gardencard.large .tagbank{
+  grid-column:1;
+  grid-row:1 / span 2;
+}
+
+.gardencard.medium .planters,
+.gardencard.large .planters{
+  grid-column:2;
+  grid-row:1;
+  align-self:end;
+}
+
+.gardencard.medium .herenow,
+.gardencard.large .herenow{
+  grid-column:2;
+  grid-row:2;
+}
+
 .gardencard:active{
   cursor:grabbing;
 }

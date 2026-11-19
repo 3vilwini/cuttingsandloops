@@ -29,9 +29,9 @@
    - POST /register-garden — a garden reports its (up to 3) tags, which are
      its name, its season settings (which the index previews on hover) and the
      names of the people who planted in it.
-     Body: { id, tags, settings, contributors, fillOnly }. Normally it replaces
+     Body: { id, tags, settings, contributors, plantCount, seedCount, fillOnly }. Normally it replaces
      what's stored; with fillOnly it only fills in what's still missing. Upsert into a second D1 table.
-   - GET /gardens — every registered garden's { id, tags, settings, contributors }, for the
+   - GET /gardens — every registered garden's { id, tags, settings, contributors, plants, seeds }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
      fills those in from /garden-count as unnamed. Also carries `here`, how many
      visitors each garden has right now ({ "<id>": n }).
@@ -130,13 +130,13 @@ let gardensTableReady = false;
 async function ensureGardensTable(env) {
   if (gardensTableReady) return;
   await env.GARDEN_DB.prepare(
-    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, contributors TEXT, updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS gardens (id INTEGER PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]', settings TEXT, contributors TEXT, plants INTEGER, seeds INTEGER, updated_at INTEGER NOT NULL)"
   ).run();
   // a table made before these columns existed lacks them — add each. when one
   // is already there this throws, which is the expected "nothing to do" case
-  for (const column of ["settings", "contributors"]) {
+  for (const [column, type] of [["settings", "TEXT"], ["contributors", "TEXT"], ["plants", "INTEGER"], ["seeds", "INTEGER"]]) {
     try {
-      await env.GARDEN_DB.prepare(`ALTER TABLE gardens ADD COLUMN ${column} TEXT`).run();
+      await env.GARDEN_DB.prepare(`ALTER TABLE gardens ADD COLUMN ${column} ${type}`).run();
     } catch {}
   }
   gardensTableReady = true;
@@ -176,7 +176,13 @@ function parseContributors(list) {
   return names;
 }
 
-// returns { id, tags, settings, contributors } for a usable registration, or null. the id
+// a plant or seed count: a whole number from 0 to 1000, or null when it wasn't
+// sent (an older page, or a connect-time page unsure it has synced yet)
+function parseCount(n) {
+  return Number.isInteger(n) && n >= 0 && n <= 1000 ? n : null;
+}
+
+// returns { id, tags, settings, contributors, plants, seeds } for a usable registration, or null. the id
 // can't be beyond how many gardens have actually been created, so nobody can
 // fill the table with made-up ids; tags are capped to the app's own limit of 3.
 // settings are optional (older pages only send tags) and unusable ones are
@@ -196,6 +202,8 @@ function parseGardenRegistration(body, count) {
     tags,
     settings: parseSettings(body.settings),
     contributors: parseContributors(body.contributors),
+    plants: parseCount(body.plantCount),
+    seeds: parseCount(body.seedCount),
     fillOnly: body.fillOnly === true,
   };
 }
@@ -219,16 +227,21 @@ async function handleRegisterGarden(request, env) {
   // fillOnly: the opposite, only fills gaps — an existing look/list/name stays,
   // so a page that hasn't finished syncing can't overwrite the real thing
   const sql = parsed.fillOnly
-    ? "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
+    ? "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) " +
       "ON CONFLICT(id) DO UPDATE SET " +
       "tags = CASE WHEN gardens.tags = '[]' THEN excluded.tags ELSE gardens.tags END, " +
       "settings = COALESCE(gardens.settings, excluded.settings), " +
       "contributors = COALESCE(gardens.contributors, excluded.contributors), " +
+      "plants = COALESCE(gardens.plants, excluded.plants), " +
+      "seeds = COALESCE(gardens.seeds, excluded.seeds), " +
       "updated_at = gardens.updated_at"
-    : "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
+    : "INSERT INTO gardens (id, tags, settings, contributors, plants, seeds, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) " +
       "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
       "settings = COALESCE(excluded.settings, gardens.settings), " +
-      "contributors = COALESCE(excluded.contributors, gardens.contributors), updated_at = excluded.updated_at";
+      "contributors = COALESCE(excluded.contributors, gardens.contributors), " +
+      "plants = COALESCE(excluded.plants, gardens.plants), " +
+      "seeds = COALESCE(excluded.seeds, gardens.seeds), " +
+      "updated_at = excluded.updated_at";
   await env.GARDEN_DB
     .prepare(sql)
     .bind(
@@ -236,6 +249,8 @@ async function handleRegisterGarden(request, env) {
       JSON.stringify(parsed.tags),
       parsed.settings && JSON.stringify(parsed.settings),
       parsed.contributors && JSON.stringify(parsed.contributors),
+      parsed.plants,
+      parsed.seeds,
       Date.now()
     )
     .run();
@@ -299,12 +314,14 @@ async function currentPresence(env) {
 
 async function handleListGardens(env) {
   await ensureGardensTable(env);
-  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, updated_at FROM gardens ORDER BY id").all();
+  const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, plants, seeds, updated_at FROM gardens ORDER BY id").all();
   const gardens = results.map(r => ({
     id: r.id,
     tags: JSON.parse(r.tags),
     settings: r.settings ? JSON.parse(r.settings) : null,
     contributors: r.contributors ? JSON.parse(r.contributors) : [],
+    plants: r.plants || 0,
+    seeds: r.seeds || 0,
     updatedAt: r.updated_at,
   }));
   return new Response(JSON.stringify({ gardens, here: await currentPresence(env) }), {
