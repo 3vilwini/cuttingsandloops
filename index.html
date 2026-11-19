@@ -65,11 +65,17 @@ function clearPreview(){
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
-// cards are plain white windows; the garden's colors show in the stripe on top
-// (its sky fading into its soil) and, for the tags, as a glow on hover (see mood.css)
+// the card's window is the garden's sky fading into its soil, with a plain
+// black-and-white menu bar on top; tags are white and glow in its seed color on hover
 
-// contrast ratio between two "#rrggbb" colors, so a garden's text color is only
-// used on the white card when it can actually be read there
+// contrast ratio between two "#rrggbb" colors. the card's lettering is black or
+// white, whichever reads better against the middle of its sky-to-soil fade, and a
+// garden's own text color is only used for the "here now" label when it can be read
+function midColor(a, b){
+  return "#" + [1, 3, 5].map(i =>
+    Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, "0")
+  ).join("");
+}
 function luminance(hex){
   const [r, g, b] = [1, 3, 5].map(i => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
@@ -143,6 +149,15 @@ function renderGardens(gardens){
     card.setAttribute("can-move", "");
     card.draggable = false;   // the browser's own link-drag would fight the card drag
     card.href = gardenUrl(g.id);
+    let mid = "#ffffff";
+    if(g.settings){
+      const [sky, soil] = g.settings.colors.background;
+      mid = midColor(sky, soil);
+      const ink = contrast(mid, "#000000") >= contrast(mid, "#ffffff") ? "#000000" : "#ffffff";
+      card.style.background = `linear-gradient(to bottom, ${sky}, ${soil})`;
+      card.style.setProperty("--ink", ink);
+      card.style.setProperty("--muted", ink === "#000000" ? "#333333" : "#e6e6e6");
+    }
     card.addEventListener("pointerenter", () => showPreview(g.settings));
     card.addEventListener("pointerleave", clearPreview);
     card.addEventListener("focus", () => showPreview(g.settings));
@@ -157,11 +172,6 @@ function renderGardens(gardens){
 
     const bar = document.createElement("div");
     bar.className = "titlebar";
-    if(g.settings){
-      // the usual black stripes, over a fade from the garden's sky to its soil
-      const [sky, soil] = g.settings.colors.background;
-      bar.style.backgroundImage = `repeating-linear-gradient(#000 0 1px, transparent 1px 3px), linear-gradient(to right, ${sky}, ${soil})`;
-    }
     const closebox = document.createElement("span");
     closebox.className = "closebox";
     bar.appendChild(closebox);
@@ -201,10 +211,10 @@ function renderGardens(gardens){
     here.append(dot, hereText);
     here.dataset.here = g.here;
     if(g.settings){
-      // dot in the garden's seed color, label in its text color (unless that is
-      // too pale to read on the white card — then the label keeps the usual grey)
+      // dot in the garden's seed color, label in its text color (unless that can't
+      // be read against the card — then the label keeps the card's own lettering)
       here.style.setProperty("--dot", g.settings.colors.seed);
-      if(contrast("#ffffff", g.settings.colors.text) >= 3) here.style.setProperty("--label", g.settings.colors.text);
+      if(contrast(mid, g.settings.colors.text) >= 3) here.style.setProperty("--label", g.settings.colors.text);
     }
 
     body.append(name, planters, here);

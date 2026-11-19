@@ -1125,6 +1125,11 @@ button.easteregg#newGardenBtn:disabled{
   grid-row:2;
 }
 
+/* the menu bar stays plain black and white; the color is the window behind it */
+.gardencard .titlebar{
+  background-color:#fff;
+}
+
 .gardencard:active{
   cursor:grabbing;
 }
