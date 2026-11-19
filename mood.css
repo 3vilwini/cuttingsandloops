@@ -1196,27 +1196,25 @@ button.easteregg#newGardenBtn:disabled{
   color:var(--ink);
 }
 
-/* "N here now" — same green dot as the counter inside a garden; only lit while
-   someone's actually there */
+/* "N here now" — dot in the garden's seed color, label in its text color (set
+   per card by index.html); dimmed when no one is there */
 .gardencard .herenow{
   display:flex;
   align-items:center;
   gap:.4rem;
-  color:var(--muted);
+  color:var(--label, var(--muted));
 }
 
 .gardencard .herenow .dot{
   width:8px;
   height:8px;
+  box-sizing:border-box;
   border-radius:50%;
-  background:#bbb;
+  border:1px solid #000;
+  background:var(--dot, #bbb);
   flex-shrink:0;
 }
 
-.gardencard .herenow:not([data-here="0"]){
-  color:var(--ink);
-}
-
-.gardencard .herenow:not([data-here="0"]) .dot{
-  background:#3ab704;
+.gardencard .herenow[data-here="0"]{
+  opacity:.55;
 }

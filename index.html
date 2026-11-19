@@ -68,6 +68,20 @@ function clearPreview(){
 // cards are plain white windows; the garden's colors show in the stripe on top
 // (its sky fading into its soil) and, for the tags, as a glow on hover (see mood.css)
 
+// contrast ratio between two "#rrggbb" colors, so a garden's text color is only
+// used on the white card when it can actually be read there
+function luminance(hex){
+  const [r, g, b] = [1, 3, 5].map(i => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+  });
+  return .2126 * r + .7152 * g + .0722 * b;
+}
+function contrast(a, b){
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + .05) / (lo + .05);
+}
+
 // a tag chip; --glow is the garden's seed color, used for the hover glow
 function makeChip(text, g){
   const chip = document.createElement("span");
@@ -186,6 +200,12 @@ function renderGardens(gardens){
     hereText.textContent = hereNowText(g.here);
     here.append(dot, hereText);
     here.dataset.here = g.here;
+    if(g.settings){
+      // dot in the garden's seed color, label in its text color (unless that is
+      // too pale to read on the white card — then the label keeps the usual grey)
+      here.style.setProperty("--dot", g.settings.colors.seed);
+      if(contrast("#ffffff", g.settings.colors.text) >= 3) here.style.setProperty("--label", g.settings.colors.text);
+    }
 
     body.append(name, planters, here);
     card.append(bar, body);
