@@ -924,16 +924,16 @@ button.easteregg{
 @property --sky{
   syntax:"<color>";
   inherits:false;
-  initial-value:#3ab704;
+  initial-value:#ffffff;
 }
 
 @property --soil{
   syntax:"<color>";
   inherits:false;
-  initial-value:#e2ffcb;
+  initial-value:#ffffff;
 }
 
-/* the page background — the default look until a card is hovered, then that
+/* the page background — plain white until a card is hovered, then that
    garden's sky/soil and field pattern as a preview (see showPreview) */
 .gardenbg{
   position:fixed;
@@ -967,36 +967,87 @@ main.gardenindex{
   padding:2.5rem 2.5rem 5rem;
 }
 
-.indexhead{
-  box-sizing:border-box;
-  max-width:680px;
-  margin-left:auto;
-  margin-right:auto;
-}
-
-/* title + blurb on a small paper chip so they stay readable on any preview */
-.indexhead{
+/* only shows while the list is loading or couldn't be reached */
+.gardenstatus{
+  display:inline-block;
+  margin:0;
+  padding:.4rem .8rem;
   background:var(--paper);
   border:1px solid #000;
-  padding:.6rem .8rem .1rem;
-  margin-bottom:.6rem;
+  color:var(--muted);
 }
 
-.indexhead .sub{
-  margin-bottom:.5rem;
-}
-
-.indexhead .sub[hidden]{
+.gardenstatus[hidden]{
   display:none;
 }
 
-button.easteregg#newGardenBtn{
+/* bottom bar: the tag marquee fills the left, the button stays put at the right */
+.bottombar{
   position:fixed;
+  left:1.2rem;
   right:1.2rem;
   bottom:1.2rem;
   z-index:2;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  pointer-events:none;   /* only the chips and button catch clicks, not the empty bar */
+}
+
+button.easteregg#newGardenBtn{
+  flex-shrink:0;
+  margin-left:auto;
+  pointer-events:auto;
   background:var(--paper);
   border:1px solid #000;
+}
+
+.marquee{
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  pointer-events:auto;
+  /* chips fade in and out at the edges instead of being cut off */
+  -webkit-mask-image:linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  mask-image:linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+.marquee[hidden]{
+  display:none;
+}
+
+.marqueetrack{
+  display:flex;
+  gap:.5rem;
+  width:max-content;
+  animation:tagdrift 30s linear infinite;
+}
+
+.marquee:hover .marqueetrack{
+  animation-play-state:paused;
+}
+
+.marqueetrack a{
+  display:block;
+  flex-shrink:0;
+  text-decoration:none;
+}
+
+.marqueetrack .tag{
+  display:block;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+/* the track holds the tag list twice; sliding by half of it lands exactly where it began.
+   the gap is added to the trailing edge so the two halves are the same width */
+@keyframes tagdrift{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(calc(-50% - .25rem)); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .marqueetrack{ animation:none; }
 }
 
 button.easteregg#newGardenBtn:disabled{
@@ -1014,7 +1065,7 @@ button.easteregg#newGardenBtn:disabled{
    rectangle: the tags on top, who planted in it at the bottom */
 .gardencard{
   position:absolute;
-  width:9.5rem;
+  width:14rem;
   aspect-ratio:3 / 4;
   display:flex;
   flex-direction:column;
@@ -1037,9 +1088,9 @@ button.easteregg#newGardenBtn:disabled{
   outline:none;
 }
 
-.gardencard:hover .cardbody,
-.gardencard:focus-visible .cardbody{
-  background:#f0f0f0;
+.gardencard:hover,
+.gardencard:focus-visible{
+  box-shadow:4px 4px 0 #000;
 }
 
 .gardencard .cardbody{
@@ -1047,12 +1098,22 @@ button.easteregg#newGardenBtn:disabled{
   display:flex;
   flex-direction:column;
   justify-content:space-between;
-  padding:.6rem;
+  gap:.8rem;
+  padding:.9rem;
   min-height:0;
 }
 
 .gardencard .tagbank{
   margin-bottom:0;
+}
+
+/* chips are the same size and font as the ones shown inside a garden (.tagdisplay span) */
+.gardencard .tag,
+.marqueetrack .tag{
+  padding:.5rem .9rem;
+  font-family:inherit;
+  font-size:inherit;
+  line-height:normal;
 }
 
 .gardencard .tag{
@@ -1074,4 +1135,29 @@ button.easteregg#newGardenBtn:disabled{
 .gardencard .planterlabel{
   display:block;
   color:var(--ink);
+}
+
+/* "N here now" — same green dot as the counter inside a garden; only lit while
+   someone's actually there */
+.gardencard .herenow{
+  display:flex;
+  align-items:center;
+  gap:.4rem;
+  color:var(--muted);
+}
+
+.gardencard .herenow .dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#bbb;
+  flex-shrink:0;
+}
+
+.gardencard .herenow:not([data-here="0"]){
+  color:var(--ink);
+}
+
+.gardencard .herenow:not([data-here="0"]) .dot{
+  background:#3ab704;
 }

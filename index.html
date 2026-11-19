@@ -13,16 +13,15 @@
 
 <!-- every garden, named by its "feels like" tags — cards float straight on the background -->
 <main class="gardenindex">
-  <header class="indexhead">
-    <label class="cardtitle">୨ৎ all the sound gardens ༄</label>
-    <p class="sub">each one feels like something ~ pick one to wander into</p>
-    <p class="sub" id="gardenStatus">gathering the gardens...</p>
-  </header>
+  <p class="gardenstatus" id="gardenStatus">gathering the gardens...</p>
   <div id="gardenList"></div>
 </main>
 
-<!-- kept apart from the cards, always bottom right -->
-<button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
+<!-- bottom bar: every garden's tags drifting by, and the new-season button kept static at the right -->
+<div class="bottombar">
+  <div class="marquee" id="tagMarquee" hidden><div class="marqueetrack" id="tagMarqueeTrack"></div></div>
+  <button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
+</div>
 
 <script type="module">
 /* ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.
@@ -30,7 +29,7 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, startNewGarden, gardenUrl } from "./gardens.js";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js";
 import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js";
 
 const gardenListEl = document.getElementById("gardenList");
@@ -66,6 +65,79 @@ function clearPreview(){
   bgEl.classList.remove("previewing");   // the pattern fades out; it's cleared on the next preview
 }
 
+// chips wear the garden's own colors: its seed color as the fill and its text
+// color as the lettering. when those two are too close to read (a white text
+// color on a pale seed, say), the lettering falls back to black or white,
+// whichever stands out from the fill
+function luminance(hex){
+  const [r, g, b] = [1, 3, 5].map(i => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+  });
+  return .2126 * r + .7152 * g + .0722 * b;
+}
+function contrast(a, b){
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + .05) / (lo + .05);
+}
+function readableOn(fill, preferred){
+  if(contrast(fill, preferred) >= 3) return preferred;
+  return contrast(fill, "#000000") >= contrast(fill, "#ffffff") ? "#000000" : "#ffffff";
+}
+
+// the card itself is the garden's sky fading into its soil. its lettering is
+// black or white, whichever reads better against the middle of that fade
+function midColor(a, b){
+  return "#" + [1, 3, 5].map(i =>
+    Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, "0")
+  ).join("");
+}
+
+// a tag chip in its garden's colors (see above)
+function makeChip(text, g){
+  const chip = document.createElement("span");
+  chip.className = "tag";
+  chip.setAttribute("data-selected", "true");
+  chip.textContent = text;
+  if(g.settings){
+    const fill = g.settings.colors.seed;
+    const ink = readableOn(fill, g.settings.colors.text);
+    chip.style.background = fill;
+    chip.style.color = ink;
+    chip.style.borderColor = ink;
+  }
+  return chip;
+}
+
+// every tag from every garden in one strip along the bottom, scrolling sideways
+// forever. the list is laid out twice so sliding it by exactly
+// half its width loops with no seam; each chip links to its garden
+function renderMarquee(gardens){
+  const track = document.getElementById("tagMarqueeTrack");
+  const marquee = document.getElementById("tagMarquee");
+  track.innerHTML = "";
+  const entries = gardens.flatMap(g => g.tags.map(t => ({ t, g })));
+  marquee.hidden = !entries.length;
+  if(!entries.length) return;
+  for(let copy = 0; copy < 2; copy++){
+    for(const { t, g } of entries){
+      const link = document.createElement("a");
+      link.href = gardenUrl(g.id);
+      link.draggable = false;
+      if(copy === 1) link.setAttribute("aria-hidden", "true");   // the repeat is only for the loop
+      link.tabIndex = copy === 1 ? -1 : 0;
+      link.appendChild(makeChip(t, g));
+      track.appendChild(link);
+    }
+  }
+  // steady speed however many tags there are
+  track.style.animationDuration = Math.max(12, entries.length * 3) + "s";
+}
+
+function hereNowText(n){
+  return n > 0 ? `${n} here now` : "no one here now";
+}
+
 // one dialog-box card per garden: its tags as the title, and the names of
 // whoever planted in it. built with textContent, never innerHTML, since tags and
 // names are typed in by visitors. can-move + a stable id makes each card
@@ -79,6 +151,14 @@ function renderGardens(gardens){
     card.setAttribute("can-move", "");
     card.draggable = false;   // the browser's own link-drag would fight the card drag
     card.href = gardenUrl(g.id);
+    if(g.settings){
+      const [sky, soil] = g.settings.colors.background;
+      const mid = midColor(sky, soil);
+      const ink = contrast(mid, "#000000") >= contrast(mid, "#ffffff") ? "#000000" : "#ffffff";
+      card.style.background = `linear-gradient(to bottom, ${sky}, ${soil})`;
+      card.style.setProperty("--ink", ink);
+      card.style.setProperty("--muted", ink === "#000000" ? "#333333" : "#e6e6e6");
+    }
     card.addEventListener("pointerenter", () => showPreview(g.settings));
     card.addEventListener("pointerleave", clearPreview);
     card.addEventListener("focus", () => showPreview(g.settings));
@@ -103,13 +183,7 @@ function renderGardens(gardens){
     const name = document.createElement("div");
     name.className = "tagbank";
     if(g.tags.length){
-      for(const t of g.tags){
-        const chip = document.createElement("span");
-        chip.className = "tag";
-        chip.setAttribute("data-selected", "true");
-        chip.textContent = t;
-        name.appendChild(chip);
-      }
+      for(const t of g.tags) name.appendChild(makeChip(t, g));
     } else {
       const none = document.createElement("span");
       none.className = "sub";
@@ -127,7 +201,18 @@ function renderGardens(gardens){
     names.textContent = g.contributors.length ? g.contributors.join(", ") : "no one yet";
 
     planters.append(label, names);
-    body.append(name, planters);
+
+    // live count, refreshed in place by refreshHereNow() so dragged cards stay put
+    const here = document.createElement("div");
+    here.className = "herenow";
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    const hereText = document.createElement("span");
+    hereText.textContent = hereNowText(g.here);
+    here.append(dot, hereText);
+    here.dataset.here = g.here;
+
+    body.append(name, planters, here);
     card.append(bar, body);
     gardenListEl.appendChild(card);
   }
@@ -165,7 +250,7 @@ function layoutCards(){
     const rand = seededRandom(id);
     const col = i % cols, row = Math.floor(i / cols);
     const jx = (rand() - .5) * (gap + slackX / cols);
-    const jy = (rand() - .5) * gap * 2.2;
+    const jy = (rand() - .5) * gap;   // small enough that rows never overlap
     card.style.left = Math.max(0, col * (cellW + slackX / cols) + jx + slackX / cols / 2) + "px";
     card.style.top = Math.max(0, row * (cellH + gap * .6) + jy + gap) + "px";
   });
@@ -173,10 +258,23 @@ function layoutCards(){
 }
 window.addEventListener("resize", layoutCards);
 
+// every so often, ask who's around and update just the counts
+async function refreshHereNow(){
+  const here = await fetchHereNow();
+  for(const el of gardenListEl.querySelectorAll(".herenow")){
+    const id = el.parentElement.parentElement.id.replace("gardencard-", "");
+    const n = here[id] || 0;
+    el.dataset.here = n;
+    el.lastElementChild.textContent = hereNowText(n);
+  }
+}
+setInterval(() => { if(document.visibilityState === "visible" && gardenListEl.children.length) refreshHereNow(); }, 20000);
+
 fetchGardens()
   .then(gardens => {
     gardenStatusEl.hidden = true;
     renderGardens(gardens);
+    renderMarquee(gardens);
     playhtmlReady.then(() => playhtml.setupPlayElements());
   })
   .catch(err => {

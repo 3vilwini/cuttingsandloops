@@ -38,6 +38,39 @@ export async function registerGarden(id, { tags, settings, contributors }){
   }
 }
 
+// tells the Worker someone is in this garden, so the index can show "N here
+// now". a random id per page load (nothing personal) is pinged every
+// PRESENCE_PING_MS while the tab is visible, and dropped when the page closes.
+// skipped on localhost for the same reason registerGarden is
+const PRESENCE_PING_MS = 45 * 1000;
+export function startPresence(id){
+  if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
+  const visitor = crypto.randomUUID();
+  const send = leaving => fetch(`${UPLOAD_ENDPOINT}/presence`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(leaving ? { id, visitor, leaving: true } : { id, visitor }),
+    keepalive: true,
+  }).catch(() => {});
+  const ping = () => { if(document.visibilityState === "visible") send(false); };
+  ping();
+  setInterval(ping, PRESENCE_PING_MS);
+  document.addEventListener("visibilitychange", ping);
+  window.addEventListener("pagehide", () => send(true));
+}
+
+// { "<garden id>": how many are in it right now } — just the live counts, cheap
+// enough to re-ask every few seconds. {} when it can't be reached
+export async function fetchHereNow(){
+  try {
+    const res = await fetch(`${UPLOAD_ENDPOINT}/gardens`, { cache: "no-store" });
+    if(!res.ok) return {};
+    return (await res.json()).here || {};
+  } catch {
+    return {};
+  }
+}
+
 // every garden that exists: the original, plus 1..count from the counter, with
 // names, settings and contributors filled in for whichever have reported them
 // ({ id, tags, settings, contributors } — settings is null until a garden has). if that list can't be
@@ -52,14 +85,17 @@ export async function fetchGardens(){
   const { count } = await countRes.value.json();
 
   const reported = {};
+  let here = {};
   if(namesRes.status === "fulfilled" && namesRes.value.ok){
-    const { gardens } = await namesRes.value.json();
-    for(const g of gardens) reported[g.id] = g;
+    const data = await namesRes.value.json();
+    for(const g of data.gardens) reported[g.id] = g;
+    here = data.here || {};
   }
   return Array.from({ length: count + 1 }, (_, id) => ({
     id,
     tags: reported[id]?.tags || [],
     settings: reported[id]?.settings || null,
     contributors: reported[id]?.contributors || [],
+    here: here[id] || 0,
   }));
 }

@@ -4,7 +4,7 @@
 
 import { playhtml } from "https://unpkg.com/playhtml";
 // UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
-import { UPLOAD_ENDPOINT, startNewGarden, registerGarden } from "./gardens.js";
+import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js";
 import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
@@ -649,6 +649,9 @@ function registerCurrentGarden(skipIfEmpty = false){
     },
   });
 }
+
+// so the index can show how many are here right now
+if(Number.isInteger(currentGardenId) && currentGardenId >= 0) startPresence(currentGardenId);
 
 // dragging a color picker fires a change per pixel — wait for it to settle
 let registerTimer = null;

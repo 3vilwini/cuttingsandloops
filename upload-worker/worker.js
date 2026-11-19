@@ -1,6 +1,6 @@
 /* sound-garden seed uploads + garden id counter
    ---------------------------------------------------------------------
-   Seven routes:
+   Eight routes:
    - POST /upload — receives a seed's audio file (raw bytes, streamed
      straight into R2 via the bucket binding, never buffered fully in
      memory) and returns the public URL to store in that slot's synced
@@ -32,7 +32,12 @@
      Body: { id, tags, settings, contributors }. Upsert into a second D1 table.
    - GET /gardens — every registered garden's { id, tags, settings, contributors }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
-     fills those in from /garden-count as unnamed.
+     fills those in from /garden-count as unnamed. Also carries `here`, how many
+     visitors each garden has right now ({ "<id>": n }).
+   - POST /presence — a visitor's open garden tab pings this every so often
+     ({ id, visitor } — visitor is a random per-page-load string, nothing
+     personal; { leaving: true } on the way out). Anyone seen in the last ~100
+     seconds counts as "here now" on the index.
 
    Deployed via the Cloudflare dashboard (Workers & Pages → Edit code),
    with an R2 bucket bound as SEEDS, a D1 database bound as GARDEN_DB
@@ -66,6 +71,9 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/gardens") {
       return handleListGardens(env);
+    }
+    if (request.method === "POST" && url.pathname === "/presence") {
+      return handlePresence(request, env);
     }
     if (request.method === "POST" && url.pathname === "/register-garden") {
       return handleRegisterGarden(request, env);
@@ -219,6 +227,61 @@ async function handleRegisterGarden(request, env) {
   return new Response(null, { status: 204, headers: corsHeaders(env) });
 }
 
+// who's in which garden right now. one row per visitor (a random id made fresh
+// each time a garden page loads), refreshed by their pings; a row not refreshed
+// within PRESENCE_WINDOW_MS has gone quiet and no longer counts
+const PRESENCE_WINDOW_MS = 100 * 1000;
+let presenceTableReady = false;
+async function ensurePresenceTable(env) {
+  if (presenceTableReady) return;
+  await env.GARDEN_DB.prepare(
+    "CREATE TABLE IF NOT EXISTS presence (visitor TEXT PRIMARY KEY, garden_id INTEGER NOT NULL, seen_at INTEGER NOT NULL)"
+  ).run();
+  presenceTableReady = true;
+}
+
+async function handlePresence(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response("bad json", { status: 400, headers: corsHeaders(env) });
+  }
+  const { id, visitor, leaving } = body || {};
+  // same shape as a garden id, and a visitor id of sane length — nothing else is stored
+  if (!Number.isInteger(id) || id < 0 || id > 100000 || typeof visitor !== "string" || !visitor || visitor.length > 64) {
+    return new Response("invalid presence", { status: 400, headers: corsHeaders(env) });
+  }
+  await ensurePresenceTable(env);
+  if (leaving === true) {
+    await env.GARDEN_DB.prepare("DELETE FROM presence WHERE visitor = ?1").bind(visitor).run();
+  } else {
+    await env.GARDEN_DB
+      .prepare(
+        "INSERT INTO presence (visitor, garden_id, seen_at) VALUES (?1, ?2, ?3) " +
+        "ON CONFLICT(visitor) DO UPDATE SET garden_id = excluded.garden_id, seen_at = excluded.seen_at"
+      )
+      .bind(visitor, id, Date.now())
+      .run();
+  }
+  return new Response(null, { status: 204, headers: corsHeaders(env) });
+}
+
+// { "<garden id>": visitors seen within the window }, clearing out rows that
+// went quiet long ago while it's at it
+async function currentPresence(env) {
+  await ensurePresenceTable(env);
+  const now = Date.now();
+  await env.GARDEN_DB.prepare("DELETE FROM presence WHERE seen_at < ?1").bind(now - 60 * 60 * 1000).run();
+  const { results } = await env.GARDEN_DB
+    .prepare("SELECT garden_id, COUNT(*) AS n FROM presence WHERE seen_at >= ?1 GROUP BY garden_id")
+    .bind(now - PRESENCE_WINDOW_MS)
+    .all();
+  const here = {};
+  for (const r of results) here[r.garden_id] = r.n;
+  return here;
+}
+
 async function handleListGardens(env) {
   await ensureGardensTable(env);
   const { results } = await env.GARDEN_DB.prepare("SELECT id, tags, settings, contributors, updated_at FROM gardens ORDER BY id").all();
@@ -229,7 +292,7 @@ async function handleListGardens(env) {
     contributors: r.contributors ? JSON.parse(r.contributors) : [],
     updatedAt: r.updated_at,
   }));
-  return new Response(JSON.stringify({ gardens }), {
+  return new Response(JSON.stringify({ gardens, here: await currentPresence(env) }), {
     headers: { ...corsHeaders(env), "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
