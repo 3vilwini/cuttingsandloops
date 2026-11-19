@@ -968,6 +968,30 @@ main.gardenindex{
   padding:2.5rem 2.5rem 5rem;
 }
 
+/* the scrollbars of this layer sit on top of the page background, so on a computer
+   that always shows them they'd be solid strips that look like the background is
+   cut off at the edge. make them thin with a see-through track instead */
+main.gardenindex{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(0,0,0,.45) transparent;
+}
+
+main.gardenindex::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+  background:transparent;
+}
+
+main.gardenindex::-webkit-scrollbar-track,
+main.gardenindex::-webkit-scrollbar-corner{
+  background:transparent;
+}
+
+main.gardenindex::-webkit-scrollbar-thumb{
+  background:rgba(0,0,0,.45);
+  border-radius:4px;
+}
+
 /* only shows while the list is loading or couldn't be reached */
 .gardenstatus{
   display:inline-block;
