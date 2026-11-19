@@ -22,16 +22,17 @@ export async function startNewGarden(){
 
 // a garden's name is its tags, settings ({ colors, pattern, scale }) are what
 // the index previews on hover, and contributors are the names of whoever planted
-// in it — report them so the index can list and show it.
+// in it — report them so the index can list and show it. fillOnly means only
+// fill in what the registry doesn't have yet, never replace what's there.
 // skipped on localhost: a local test garden 0 would otherwise overwrite the
 // real original garden's name and look in the shared list
-export async function registerGarden(id, { tags, settings, contributors }){
+export async function registerGarden(id, { tags, settings, contributors, fillOnly = false }){
   if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
   try {
     await fetch(`${UPLOAD_ENDPOINT}/register-garden`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, tags, settings, contributors }),
+      body: JSON.stringify({ id, tags, settings, contributors, fillOnly }),
     });
   } catch(err) {
     console.warn("couldn't register this garden's name:", err);
@@ -45,7 +46,8 @@ export async function registerGarden(id, { tags, settings, contributors }){
 const PRESENCE_PING_MS = 45 * 1000;
 export function startPresence(id){
   if(["localhost", "127.0.0.1"].includes(location.hostname)) return;
-  const visitor = crypto.randomUUID();
+  // randomUUID needs a secure page and a recent browser; this just has to be unique-ish
+  const visitor = crypto.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const send = leaving => fetch(`${UPLOAD_ENDPOINT}/presence`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -628,20 +628,23 @@ playhtml.init({
 // which garden this is, for the index page's list — 0 is the original (no ?g=)
 const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
 // reports this garden's tags (its name), season settings (what the index
-// page previews on hover) and the names of whoever planted in it. on connect
-// it's skipped when there are no tags and no plants: a room that hasn't finished
-// syncing still has the empty/random local defaults, and would overwrite a real
-// name and look. after an explicit edit, empty is a real answer and gets sent.
+// page previews on hover — its card is those colors) and the names of whoever
+// planted in it. an explicit edit sends everything and replaces what's stored.
+// on connect it's fillOnly: it only fills in what the registry has nothing for
+// yet, never replaces — a room that hasn't finished syncing still has the local
+// random defaults, and those must not overwrite a real name and look. this is
+// what puts a garden on the index with its colors the first time anyone opens it.
 // the values are copied out one by one so what goes over the wire is plain
 // data, not the synced store's proxy objects
-function registerCurrentGarden(skipIfEmpty = false){
+function registerCurrentGarden(fillOnly = false){
   if(!Number.isInteger(currentGardenId) || currentGardenId < 0) return;
   const m = garden.meta;
   const contributors = [...new Set(Object.values(garden.plants || {}).map(pl => pl.name).filter(Boolean))].slice(0, 12);
-  if(skipIfEmpty && !m.tags.length && !contributors.length) return;
   registerGarden(currentGardenId, {
     tags: [...m.tags],
-    contributors,
+    // an empty list on connect may just mean the plants haven't synced yet — say nothing instead
+    contributors: fillOnly && !contributors.length ? undefined : contributors,
+    fillOnly,
     settings: {
       colors: { background: [...m.colors.background], seed: m.colors.seed, text: m.colors.text },
       pattern: m.pattern,
@@ -736,7 +739,7 @@ function connectChannels(){
   metaChannel = playhtml.createPageData("garden-meta", garden.meta);
   garden.meta = metaChannel.getData();
   applyMetaToUI();
-  registerCurrentGarden(true);   // so gardens that already have tags show up by name on the index
+  registerCurrentGarden(true);   // fill-only: puts this garden on the index with its colors the first time anyone opens it
   metaChannel.onUpdate(data => { garden.meta = data; applyMetaToUI(); });
 
   // tag-press easter egg — see checkTagPresses 

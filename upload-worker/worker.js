@@ -29,7 +29,8 @@
    - POST /register-garden — a garden reports its (up to 3) tags, which are
      its name, its season settings (which the index previews on hover) and the
      names of the people who planted in it.
-     Body: { id, tags, settings, contributors }. Upsert into a second D1 table.
+     Body: { id, tags, settings, contributors, fillOnly }. Normally it replaces
+     what's stored; with fillOnly it only fills in what's still missing. Upsert into a second D1 table.
    - GET /gardens — every registered garden's { id, tags, settings, contributors }, for the
      index page. Gardens that haven't reported yet aren't in here; the index
      fills those in from /garden-count as unnamed. Also carries `here`, how many
@@ -190,7 +191,13 @@ function parseGardenRegistration(body, count) {
     const clean = t.trim().slice(0, 40);
     if (clean) tags.push(clean);
   }
-  return { id, tags, settings: parseSettings(body.settings), contributors: parseContributors(body.contributors) };
+  return {
+    id,
+    tags,
+    settings: parseSettings(body.settings),
+    contributors: parseContributors(body.contributors),
+    fillOnly: body.fillOnly === true,
+  };
 }
 
 async function handleRegisterGarden(request, env) {
@@ -207,15 +214,23 @@ async function handleRegisterGarden(request, env) {
     return new Response("invalid garden", { status: 400, headers: corsHeaders(env) });
   }
   await ensureGardensTable(env);
-  // COALESCE: a registration without usable settings (or without a contributors
-  // list) keeps whatever was already stored instead of erasing it
-  await env.GARDEN_DB
-    .prepare(
-      "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
+  // normal: replace what's stored. COALESCE means a registration without usable
+  // settings (or without a contributors list) keeps what was already there
+  // fillOnly: the opposite, only fills gaps — an existing look/list/name stays,
+  // so a page that hasn't finished syncing can't overwrite the real thing
+  const sql = parsed.fillOnly
+    ? "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
+      "ON CONFLICT(id) DO UPDATE SET " +
+      "tags = CASE WHEN gardens.tags = '[]' THEN excluded.tags ELSE gardens.tags END, " +
+      "settings = COALESCE(gardens.settings, excluded.settings), " +
+      "contributors = COALESCE(gardens.contributors, excluded.contributors), " +
+      "updated_at = gardens.updated_at"
+    : "INSERT INTO gardens (id, tags, settings, contributors, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) " +
       "ON CONFLICT(id) DO UPDATE SET tags = excluded.tags, " +
       "settings = COALESCE(excluded.settings, gardens.settings), " +
-      "contributors = COALESCE(excluded.contributors, gardens.contributors), updated_at = excluded.updated_at"
-    )
+      "contributors = COALESCE(excluded.contributors, gardens.contributors), updated_at = excluded.updated_at";
+  await env.GARDEN_DB
+    .prepare(sql)
     .bind(
       parsed.id,
       JSON.stringify(parsed.tags),
