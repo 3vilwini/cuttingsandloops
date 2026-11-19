@@ -1089,8 +1089,7 @@ button.easteregg#newGardenBtn:disabled{
   -webkit-user-select:none;
 }
 
-/* horizontal sizes: more room, so the tags sit on the left and who's planted
-   there and who's around sit on the right */
+/* horizontal sizes: more room than the plain vertical card */
 .gardencard.medium,
 .gardencard.large{
   aspect-ratio:auto;
@@ -1107,6 +1106,20 @@ button.easteregg#newGardenBtn:disabled{
   height:22rem;
 }
 
+/* who planted + who's here, kept together as one block. on the plain vertical card
+   its two lines are just spread down the card with the rest */
+.gardencard .cardinfo{
+  display:flex;
+  flex-direction:column;
+  gap:.8rem;
+}
+
+.gardencard.small .cardinfo{
+  display:contents;
+}
+
+/* medium or large with nothing drawn (a garden with only seeds): tags on the left,
+   the info block bottom right */
 .gardencard.medium .cardbody,
 .gardencard.large .cardbody{
   display:grid;
@@ -1122,17 +1135,11 @@ button.easteregg#newGardenBtn:disabled{
   grid-row:1 / span 2;
 }
 
-.gardencard.medium .planters,
-.gardencard.large .planters{
+.gardencard.medium .cardinfo,
+.gardencard.large .cardinfo{
   grid-column:2;
-  grid-row:1;
+  grid-row:1 / span 2;
   align-self:end;
-}
-
-.gardencard.medium .herenow,
-.gardencard.large .herenow{
-  grid-column:2;
-  grid-row:2;
 }
 
 /* the menu bar stays plain black and white; the color is the window behind it */
@@ -1140,21 +1147,10 @@ button.easteregg#newGardenBtn:disabled{
   background-color:#fff;
 }
 
-/* a card with plant drawings (one on a medium card, two on a large one): they sit
-   at their real size, 140px, under the tags */
-.gardencard.hasdrawing .cardbody{
-  grid-template-rows:auto 1fr auto;
-}
-
-.gardencard.hasdrawing .tagbank{
-  grid-column:1;
-  grid-row:1;
-}
-
+/* plant drawings sit at their real size, 140px. their wrapper steps aside so each
+   drawing can be placed on the card's own grid */
 .gardencard .plantdrawings{
-  display:flex;
-  align-items:flex-end;
-  gap:1rem;
+  display:contents;
 }
 
 .gardencard .plantdrawing{
@@ -1162,40 +1158,62 @@ button.easteregg#newGardenBtn:disabled{
   overflow:visible;
 }
 
-/* medium: drawing bottom left, who planted and who's here down the right */
-.gardencard.medium.hasdrawing .plantdrawings{
+/* medium with a drawing: tags top left, info bottom left, the drawing centered on
+   the right */
+.gardencard.medium.hasdrawing .cardbody{
+  grid-template-columns:1fr 140px;
+  grid-template-rows:auto 1fr auto;
+}
+
+.gardencard.medium.hasdrawing .tagbank{
+  grid-column:1;
+  grid-row:1;
+}
+
+.gardencard.medium.hasdrawing .cardinfo{
+  grid-column:1;
+  grid-row:3;
+  align-self:end;
+}
+
+.gardencard.medium.hasdrawing .plantdrawing{
+  grid-column:2;
+  grid-row:1 / span 3;
+  align-self:center;
+  justify-self:end;
+}
+
+/* large with drawings: tags top left, the first drawing upper right, the second
+   lower left, the info block bottom right */
+.gardencard.large.hasdrawing .cardbody{
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto 1fr auto;
+}
+
+.gardencard.large.hasdrawing .tagbank{
+  grid-column:1;
+  grid-row:1;
+}
+
+.gardencard.large.hasdrawing .plantdrawings > .plantdrawing:first-child{
+  grid-column:2;
+  grid-row:1 / span 2;
+  align-self:start;
+  justify-self:end;
+}
+
+.gardencard.large.hasdrawing .plantdrawings > .plantdrawing:not(:first-child){
   grid-column:1;
   grid-row:2 / span 2;
   align-self:end;
+  justify-self:start;
 }
 
-.gardencard.medium.hasdrawing .planters{
-  grid-column:2;
-  grid-row:2;
-}
-
-.gardencard.medium.hasdrawing .herenow{
+.gardencard.large.hasdrawing .cardinfo{
   grid-column:2;
   grid-row:3;
-}
-
-/* large: who planted top right, the two drawings side by side across the middle,
-   who's here along the bottom */
-.gardencard.large.hasdrawing .planters{
-  grid-column:2;
-  grid-row:1;
-  align-self:start;
-}
-
-.gardencard.large.hasdrawing .plantdrawings{
-  grid-column:1 / span 2;
-  grid-row:2;
   align-self:end;
-}
-
-.gardencard.large.hasdrawing .herenow{
-  grid-column:1 / span 2;
-  grid-row:3;
+  justify-self:end;
 }
 
 .gardencard:active{

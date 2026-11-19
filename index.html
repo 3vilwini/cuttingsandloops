@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119m">
+<link rel="stylesheet" href="mood.css?v=20261119n">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119m";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119m";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119n";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119n";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -263,7 +263,12 @@ function renderGardens(gardens){
       here.style.setProperty("--label", g.settings.colors.text);
     }
 
-    body.append(name, planters, here);
+    // who planted and who's here travel together, so a layout can put them as one block
+    const info = document.createElement("div");
+    info.className = "cardinfo";
+    info.append(planters, here);
+
+    body.append(name, info);
 
     // a medium card shows one of the garden's plant drawings, a large card two, chosen at random —
     // each in the plant's own color and at the size it's drawn out in the garden
@@ -412,7 +417,7 @@ if(!matchMedia("(prefers-reduced-motion: reduce)").matches){
 async function refreshHereNow(){
   const here = await fetchHereNow();
   for(const el of gardenListEl.querySelectorAll(".herenow")){
-    const id = el.parentElement.parentElement.id.replace("gardencard-", "");
+    const id = el.closest(".gardencard").id.replace("gardencard-", "");
     const n = here[id] || 0;
     el.dataset.here = n;
     el.lastElementChild.textContent = hereNowText(n);
