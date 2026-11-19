@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119h">
+<link rel="stylesheet" href="mood.css?v=20261119i">
 </head>
 <body>
 
@@ -17,9 +17,9 @@
   <div id="gardenList"></div>
 </main>
 
-<!-- bottom bar: every garden's tags drifting by, and the new-season button kept static at the right -->
+<!-- bottom bar: a welcome message drifting by, and the new-season button kept static at the right -->
 <div class="bottombar">
-  <div class="marquee" id="tagMarquee" hidden><div class="marqueetrack" id="tagMarqueeTrack"></div></div>
+  <div class="marquee" id="tagMarquee"><div class="marqueetrack" id="tagMarqueeTrack"></div></div>
   <button type="button" class="easteregg" id="newGardenBtn">if it feels like a new season...</button>
 </div>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119h";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119h";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119i";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119i";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -120,30 +120,36 @@ function makeChip(text, g){
   return chip;
 }
 
-// every tag from every garden in one strip along the bottom, scrolling sideways
-// forever. the list is laid out twice so sliding it by exactly
-// half its width loops with no seam; each chip links to its garden
-function renderMarquee(gardens){
-  const track = document.getElementById("tagMarqueeTrack");
+// the message scrolling along the bottom. it's repeated until one run is at least
+// as wide as the bar, then that run is laid out twice, so sliding it by exactly
+// half its width loops with no seam
+const MARQUEE_TEXT = "welcome to the sound garden multiverse ୨ৎ wander around જ⁀➴ smell the sounds ༄ feel the grass ✩‧₊ hope u like it (˶ᵔ ᵕ ᵔ˶) ‹𝟹";
+const MARQUEE_PX_PER_SECOND = 50;
+function startMarquee(){
   const marquee = document.getElementById("tagMarquee");
+  const track = document.getElementById("tagMarqueeTrack");
+  const addRun = () => {
+    const item = document.createElement("span");
+    item.textContent = MARQUEE_TEXT;
+    track.appendChild(item);
+    return item;
+  };
   track.innerHTML = "";
-  const entries = gardens.flatMap(g => g.tags.map(t => ({ t, g })));
-  marquee.hidden = !entries.length;
-  if(!entries.length) return;
-  for(let copy = 0; copy < 2; copy++){
-    for(const { t, g } of entries){
-      const link = document.createElement("a");
-      link.href = gardenUrl(g.id);
-      link.draggable = false;
-      if(copy === 1) link.setAttribute("aria-hidden", "true");   // the repeat is only for the loop
-      link.tabIndex = copy === 1 ? -1 : 0;
-      link.appendChild(makeChip(t, g));
-      track.appendChild(link);
-    }
+  let runs = 1;
+  addRun();
+  while(track.scrollWidth < marquee.clientWidth && runs < 20){ addRun(); runs++; }
+  const halfWidth = track.scrollWidth;
+  for(let i = 0; i < runs; i++){
+    const copy = addRun();
+    copy.setAttribute("aria-hidden", "true");   // the second run is only there for the loop
   }
-  // steady speed however many tags there are
-  track.style.animationDuration = Math.max(12, entries.length * 3) + "s";
+  track.style.animationDuration = halfWidth / MARQUEE_PX_PER_SECOND + "s";
 }
+let marqueeWidth = 0;
+window.addEventListener("resize", () => {
+  const w = document.getElementById("tagMarquee").clientWidth;
+  if(Math.abs(w - marqueeWidth) > 40){ marqueeWidth = w; startMarquee(); }
+});
 
 function hereNowText(n){
   return n > 0 ? `${n} here now` : "no one here now";
@@ -269,6 +275,8 @@ function seededRandom(seed){
   };
 }
 
+const RIGHT_BUFFER = 240;   // px of empty space after the last column
+
 function layoutCards(){
   const cards = [...gardenListEl.children];
   if(!cards.length) return;
@@ -307,9 +315,12 @@ function layoutCards(){
     }
     x += c.width + gap;
   }
-  gardenListEl.style.width = x + "px";
+  // extra room past the last column, so scrolling to the end leaves a margin
+  gardenListEl.style.width = x + RIGHT_BUFFER + "px";
 }
 window.addEventListener("resize", layoutCards);
+startMarquee();
+marqueeWidth = document.getElementById("tagMarquee").clientWidth;
 
 // the page scrolls sideways, so an ordinary (vertical) mouse wheel scrolls it too
 const indexEl = document.querySelector("main.gardenindex");
@@ -367,7 +378,6 @@ fetchGardens()
   .then(gardens => {
     gardenStatusEl.hidden = true;
     renderGardens(gardens);
-    renderMarquee(gardens);
     playhtmlReady.then(() => playhtml.setupPlayElements());
   })
   .catch(err => {

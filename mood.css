@@ -1009,6 +1009,11 @@ button.easteregg#newGardenBtn{
   min-width:0;
   overflow:hidden;
   pointer-events:auto;
+  background:var(--paper);
+  border:1px solid #000;
+  border-radius:999px;
+  padding:.3rem 0;
+  white-space:nowrap;
   /* chips fade in and out at the edges instead of being cut off */
   -webkit-mask-image:linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
   mask-image:linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
@@ -1020,13 +1025,17 @@ button.easteregg#newGardenBtn{
 
 .marqueetrack{
   display:flex;
-  gap:.5rem;
   width:max-content;
   animation:tagdrift 30s linear infinite;
 }
 
 .marquee:hover .marqueetrack{
   animation-play-state:paused;
+}
+
+.marqueetrack span{
+  flex-shrink:0;
+  padding-right:3rem;   /* the space between one run of the message and the next */
 }
 
 .marqueetrack a{
@@ -1041,11 +1050,11 @@ button.easteregg#newGardenBtn{
   white-space:nowrap;
 }
 
-/* the track holds the tag list twice; sliding by half of it lands exactly where it began.
-   the gap is added to the trailing edge so the two halves are the same width */
+/* the track holds the message in two identical runs; sliding by half of it lands
+   exactly where it began */
 @keyframes tagdrift{
   from{ transform:translateX(0); }
-  to{ transform:translateX(calc(-50% - .25rem)); }
+  to{ transform:translateX(-50%); }
 }
 
 @media (prefers-reduced-motion: reduce){
