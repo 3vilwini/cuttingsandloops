@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119q">
+<link rel="stylesheet" href="mood.css?v=20261119r">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119q";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119q";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119r";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119r";
 
 const gardenListEl = document.getElementById("gardenList");
 const indexEl = document.querySelector("main.gardenindex");
@@ -243,13 +243,18 @@ function renderGardens(gardens){
 
     const planters = document.createElement("div");
     planters.className = "planters";
-    const label = document.createElement("span");
-    label.className = "planterlabel";
-    label.textContent = "planted by";
     const names = document.createElement("span");
-    names.textContent = g.contributors.length ? g.contributors.join(", ") : "just grass...";
-
-    planters.append(label, names);
+    if(g.contributors.length){
+      const label = document.createElement("span");
+      label.className = "planterlabel";
+      label.textContent = "planted by";
+      names.textContent = g.contributors.join(", ");
+      planters.append(label, names);
+    } else {
+      // nobody has planted here: no "planted by" heading, just the line
+      names.textContent = "szns come n go ~";
+      planters.append(names);
+    }
 
     // live count, refreshed in place by refreshHereNow() so dragged cards stay put
     const here = document.createElement("div");

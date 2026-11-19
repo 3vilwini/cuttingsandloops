@@ -4,8 +4,8 @@
 
 import { playhtml } from "https://unpkg.com/playhtml";
 // UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
-import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119q";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119q";
+import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119r";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119r";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
 const MAX_TAGS = 3;
