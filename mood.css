@@ -957,12 +957,14 @@ button.easteregg{
 }
 
 /* the cards float straight on the background — no window around them. the
-   page scrolls inside this layer because body itself is overflow:hidden */
+   canvas is wide and scrolls sideways, inside this layer because body itself is
+   overflow:hidden */
 main.gardenindex{
   position:fixed;
   inset:0;
   z-index:1;
-  overflow:auto;
+  overflow-x:auto;
+  overflow-y:hidden;
   box-sizing:border-box;
   padding:2.5rem 2.5rem 5rem;
 }
@@ -1058,7 +1060,8 @@ button.easteregg#newGardenBtn:disabled{
    can-move then drags them and syncs where they've been put */
 #gardenList{
   position:relative;
-  width:100%;
+  height:100%;   /* the cards use this height; layoutCards() sets the width they need */
+  min-width:100%;
 }
 
 /* each card is a little dialog box — same window look as the modals, a vertical

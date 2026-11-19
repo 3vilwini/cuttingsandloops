@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119g">
+<link rel="stylesheet" href="mood.css?v=20261119h">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119g";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119g";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119h";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119h";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -254,10 +254,10 @@ function renderGardens(gardens){
   layoutCards();
 }
 
-// scatter the cards across the page instead of lining them up. each lands in
-// its own cell of a loose grid, nudged by a pseudo-random offset that comes only
-// from the garden's id — so everyone starts from the same arrangement, and
-// dragging (which playhtml syncs as an offset from here) moves them from there
+// scatter the cards across a wide canvas that scrolls sideways. each lands in a
+// column, nudged by a pseudo-random offset that comes only from the garden's id —
+// so everyone starts from the same arrangement, and dragging (which playhtml syncs
+// as an offset from here) moves them from there
 function seededRandom(seed){
   let a = (seed + 1) * 2654435761 >>> 0;
   return () => {
@@ -273,44 +273,52 @@ function layoutCards(){
   const cards = [...gardenListEl.children];
   if(!cards.length) return;
   const gap = 28;
-  const areaW = gardenListEl.clientWidth;
+  const areaH = gardenListEl.clientHeight;
 
-  // cards come in different sizes, so they're dealt out in rows, left to right,
-  // starting a new row when the next one won't fit
-  const rows = [];
-  let row = null;
+  // cards come in different sizes, so they're dealt out in columns, top to bottom,
+  // starting a new column to the right when the next one won't fit
+  const cols = [];
+  let col = null;
   for(const card of cards){
-    const w = card.offsetWidth;
-    if(!row || row.width + gap + w > areaW){
-      row = { cards: [], width: -gap, height: 0 };
-      rows.push(row);
+    const h = card.offsetHeight;
+    if(!col || col.height + gap + h > areaH){
+      col = { cards: [], width: 0, height: -gap };
+      cols.push(col);
     }
-    row.cards.push(card);
-    row.width += gap + w;
-    row.height = Math.max(row.height, card.offsetHeight);
+    col.cards.push(card);
+    col.height += gap + h;
+    col.width = Math.max(col.width, card.offsetWidth);
   }
 
-  let y = gap;
-  for(const r of rows){
-    // spread a row's leftover width between its cards (up to a point), centered
-    const extra = Math.max(0, areaW - r.width);
-    const spread = r.cards.length > 1 ? Math.min(extra / (r.cards.length - 1), gap * 2) : 0;
-    const total = r.width + spread * (r.cards.length - 1);
-    let x = Math.max(0, (areaW - total) / 2);
-    for(const card of r.cards){
+  let x = gap;
+  for(const c of cols){
+    // spread a column's leftover height between its cards (up to a point), centered
+    const extra = Math.max(0, areaH - c.height);
+    const spread = c.cards.length > 1 ? Math.min(extra / (c.cards.length - 1), gap * 2) : 0;
+    const total = c.height + spread * (c.cards.length - 1);
+    let y = Math.max(0, (areaH - total) / 2);
+    for(const card of c.cards){
       // nudges come only from the garden's id, so everyone starts from the same scatter
       const rand = seededRandom(Number(card.id.replace("gardencard-", "")));
-      const jx = (rand() - .5) * gap * .6;
-      const slackY = r.height - card.offsetHeight;
-      card.style.left = Math.max(0, x + jx) + "px";
-      card.style.top = y + slackY * rand() * .7 + (rand() - .5) * gap * .5 + "px";
-      x += card.offsetWidth + gap + spread;
+      const slackX = c.width - card.offsetWidth;
+      card.style.left = x + slackX * rand() * .7 + (rand() - .5) * gap * .5 + "px";
+      card.style.top = Math.max(0, y + (rand() - .5) * gap * .6) + "px";
+      y += card.offsetHeight + gap + spread;
     }
-    y += r.height + gap;
+    x += c.width + gap;
   }
-  gardenListEl.style.height = y + "px";
+  gardenListEl.style.width = x + "px";
 }
 window.addEventListener("resize", layoutCards);
+
+// the page scrolls sideways, so an ordinary (vertical) mouse wheel scrolls it too
+const indexEl = document.querySelector("main.gardenindex");
+indexEl.addEventListener("wheel", e => {
+  if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
+    indexEl.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }
+}, { passive: false });
 
 // cursor trail, carried over from the garden (spawnTrailDot in water.js): little
 // glyph footprints fade out behind the pointer. there each one is tinted from the
