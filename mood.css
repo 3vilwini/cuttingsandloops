@@ -1229,7 +1229,7 @@ button.easteregg#newGardenBtn:disabled{
 }
 
 /* "N here now" — dot in the garden's seed color, label in its text color (set
-   per card by index.html); dimmed when no one is there */
+   per card by index.html), at full strength whether or not anyone is there */
 .gardencard .herenow{
   display:flex;
   align-items:center;
@@ -1245,10 +1245,6 @@ button.easteregg#newGardenBtn:disabled{
   border:1px solid #000;
   background:var(--dot, #bbb);
   flex-shrink:0;
-}
-
-.gardencard .herenow[data-here="0"]{
-  opacity:.55;
 }
 
 /* the little drawing that stands in for tags on a garden that has none yet —

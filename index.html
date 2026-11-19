@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119c">
+<link rel="stylesheet" href="mood.css?v=20261119d">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119c";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119c";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119d";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119d";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -240,10 +240,10 @@ function renderGardens(gardens){
     here.append(dot, hereText);
     here.dataset.here = g.here;
     if(g.settings){
-      // dot in the garden's seed color, label in its text color (unless that can't
-      // be read against the card — then the label keeps the card's own lettering)
+      // dot in the garden's seed color, label in its text color — the same
+      // pairing the garden itself uses, whether someone's there or not
       here.style.setProperty("--dot", g.settings.colors.seed);
-      if(contrast(mid, g.settings.colors.text) >= 3) here.style.setProperty("--label", g.settings.colors.text);
+      here.style.setProperty("--label", g.settings.colors.text);
     }
 
     body.append(name, planters, here);
