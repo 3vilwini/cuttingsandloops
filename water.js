@@ -4,8 +4,8 @@
 
 import { playhtml } from "https://unpkg.com/playhtml";
 // UPLOAD_ENDPOINT is the deployed Worker (upload-worker/worker.js) that streams uploads into R2
-import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119l";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119l";
+import { UPLOAD_ENDPOINT, startNewGarden, registerGarden, startPresence } from "./gardens.js?v=20261119m";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119m";
 
 const TAG_BANK = ["sunny","ambient","delicious","rainy","fuzzy","low bpm","lush","blooming","squishy","pop"];
 const MAX_TAGS = 3;
@@ -636,21 +636,22 @@ const currentGardenId = gardenParam === null ? 0 : Number(gardenParam);
 // what puts a garden on the index with its colors the first time anyone opens it.
 // the values are copied out one by one so what goes over the wire is plain
 // data, not the synced store's proxy objects
-// up to two of the garden's plant drawings, for the index's cards (a medium card
-// shows one, a large one shows two): the plants with the most drawn points
-// (usually the most interesting), each thinned down and rounded to whole numbers
-// so it stays small. strokes are lists of [x, y]
+// a random handful (up to 5) of the garden's plant drawings, for the index to
+// choose from: a medium card shows one, a large card two, picked at random each
+// time the index loads. each is thinned down to about 300 points and rounded to
+// whole numbers so it stays small. strokes are lists of [x, y]
 function pickPlantDrawings(){
-  const candidates = [];
-  for(const pl of Object.values(garden.plants || {})){
-    if(!pl.paths || !pl.paths.length || !/^#[0-9a-fA-F]{6}$/.test(pl.color)) continue;
-    const points = pl.paths.reduce((sum, stroke) => sum + stroke.length, 0);
-    candidates.push({ pl, points });
+  const candidates = Object.values(garden.plants || {})
+    .filter(pl => pl.paths && pl.paths.length && /^#[0-9a-fA-F]{6}$/.test(pl.color));
+  // shuffle (Fisher–Yates) so a garden with more than 5 drawn plants offers a different 5 each time
+  for(let i = candidates.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
-  candidates.sort((a, b) => b.points - a.points);
   const drawings = [];
-  for(const { pl, points } of candidates.slice(0, 2)){
-    const step = Math.max(1, Math.ceil(points / 500));
+  for(const pl of candidates.slice(0, 5)){
+    const points = pl.paths.reduce((sum, stroke) => sum + stroke.length, 0);
+    const step = Math.max(1, Math.ceil(points / 300));
     const paths = [];
     for(const stroke of pl.paths.slice(0, 30)){
       const pts = [];

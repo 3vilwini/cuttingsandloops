@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>୨ৎ cuttings જ⁀➴ loops ༄</title>
-<link rel="stylesheet" href="mood.css?v=20261119l">
+<link rel="stylesheet" href="mood.css?v=20261119m">
 </head>
 <body>
 
@@ -29,8 +29,8 @@
    ୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚.୨ৎ ˖᯽ ݁˖ જ ˚ ༘♡ ⋆｡˚ ੈ✩‧₊˚⋆˚❀ ༉ ‧₊˚. */
 
 import { playhtml } from "https://unpkg.com/playhtml";
-import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119l";
-import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119l";
+import { fetchGardens, fetchHereNow, startNewGarden, gardenUrl } from "./gardens.js?v=20261119m";
+import { FIELD_W, FIELD_H, drawFieldPattern } from "./field.js?v=20261119m";
 
 const gardenListEl = document.getElementById("gardenList");
 const gardenStatusEl = document.getElementById("gardenStatus");
@@ -92,6 +92,16 @@ function luminance(hex){
 function contrast(a, b){
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + .05) / (lo + .05);
+}
+
+// a copy of a list in random order (Fisher–Yates)
+function shuffled(list){
+  const copy = [...list];
+  for(let i = copy.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 // a plant's strokes as an <svg>, same size and line style as in the garden; the
@@ -255,10 +265,10 @@ function renderGardens(gardens){
 
     body.append(name, planters, here);
 
-    // a medium card shows one of the garden's plant drawings, a large card two —
+    // a medium card shows one of the garden's plant drawings, a large card two, chosen at random —
     // each in the plant's own color and at the size it's drawn out in the garden
     const showDrawings = ({ medium: 1, large: 2 })[cardSize(g)] || 0;
-    const drawings = g.plantDrawings.slice(0, showDrawings);
+    const drawings = shuffled(g.plantDrawings).slice(0, showDrawings);   // a different pick every time the index loads
     if(drawings.length){
       const holder = document.createElement("div");
       holder.className = "plantdrawings";

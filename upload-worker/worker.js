@@ -184,7 +184,7 @@ function parseCount(n) {
 
 // one plant's drawing, shown on the index's large card: { w, h, color, paths }
 // with paths as lists of [x, y]. rebuilt from checked numbers (nothing else a
-// client sends is kept) and kept small: at most 30 strokes, 600 points in all.
+// client sends is kept) and kept small: at most 30 strokes, 300 points in all.
 // null if there's nothing usable
 function parsePlantDrawing(d) {
   if (!d || !Number.isInteger(d.w) || !Number.isInteger(d.h)) return null;
@@ -198,19 +198,20 @@ function parsePlantDrawing(d) {
       if (!Array.isArray(pt) || pt.length !== 2 || !pt.every(n => typeof n === "number" && n >= 0 && n <= 1000)) continue;
       pts.push([Math.round(pt[0]), Math.round(pt[1])]);
     }
-    if (pts.length < 2 || points + pts.length > 600) continue;
+    if (pts.length < 2 || points + pts.length > 300) continue;
     points += pts.length;
     paths.push(pts);
   }
   return paths.length ? { w: d.w, h: d.h, color: d.color, paths } : null;
 }
 
-// up to two plant drawings (a medium card shows one, a large card two). each one
-// is checked as above; unusable ones are dropped. null when nothing is usable, or
-// nothing was sent. an older page sends a single `plantDrawing`, which counts too
+// up to five plant drawings. the index picks from them at random, one for a medium
+// card and two for a large one. each is checked as above; unusable ones are
+// dropped. null when nothing is usable, or nothing was sent. an older page sends a
+// single `plantDrawing`, which counts too
 function parsePlantDrawings(list) {
   if (!Array.isArray(list)) return null;
-  const drawings = list.slice(0, 2).map(parsePlantDrawing).filter(Boolean);
+  const drawings = list.slice(0, 5).map(parsePlantDrawing).filter(Boolean);
   return drawings.length ? drawings : null;
 }
 
