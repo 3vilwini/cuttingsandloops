@@ -1123,6 +1123,7 @@ const pSub = document.getElementById("pSub");
 const pFile = document.getElementById("pFile");
 const pFileLabel = document.getElementById("pFileLabel");
 const pFileLabelText = document.getElementById("pFileLabelText");
+const pFileClear = document.getElementById("pFileClear");
 const pSampledFromBank = document.getElementById("pSampledFromBank");
 const pCanvas = document.getElementById("pCanvas");
 const pClearCanvas = document.getElementById("pClearCanvas");
@@ -1307,6 +1308,8 @@ function updateAmbientAudio(){
 }
 requestAnimationFrame(updateAmbientAudio);
 let plantDraftFile = null;
+let plantExistingAudioName = null;   // the track already on the plant being edited, if any
+let plantAudioRemoved = false;       // user hit the x on the plant's current track
 let pendingPlantPos = null;
 let editingPlantId = null;   
 let selectedSampledFrom = [];   
@@ -1341,17 +1344,48 @@ pClearCanvas.addEventListener("click", () => {
   validatePlant();
 });
 
+// older plants never stored the file's name, so fall back to the last piece
+// of their audio URL (the R2 key ends in the uploaded filename). a blob:
+// url is just a random id, so there's no real name to show for those.
+function nameFromAudioRef(audioRef){
+  if(!audioRef) return null;
+  if(audioRef.startsWith("blob:")) return "current track";
+  return decodeURIComponent(audioRef.split("/").pop());
+}
+
+// shows the newly picked file, else the plant's current track (editing),
+// else the empty prompt — with an x whenever there's something to remove
+function renderPlantFileLabel(){
+  const name = plantDraftFile ? plantDraftFile.name
+    : (!plantAudioRemoved && plantExistingAudioName) || null;
+  pFileLabelText.textContent = name || "choose audio file…";
+  pFileLabel.classList.toggle("has-file", !!name);
+  pFileClear.hidden = !name;
+}
+
 pFile.addEventListener("change", () => {
   plantDraftFile = pFile.files[0] || null;
-  pFileLabelText.textContent = plantDraftFile ? plantDraftFile.name : "choose audio file…";
-  pFileLabel.classList.toggle("has-file", !!plantDraftFile);
+  renderPlantFileLabel();
   validatePlant();
 });
-pFileLabel.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pFile.click(); } });
+// the x sits inside the label, so keep its own Enter/Space presses from
+// also opening the file picker
+pFileLabel.addEventListener("keydown", e => {
+  if(e.target !== pFileLabel) return;
+  if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pFile.click(); }
+});
+pFileClear.addEventListener("click", () => {
+  plantDraftFile = null;
+  pFile.value = "";
+  plantAudioRemoved = true;
+  renderPlantFileLabel();
+  validatePlant();
+});
 
 pName.addEventListener("input", validatePlant);
 function validatePlant(){
-  const needsFile = !editingPlantId;
+  // removing an existing track means a replacement is needed again
+  const needsFile = !editingPlantId || plantAudioRemoved;
   pSaveBtn.disabled = (needsFile && !plantDraftFile) || !pName.value.trim() || !plantDraftPaths.length;
 }
 
@@ -1399,7 +1433,8 @@ function openPlantModal(pos){
   pSaveBtn.textContent = "plant";
   pendingPlantPos = pos || { x: CX, y: CY };
   plantDraftFile = null;
-  pFile.value = ""; pFileLabelText.textContent = "choose audio file…"; pFileLabel.classList.remove("has-file");
+  plantExistingAudioName = null; plantAudioRemoved = false;
+  pFile.value = ""; renderPlantFileLabel();
   pName.value = ""; pctx.clearRect(0, 0, pCanvas.width, pCanvas.height); plantDraftPaths = [];
   plantDraftColor = invertHex(garden.meta.colors.seed); pctx.strokeStyle = plantDraftColor;
   pDeleteBtn.style.display = "none";
@@ -1416,7 +1451,8 @@ function openPlantEditModal(p){
   pSaveBtn.textContent = "save";
   pendingPlantPos = { x: p.x, y: p.y };
   plantDraftFile = null;
-  pFile.value = ""; pFileLabelText.textContent = "choose audio file… (keeps current if left blank)"; pFileLabel.classList.remove("has-file");
+  plantExistingAudioName = p.audioName || nameFromAudioRef(p.audioRef); plantAudioRemoved = false;
+  pFile.value = ""; renderPlantFileLabel();
   pName.value = p.name;
   plantDraftColor = p.color; pctx.strokeStyle = p.color;
   plantDraftPaths = p.paths.map(stroke => stroke.map(pt => ({ ...pt })));
@@ -1463,6 +1499,10 @@ pSaveBtn.addEventListener("click", async () => {
     x: pendingPlantPos.x, y: pendingPlantPos.y,
     plantedAt: existing?.plantedAt || Date.now(),
   };
+  // original filename, so the edit modal can show it later (only set when
+  // there is one — legacy plants don't have it)
+  const audioName = plantDraftFile ? plantDraftFile.name : existing?.audioName;
+  if(audioName) plant.audioName = audioName;
   garden.plants[plantId] = plant;
   plantSlotsChannel?.setData(draft => { draft[plantId] = plant; });
   renderPlantSlots();
